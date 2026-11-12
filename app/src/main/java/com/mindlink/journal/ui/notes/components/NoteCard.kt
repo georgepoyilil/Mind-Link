@@ -9,12 +9,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.ViewAgenda
+import androidx.compose.material.icons.filled.ViewStream
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -24,10 +28,10 @@ import coil.compose.AsyncImage
 import com.mindlink.journal.domain.model.Note
 import com.mindlink.journal.ui.theme.*
 
-enum class NoteViewMode(val label: String, val iconEmoji: String) {
-    CARDS("Cards", "🗂️"),
-    COMPACT_LIST("List", "📋"),
-    FULL_WIDTH("Stream", "📰")
+enum class NoteViewMode(val label: String, val icon: ImageVector) {
+    CARDS("Cards", Icons.Default.GridView),
+    COMPACT_LIST("List", Icons.Default.ViewAgenda),
+    FULL_WIDTH("Stream", Icons.Default.ViewStream)
 }
 
 @Composable

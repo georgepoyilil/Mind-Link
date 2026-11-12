@@ -570,6 +570,65 @@ fun NoteEditorScreen(
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // On-demand OCR for uploaded/captured image
+                            FilledTonalButton(
+                                onClick = {
+                                    val uriStr = uiState.imageUri ?: return@FilledTonalButton
+                                    val uri = Uri.parse(uriStr)
+                                    coroutineScope.launch {
+                                        isOcrScanning = true
+                                        val result = ocrHelper.extractTextFromImageUri(uri)
+                                        result.onSuccess { rawText ->
+                                            if (rawText.isNotBlank()) {
+                                                val (polishedTitle, polishedBody) = brainstormingEngine.polishOcrText(rawText)
+                                                if (uiState.title.isBlank()) viewModel.updateTitle(polishedTitle)
+                                                val merged = if (uiState.content.isBlank()) polishedBody else "${uiState.content}\n\n$polishedBody"
+                                                viewModel.updateContent(merged)
+                                                Toast.makeText(context, "Text extracted and polished into note", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(context, "No text detected in this image", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }.onFailure { err ->
+                                            Toast.makeText(context, "OCR failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                        isOcrScanning = false
+                                    }
+                                },
+                                enabled = !isOcrScanning,
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MindViolet.copy(alpha = 0.25f),
+                                    contentColor = MindViolet
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (isOcrScanning) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MindViolet
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Extracting Text with ML Kit...", fontSize = 12.sp, color = MindViolet)
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.DocumentScanner,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MindViolet
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Extract Text from Image",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MindViolet
+                                    )
+                                }
+                            }
                         }
                     }
                 }

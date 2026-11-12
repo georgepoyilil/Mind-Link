@@ -64,6 +64,22 @@ class NoteDetailViewModel(
         }
     }
 
+    fun appendContent(additionalText: String) {
+        val currentNote = _uiState.value.note ?: return
+        val newContent = if (currentNote.content.isBlank()) {
+            additionalText
+        } else {
+            "${currentNote.content}\n\n$additionalText"
+        }
+        val updatedNote = currentNote.copy(
+            content = newContent,
+            updatedAt = System.currentTimeMillis()
+        )
+        viewModelScope.launch {
+            repository.saveNote(updatedNote)
+        }
+    }
+
     fun deleteNote(onDeleted: () -> Unit) {
         viewModelScope.launch {
             repository.deleteNote(noteId)

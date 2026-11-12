@@ -30,11 +30,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import android.widget.Toast
 import coil.compose.AsyncImage
+import com.mindlink.journal.data.ai.LocalHeuristicBrainstormingEngine
 import com.mindlink.journal.ui.detail.components.ReflectionPromptsCard
 import com.mindlink.journal.ui.detail.components.RelatedThoughtsCard
+import com.mindlink.journal.ui.editor.components.TextRecognitionHelper
 import com.mindlink.journal.ui.notes.components.MoodBadge
 import com.mindlink.journal.ui.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,9 +49,14 @@ fun NoteDetailScreen(
     onThoughtClick: (Long) -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isFullScreenImageOpen by remember { mutableStateOf(false) }
+    var isOcrScanning by remember { mutableStateOf(false) }
+
+    val ocrHelper = remember { TextRecognitionHelper(context) }
+    val brainstormingEngine = remember { LocalHeuristicBrainstormingEngine() }
 
     // Audio Playback state
     var isPlayingAudio by remember { mutableStateOf(false) }
@@ -255,6 +264,65 @@ fun NoteDetailScreen(
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MindTextSecondary,
                                             fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+                                FilledTonalButton(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            isOcrScanning = true
+                                            try {
+                                                val uri = Uri.parse(note.imageUri)
+                                                val result = ocrHelper.extractTextFromImageUri(uri)
+                                                result.onSuccess { rawText ->
+                                                    if (rawText.isNotBlank()) {
+                                                        val (_, polishedBody) = brainstormingEngine.polishOcrText(rawText)
+                                                        viewModel.appendContent(polishedBody)
+                                                        Toast.makeText(context, "Text extracted & saved to thought", Toast.LENGTH_SHORT).show()
+                                                    } else {
+                                                        Toast.makeText(context, "No text detected in this image", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }.onFailure { err ->
+                                                    Toast.makeText(context, "OCR failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                                                }
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            } finally {
+                                                isOcrScanning = false
+                                            }
+                                        }
+                                    },
+                                    enabled = !isOcrScanning,
+                                    colors = ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = MindViolet.copy(alpha = 0.25f),
+                                        contentColor = MindViolet
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    if (isOcrScanning) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MindViolet
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Extracting Text...", fontSize = 12.sp, color = MindViolet)
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.DocumentScanner,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MindViolet
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Extract Text from Image",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MindViolet
                                         )
                                     }
                                 }

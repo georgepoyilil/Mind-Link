@@ -16,6 +16,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -28,6 +31,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -129,11 +133,11 @@ fun NotesListScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Method 1: Standard Markdown
+                // Method 1: Unified Journal Thought (Text + Camera + Photo + Caption)
                 JournalMethodItem(
                     emoji = "✍️",
-                    title = "Text & Markdown Thought",
-                    subtitle = "Distraction-free reflective writing with auto-structuring",
+                    title = "Journal Thought",
+                    subtitle = "Write freely, snap camera photos, or attach images with captions",
                     accentColor = MindIndigo,
                     onClick = {
                         showJournalingMethodsSheet = false
@@ -145,7 +149,7 @@ fun NotesListScreen(
                 JournalMethodItem(
                     emoji = "🎙️",
                     title = "Voice Audio Note",
-                    subtitle = "Stream speech-to-text + record raw audio memo locally",
+                    subtitle = "Stream speech-to-text + record high-efficiency audio locally",
                     accentColor = MindRose,
                     onClick = {
                         showJournalingMethodsSheet = false
@@ -153,34 +157,10 @@ fun NotesListScreen(
                     }
                 )
 
-                // Method 3: Photo & Reflection
-                JournalMethodItem(
-                    emoji = "🖼️",
-                    title = "Photo & Caption",
-                    subtitle = "Attach images from gallery with voice or written reflections",
-                    accentColor = MindCyan,
-                    onClick = {
-                        showJournalingMethodsSheet = false
-                        onCreateNoteClick("image")
-                    }
-                )
-
-                // Method 4: Camera Snap
-                JournalMethodItem(
-                    emoji = "📸",
-                    title = "Camera Snap & Journal",
-                    subtitle = "Take an immediate photo and capture current thought",
-                    accentColor = MindAmber,
-                    onClick = {
-                        showJournalingMethodsSheet = false
-                        onCreateNoteClick("camera")
-                    }
-                )
-
-                // Method 5: Camera OCR Scan & Polish
+                // Method 3: Camera OCR Scan & Polish
                 JournalMethodItem(
                     emoji = "🔍",
-                    title = "Camera Scan & OCR Polish",
+                    title = "Scan Document & OCR",
                     subtitle = "Snap books, whiteboards or papers -> AI polishes into structured notes",
                     accentColor = MindViolet,
                     onClick = {
@@ -197,52 +177,15 @@ fun NotesListScreen(
             Column(modifier = Modifier.background(MindBackgroundAmoled)) {
                 TopAppBar(
                     title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "MindLink",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MindTextPrimary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MindIndigo.copy(alpha = 0.2f),
-                                border = BorderStroke(0.5.dp, MindPrismGlassCardBorder),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable(onClick = onSecondBrainClick)
-                            ) {
-                                Text(
-                                    text = "2nd Brain",
-                                    color = MindIndigo,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
+                        Text(
+                            text = "MindLink",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MindTextPrimary
+                        )
                     },
                     actions = {
-                        // 1. Search Icon
-                        IconButton(onClick = { isSearchActive = !isSearchActive }) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = if (isSearchActive || uiState.searchQuery.isNotEmpty()) MindIndigo else MindTextPrimary
-                            )
-                        }
-
-                        // 2. Second Brain (AI Q&A & Associative Memory)
-                        IconButton(onClick = onSecondBrainClick) {
-                            Icon(
-                                imageVector = Icons.Default.Psychology,
-                                contentDescription = "Second Brain",
-                                tint = MindIndigo
-                            )
-                        }
-
-                        // 3. View Mode Toggle (Cards -> List -> Stream)
+                        // 1. Google Keep Style Layout Switching Vector Icon
                         IconButton(onClick = {
                             viewMode = when (viewMode) {
                                 NoteViewMode.CARDS -> NoteViewMode.COMPACT_LIST
@@ -250,15 +193,23 @@ fun NotesListScreen(
                                 NoteViewMode.FULL_WIDTH -> NoteViewMode.CARDS
                             }
                         }) {
-                            Text(text = viewMode.iconEmoji, fontSize = 18.sp)
+                            Icon(
+                                imageVector = viewMode.icon,
+                                contentDescription = viewMode.label,
+                                tint = MindTextPrimary
+                            )
                         }
 
-                        // 4. Thought Graph (Synaptic Network Knowledge Visualizer)
+                        // 2. Intelligent Synaptic Network ("i" Icon)
                         IconButton(onClick = onThoughtGraphClick) {
-                            Text(text = "🕸️", fontSize = 18.sp)
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Intelligence Graph",
+                                tint = MindIndigo
+                            )
                         }
 
-                        // 5. Settings Icon
+                        // 3. Settings Icon
                         IconButton(onClick = onSettingsClick) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
@@ -272,55 +223,100 @@ fun NotesListScreen(
                     )
                 )
 
-                // Top Expandable Search Field
-                AnimatedVisibility(
-                    visible = isSearchActive || uiState.searchQuery.isNotEmpty(),
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
+                // WhatsApp-Style Persistent Search & Second Brain Bar
+                Surface(
+                    color = MindGlassSurface,
+                    border = BorderStroke(1.dp, MindPrismGlassCardBorder),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .clickable {
+                            searchFocusRequester.requestFocus()
+                            keyboardController?.show()
+                        }
                 ) {
-                    Surface(
-                        color = MindGlassSurface,
-                        border = BorderStroke(1.dp, MindPrismGlassCardBorder),
-                        shape = RoundedCornerShape(16.dp),
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        OutlinedTextField(
-                            value = uiState.searchQuery,
-                            onValueChange = { newText: String -> viewModel.updateSearchQuery(newText) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .focusRequester(searchFocusRequester),
-                            placeholder = {
-                                Text(
-                                    text = "Search thoughts, tags, or concepts...",
-                                    color = MindTextTertiary,
-                                    fontSize = 14.sp
-                                )
+                        IconButton(
+                            onClick = {
+                                searchFocusRequester.requestFocus()
+                                keyboardController?.show()
                             },
-                            trailingIcon = {
-                                if (uiState.searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { viewModel.updateSearchQuery("") }) {
-                                        Icon(Icons.Default.Clear, contentDescription = "Clear", tint = MindTextSecondary)
-                                    }
-                                } else {
-                                    IconButton(onClick = { isSearchActive = false }) {
-                                        Icon(Icons.Default.Close, contentDescription = "Close", tint = MindTextTertiary)
-                                    }
-                                }
-                            },
-                            singleLine = true,
-                            shape = RoundedCornerShape(16.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedTextColor = MindTextPrimary,
-                                unfocusedTextColor = MindTextPrimary
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = MindTextSecondary,
+                                modifier = Modifier.size(20.dp)
                             )
-                        )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    searchFocusRequester.requestFocus()
+                                    keyboardController?.show()
+                                }
+                        ) {
+                            if (uiState.searchQuery.isEmpty()) {
+                                Text(
+                                    text = "Ask Second Brain or search thoughts...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MindTextTertiary
+                                )
+                            }
+                            BasicTextField(
+                                value = uiState.searchQuery,
+                                onValueChange = { viewModel.updateSearchQuery(it) },
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MindTextPrimary),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(searchFocusRequester)
+                            )
+                        }
+                        if (uiState.searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { viewModel.updateSearchQuery("") },
+                                modifier = Modifier.size(26.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Clear",
+                                    tint = MindTextTertiary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        // Second Brain AI Trigger Icon
+                        Surface(
+                            shape = CircleShape,
+                            color = MindIndigo.copy(alpha = 0.2f),
+                            border = BorderStroke(0.5.dp, MindIndigo.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .clickable(onClick = onSecondBrainClick)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Psychology,
+                                    contentDescription = "Second Brain",
+                                    tint = MindIndigo,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
