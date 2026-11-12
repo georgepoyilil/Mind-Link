@@ -208,7 +208,10 @@ fun NotesListScreen(
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = MindIndigo.copy(alpha = 0.2f),
-                                border = BorderStroke(0.5.dp, MindPrismGlassCardBorder)
+                                border = BorderStroke(0.5.dp, MindPrismGlassCardBorder),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(onClick = onSecondBrainClick)
                             ) {
                                 Text(
                                     text = "2nd Brain",
@@ -221,7 +224,7 @@ fun NotesListScreen(
                         }
                     },
                     actions = {
-                        // 1. Search Icon (TOP Next to Settings)
+                        // 1. Search Icon
                         IconButton(onClick = { isSearchActive = !isSearchActive }) {
                             Icon(
                                 imageVector = Icons.Default.Search,
@@ -230,7 +233,16 @@ fun NotesListScreen(
                             )
                         }
 
-                        // 2. View Mode Toggle (Cards 🗂️ -> List 📋 -> Stream 📰)
+                        // 2. Second Brain (AI Q&A & Associative Memory)
+                        IconButton(onClick = onSecondBrainClick) {
+                            Icon(
+                                imageVector = Icons.Default.Psychology,
+                                contentDescription = "Second Brain",
+                                tint = MindIndigo
+                            )
+                        }
+
+                        // 3. View Mode Toggle (Cards -> List -> Stream)
                         IconButton(onClick = {
                             viewMode = when (viewMode) {
                                 NoteViewMode.CARDS -> NoteViewMode.COMPACT_LIST
@@ -241,12 +253,12 @@ fun NotesListScreen(
                             Text(text = viewMode.iconEmoji, fontSize = 18.sp)
                         }
 
-                        // 3. Thought Graph (Synaptic Network Knowledge Visualizer)
+                        // 4. Thought Graph (Synaptic Network Knowledge Visualizer)
                         IconButton(onClick = onThoughtGraphClick) {
                             Text(text = "🕸️", fontSize = 18.sp)
                         }
 
-                        // 4. Settings Icon
+                        // 5. Settings Icon
                         IconButton(onClick = onSettingsClick) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
@@ -314,39 +326,18 @@ fun NotesListScreen(
             }
         },
         floatingActionButton = {
-            // Material 3 Floating Action Buttons: Second Brain + Add Note
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+            FloatingActionButton(
+                onClick = { showJournalingMethodsSheet = true },
+                containerColor = MindIndigo,
+                contentColor = Color.White,
+                shape = CircleShape,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
             ) {
-                // 1. Second Brain Material 3 Extended FAB
-                ExtendedFloatingActionButton(
-                    onClick = onSecondBrainClick,
-                    modifier = Modifier.border(1.dp, MindPrismBorder, RoundedCornerShape(20.dp)),
-                    containerColor = MindGlassSurfaceElevated,
-                    contentColor = MindIndigo,
-                    shape = RoundedCornerShape(20.dp),
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp)
-                ) {
-                    Text("🧠", fontSize = 18.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Second Brain", fontWeight = FontWeight.Bold, color = MindIndigo)
-                }
-
-                // 2. Add Note Material 3 FAB
-                FloatingActionButton(
-                    onClick = { showJournalingMethodsSheet = true },
-                    containerColor = MindIndigo,
-                    contentColor = Color.White,
-                    shape = CircleShape,
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "New Thought",
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "New Thought",
+                    modifier = Modifier.size(28.dp)
+                )
             }
         },
         containerColor = MindBackgroundAmoled
