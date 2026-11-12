@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <files-path name="note_images" path="note_images/" />
+    <files-path name="audio_notes" path="audio_notes/" />
+    <cache-path name="camera_photos" path="camera_photos/" />
+</paths>
