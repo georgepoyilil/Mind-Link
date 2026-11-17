@@ -105,3 +105,21 @@ val Typography = Typography(
     )
 )
 
+enum class NoteFontOption(val key: String, val label: String, val fontFamily: FontFamily) {
+    CALIBRI("Sans", "Calibri", CalibriFontFamily),
+    SERIF("Serif", "Serif", FontFamily.Serif),
+    MONO("Mono", "Mono", FontFamily.Monospace),
+    CURSIVE("Cursive", "Script", FontFamily.Cursive);
+
+    companion object {
+        fun fromKey(key: String?): NoteFontOption {
+            if (key == null) return CALIBRI
+            return entries.firstOrNull { it.key.equals(key, ignoreCase = true) } ?: CALIBRI
+        }
+    }
+}
+
+fun resolveNoteFontFamily(key: String?): FontFamily {
+    return NoteFontOption.fromKey(key).fontFamily
+}
+

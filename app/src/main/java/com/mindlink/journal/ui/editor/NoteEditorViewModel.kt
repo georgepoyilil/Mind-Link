@@ -10,6 +10,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
+
+data class ChecklistItem(
+    val id: String = UUID.randomUUID().toString(),
+    val text: String,
+    val isChecked: Boolean = false
+)
 
 data class NoteEditorUiState(
     val id: Long = 0,
@@ -25,7 +32,10 @@ data class NoteEditorUiState(
     val imageCaption: String? = null,
     val audioUri: String? = null,
     val audioDurationMs: Long = 0L,
-    val suggestedTags: List<String> = emptyList()
+    val suggestedTags: List<String> = emptyList(),
+    val checklistItems: List<ChecklistItem> = emptyList(),
+    val fontFamily: String = "Sans",
+    val recordedAudioTranscript: String = ""
 )
 
 class NoteEditorViewModel(
@@ -56,16 +66,47 @@ class NoteEditorViewModel(
     private fun loadNote(id: Long) {
         viewModelScope.launch {
             repository.getNoteByIdSync(id)?.let { note ->
+                // Parse checklist items from actionItems
+                val parsedItems = note.actionItems.map { raw ->
+                    when {
+                        raw.startsWith("[x] ", ignoreCase = true) ->
+                            ChecklistItem(text = raw.substring(4), isChecked = true)
+                        raw.startsWith("[ ] ") ->
+                            ChecklistItem(text = raw.substring(4), isChecked = false)
+                        else ->
+                            ChecklistItem(text = raw, isChecked = false)
+                    }
+                }.toMutableList()
+
+                // If actionItems was empty, extract any legacy markdown "- [ ]" from content
+                var cleanedContent = note.content
+                if (parsedItems.isEmpty() && (cleanedContent.contains("- [ ]") || cleanedContent.contains("- [x]"))) {
+                    val remainingLines = mutableListOf<String>()
+                    cleanedContent.lines().forEach { line ->
+                        val trimmed = line.trim()
+                        when {
+                            trimmed.startsWith("- [x] ", ignoreCase = true) ->
+                                parsedItems.add(ChecklistItem(text = trimmed.substring(6), isChecked = true))
+                            trimmed.startsWith("- [ ] ") ->
+                                parsedItems.add(ChecklistItem(text = trimmed.substring(6), isChecked = false))
+                            else -> remainingLines.add(line)
+                        }
+                    }
+                    cleanedContent = remainingLines.joinToString("\n").trim()
+                }
+
                 _uiState.update {
                     it.copy(
                         id = note.id,
                         title = note.title,
-                        content = note.content,
+                        content = cleanedContent,
                         tags = note.tags,
                         imageUri = note.imageUri,
                         imageCaption = note.imageCaption,
                         audioUri = note.audioUri,
-                        audioDurationMs = note.audioDurationMs
+                        audioDurationMs = note.audioDurationMs,
+                        checklistItems = parsedItems,
+                        fontFamily = note.fontFamily
                     )
                 }
             }
@@ -79,6 +120,47 @@ class NoteEditorViewModel(
     fun updateContent(content: String) {
         _uiState.update { it.copy(content = content) }
     }
+
+    fun setFontFamily(font: String) {
+        _uiState.update { it.copy(fontFamily = font) }
+    }
+
+    // --- Interactive Checklist Item Management ---
+
+    fun addChecklistItem(text: String = "") {
+        val newItem = ChecklistItem(text = text, isChecked = false)
+        _uiState.update { it.copy(checklistItems = it.checklistItems + newItem) }
+    }
+
+    fun updateChecklistItem(id: String, newText: String) {
+        _uiState.update { state ->
+            state.copy(
+                checklistItems = state.checklistItems.map {
+                    if (it.id == id) it.copy(text = newText) else it
+                }
+            )
+        }
+    }
+
+    fun toggleChecklistItem(id: String) {
+        _uiState.update { state ->
+            state.copy(
+                checklistItems = state.checklistItems.map {
+                    if (it.id == id) it.copy(isChecked = !it.isChecked) else it
+                }
+            )
+        }
+    }
+
+    fun removeChecklistItem(id: String) {
+        _uiState.update { state ->
+            state.copy(
+                checklistItems = state.checklistItems.filter { it.id != id }
+            )
+        }
+    }
+
+    // --- Tag Management ---
 
     fun updateTagInput(input: String) {
         _uiState.update { it.copy(tagInput = input) }
@@ -109,6 +191,8 @@ class NoteEditorViewModel(
         }
     }
 
+    // --- Media Management ---
+
     fun setImage(uri: String?, caption: String? = null) {
         _uiState.update { it.copy(imageUri = uri, imageCaption = caption ?: it.imageCaption) }
     }
@@ -126,14 +210,35 @@ class NoteEditorViewModel(
     }
 
     fun removeAudio() {
-        _uiState.update { it.copy(audioUri = null, audioDurationMs = 0L) }
+        _uiState.update { it.copy(audioUri = null, audioDurationMs = 0L, recordedAudioTranscript = "") }
     }
 
     fun appendVoiceText(text: String) {
         if (text.isBlank()) return
         _uiState.update { state ->
             val updated = if (state.content.isBlank()) text else "${state.content} $text"
-            state.copy(content = updated, speechPartialText = "")
+            val updatedTranscript = if (state.recordedAudioTranscript.isBlank()) text else "${state.recordedAudioTranscript} $text"
+            state.copy(
+                content = updated,
+                speechPartialText = "",
+                recordedAudioTranscript = updatedTranscript
+            )
+        }
+    }
+
+    fun transcribeAudio() {
+        _uiState.update { state ->
+            val transcript = state.recordedAudioTranscript.ifBlank {
+                "Voice journal entry recorded on ${java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.getDefault()).format(java.util.Date())}"
+            }
+            val newContent = if (state.content.isBlank()) {
+                transcript
+            } else if (!state.content.contains(transcript)) {
+                "${state.content}\n\n$transcript"
+            } else {
+                state.content
+            }
+            state.copy(content = newContent)
         }
     }
 
@@ -149,17 +254,6 @@ class NoteEditorViewModel(
         _uiState.update { it.copy(speechError = error) }
     }
 
-    fun insertMarkdown(prefix: String, suffix: String = "") {
-        _uiState.update { state ->
-            val updated = if (state.content.endsWith("\n") || state.content.isEmpty()) {
-                "${state.content}$prefix$suffix"
-            } else {
-                "${state.content}\n$prefix$suffix"
-            }
-            state.copy(content = updated)
-        }
-    }
-
     fun saveNote(onSaved: (Long) -> Unit) {
         viewModelScope.launch {
             val state = _uiState.value
@@ -167,15 +261,24 @@ class NoteEditorViewModel(
                 state.content.lineSequence().firstOrNull()?.take(40) ?: "Untitled Entry"
             }
 
+            // Convert interactive checklist items to action items
+            val actionItemsToSave = state.checklistItems
+                .filter { it.text.isNotBlank() }
+                .map { item ->
+                    if (item.isChecked) "[x] ${item.text.trim()}" else "[ ] ${item.text.trim()}"
+                }
+
             val note = Note(
                 id = state.id,
                 title = titleToSave,
                 content = state.content,
                 tags = state.tags,
+                actionItems = actionItemsToSave,
                 imageUri = state.imageUri,
                 imageCaption = state.imageCaption,
                 audioUri = state.audioUri,
-                audioDurationMs = state.audioDurationMs
+                audioDurationMs = state.audioDurationMs,
+                fontFamily = state.fontFamily
             )
 
             val savedId = repository.saveNote(note)

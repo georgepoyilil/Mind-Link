@@ -193,8 +193,8 @@ class NoteRepositoryImpl(
             queryVector = queryVector,
             candidates = allEmbeddings,
             excludeNoteId = null,
-            topK = 15,
-            threshold = 0.02f
+            topK = 10,
+            threshold = 0.14f
         )
 
         // 3. Reciprocal Rank Fusion blending
@@ -283,7 +283,9 @@ class NoteRepositoryImpl(
             query = query,
             synthesisText = synthesisResult.answer,
             citedNotes = contextNotes,
-            keyTakeaways = synthesisResult.keyTakeaways
+            keyTakeaways = synthesisResult.keyTakeaways,
+            patternAlert = synthesisResult.patternAlert,
+            suggestedReminder = synthesisResult.suggestedReminder
         )
     }
 

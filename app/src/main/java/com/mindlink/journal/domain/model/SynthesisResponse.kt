@@ -4,5 +4,7 @@ data class SynthesisResponse(
     val query: String,
     val synthesisText: String,
     val citedNotes: List<Note> = emptyList(),
-    val keyTakeaways: List<String> = emptyList()
+    val keyTakeaways: List<String> = emptyList(),
+    val patternAlert: String? = null,
+    val suggestedReminder: String? = null
 )

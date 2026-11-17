@@ -9,7 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -103,6 +103,97 @@ fun ConversationalSynthesisCard(
                     modifier = Modifier.padding(16.dp),
                     lineHeight = 24.sp
                 )
+            }
+
+            // Proactive Wellness & Pattern Reminder Card
+            if (synthesis.suggestedReminder != null) {
+                var isReminderScheduled by remember { mutableStateOf(false) }
+                var isReminderDismissed by remember { mutableStateOf(false) }
+
+                if (!isReminderDismissed) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = PastelAmber.copy(alpha = 0.12f),
+                        border = BorderStroke(1.2.dp, PastelAmber.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = PastelAmber.copy(alpha = 0.25f),
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.NotificationsActive,
+                                            contentDescription = null,
+                                            tint = PastelAmber,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = synthesis.patternAlert ?: "Pattern Alert & Suggested Reminder",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PastelAmber
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = synthesis.suggestedReminder,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MindTextPrimary,
+                                fontWeight = FontWeight.Medium
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(onClick = { isReminderDismissed = true }) {
+                                    Text("Dismiss", color = MindTextTertiary, fontSize = 12.sp)
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isReminderScheduled) PastelMint.copy(alpha = 0.2f) else MindGlassButtonContainer,
+                                    border = BorderStroke(1.dp, if (isReminderScheduled) PastelMint else MindGlassButtonBorder),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable { isReminderScheduled = true }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isReminderScheduled) Icons.Default.Check else Icons.Default.Alarm,
+                                            contentDescription = null,
+                                            tint = if (isReminderScheduled) PastelMint else PastelAmber,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isReminderScheduled) "Reminder Scheduled" else "Set Reminder",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            color = if (isReminderScheduled) PastelMint else MindGlassButtonText
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Key Takeaways Section

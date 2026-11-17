@@ -179,10 +179,44 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
             answerBuilder.append("\n**Synthesized Pattern:** You have recurring thoughts around ${notes.firstOrNull()?.tags?.joinToString(", ") ?: "these areas"}, showing active iteration and focus.")
         }
 
+        val (patternAlert, suggestedReminder) = detectPatternAndReminder(lowerQuery, notes)
+
         SynthesisResult(
             answer = answerBuilder.toString().trim(),
-            keyTakeaways = takeaways.take(6)
+            keyTakeaways = takeaways.take(6),
+            patternAlert = patternAlert,
+            suggestedReminder = suggestedReminder
         )
+    }
+
+    private fun detectPatternAndReminder(query: String, notes: List<Note>): Pair<String?, String?> {
+        val fullCorpus = notes.joinToString(" ") { "${it.title} ${it.content} ${it.tags.joinToString(" ")}" }.lowercase(Locale.ROOT)
+        val hasFatigue = fullCorpus.contains("burnout") || fullCorpus.contains("exhaust") || fullCorpus.contains("tired") || fullCorpus.contains("fatigue") || fullCorpus.contains("screen") || query.contains("feel") || query.contains("burnout")
+        val hasWorkStress = fullCorpus.contains("work") || fullCorpus.contains("deadline") || fullCorpus.contains("debug") || fullCorpus.contains("blocker") || query.contains("blocker")
+        val hasLateNight = fullCorpus.contains("late night") || fullCorpus.contains("midnight") || fullCorpus.contains("1am") || fullCorpus.contains("2am") || fullCorpus.contains("sleep")
+        val hasLoneliness = fullCorpus.contains("lonel") || fullCorpus.contains("alone") || fullCorpus.contains("isolated") || query.contains("lonel")
+
+        return when {
+            hasFatigue || hasWorkStress -> {
+                Pair(
+                    "Pattern Detected: Work Strain & Evening Screen Fatigue",
+                    "Do you want to make a reminder to take a break from work in the evening and go for a walk after coffee?"
+                )
+            }
+            hasLateNight -> {
+                Pair(
+                    "Pattern Detected: Disrupted Sleep & Late-Night Coding",
+                    "Do you want to make a reminder to wind down work by 10:00 PM and protect your sleep?"
+                )
+            }
+            hasLoneliness -> {
+                Pair(
+                    "Pattern Detected: High Isolation & Tunnel Vision",
+                    "Do you want to set a reminder to step out this weekend, meet Elena or a friend, and unwind without work screens?"
+                )
+            }
+            else -> Pair(null, null)
+        }
     }
 
     private fun extractActionItems(content: String): List<String> {
@@ -404,18 +438,47 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
         val trimmedContent = content.trim()
         if (trimmedContent.isBlank()) return title
 
-        // Grab first substantial sentence
         val sentences = trimmedContent.split(Regex("(?<=[.!?])\\s+"))
             .map { it.trim() }
-            .filter { it.length > 20 && !it.startsWith("#") }
+            .filter { it.length > 15 && !it.startsWith("#") }
 
-        return if (sentences.isNotEmpty()) {
-            val first = sentences.first().replace("\n", " ")
-            if (first.length > 140) first.take(137) + "..." else first
-        } else {
-            val clean = trimmedContent.replace("\n", " ")
-            if (clean.length > 140) clean.take(137) + "..." else clean
+        if (sentences.isEmpty()) return title
+
+        // Look for resolution / realization / conclusion sentence
+        val realizationSentence = sentences.lastOrNull { s ->
+            val l = s.lowercase(Locale.ROOT)
+            l.contains("realiz") || l.contains("learn") || l.contains("decid") || l.contains("need to") ||
+                    l.contains("next step") || l.contains("ultimately") || l.contains("important") ||
+                    l.contains("grateful") || l.contains("appreciat") || l.contains("restore")
         }
+
+        // Look for core dilemma / conflict / friction sentence
+        val conflictSentence = sentences.firstOrNull { s ->
+            val l = s.lowercase(Locale.ROOT)
+            l.contains("struggl") || l.contains("burnout") || l.contains("exhaust") || l.contains("fail") ||
+                    l.contains("worried") || l.contains("hard") || l.contains("difficult") || l.contains("blocker") ||
+                    l.contains("fear") || l.contains("anxious") || l.contains("overwhelm")
+        }
+
+        val synthesized = when {
+            conflictSentence != null && realizationSentence != null && conflictSentence != realizationSentence -> {
+                "Reflecting on ${conflictSentence.take(65).trim().removeSuffix(".")}: finding clarity in ${realizationSentence.take(65).trim().removeSuffix(".")}."
+            }
+            realizationSentence != null -> {
+                "Key realization: ${realizationSentence.removeSuffix(".")}."
+            }
+            sentences.size >= 2 -> {
+                val corePoint = sentences.first().removeSuffix(".")
+                val outcome = sentences.last().removeSuffix(".")
+                "Reflecting on $corePoint — resolving to $outcome."
+            }
+            else -> {
+                val first = sentences.first()
+                "Thought synthesis: ${first.removeSuffix(".")}."
+            }
+        }
+
+        return if (synthesized.length > 150) synthesized.take(147) + "..." else synthesized
     }
 
     private fun generateReflectionPrompts(title: String, content: String, mood: String): List<String> {

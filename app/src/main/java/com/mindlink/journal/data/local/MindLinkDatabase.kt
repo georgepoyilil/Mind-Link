@@ -22,7 +22,7 @@ import com.mindlink.journal.data.local.entity.NoteLinkEntity
         NoteEmbeddingEntity::class,
         NoteLinkEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

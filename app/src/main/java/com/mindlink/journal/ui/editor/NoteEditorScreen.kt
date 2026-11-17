@@ -3,13 +3,12 @@ package com.mindlink.journal.ui.editor
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
+import android.media.MediaPlayer
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,6 +17,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -28,12 +28,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -70,7 +73,33 @@ fun NoteEditorScreen(
 
     var dictationTargetIsCaption by remember { mutableStateOf(false) }
     var isOcrScanning by remember { mutableStateOf(false) }
-    var hasLaunchedInitialMode by remember { mutableStateOf(false) }
+
+    // Media Player state for in-editor audio review
+    var isPlayingAudio by remember { mutableStateOf(false) }
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+    // Selection-aware text field value for markdown formatting & selection operations
+    var contentValue by remember {
+        mutableStateOf(TextFieldValue(uiState.content, TextRange(uiState.content.length)))
+    }
+
+    // Keep contentValue in sync when content changes from external sources (e.g. load, OCR, dictation)
+    LaunchedEffect(uiState.content) {
+        if (contentValue.text != uiState.content) {
+            contentValue = contentValue.copy(
+                text = uiState.content,
+                selection = TextRange(uiState.content.length)
+            )
+        }
+    }
+
+    DisposableEffect(uiState.audioUri) {
+        onDispose {
+            mediaPlayer?.release()
+            mediaPlayer = null
+            isPlayingAudio = false
+        }
+    }
 
     var activeCameraPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var activeOcrPhotoUri by remember { mutableStateOf<Uri?>(null) }
@@ -81,7 +110,7 @@ fun NoteEditorScreen(
         return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
     }
 
-    // High-Resolution Camera Launcher for standard Photo Journal
+    // Standard Camera Launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success: Boolean ->
@@ -90,7 +119,7 @@ fun NoteEditorScreen(
         }
     }
 
-    // High-Resolution Camera Launcher for OCR Document / Whiteboard Scanning
+    // OCR Document Scanning Camera Launcher
     val ocrCameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success: Boolean ->
@@ -106,7 +135,7 @@ fun NoteEditorScreen(
                         if (uiState.title.isBlank()) viewModel.updateTitle(polishedTitle)
                         val merged = if (uiState.content.isBlank()) polishedBody else "${uiState.content}\n\n$polishedBody"
                         viewModel.updateContent(merged)
-                        Toast.makeText(context, "Text extracted and polished by AI", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Text extracted and polished into note", Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(context, "No text detected in photo", Toast.LENGTH_SHORT).show()
                     }
@@ -118,7 +147,7 @@ fun NoteEditorScreen(
         }
     }
 
-    // Gallery Image Picker Launcher
+    // Gallery Picker
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -136,7 +165,7 @@ fun NoteEditorScreen(
         }
     }
 
-    // Handle speech state updates
+    // Voice Dictation handler
     LaunchedEffect(speechState) {
         when (val state = speechState) {
             is SpeechState.Listening -> {
@@ -167,51 +196,7 @@ fun NoteEditorScreen(
         }
     }
 
-    // Microphone permission
-    val micPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            audioRecorder.startRecording()
-            speechHelper.startListening()
-        } else {
-            Toast.makeText(context, "Microphone permission is required for voice journaling", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    val launchCameraHighRes: () -> Unit = {
-        val uri = createHighResPhotoUri()
-        activeCameraPhotoUri = uri
-        cameraLauncher.launch(uri)
-    }
-
-    val launchOcrHighRes: () -> Unit = {
-        val uri = createHighResPhotoUri()
-        activeOcrPhotoUri = uri
-        ocrCameraLauncher.launch(uri)
-    }
-
-    // Camera permission
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            launchCameraHighRes()
-        } else {
-            Toast.makeText(context, "Camera permission is required to snap photos", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    val ocrPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            launchOcrHighRes()
-        } else {
-            Toast.makeText(context, "Camera permission is required to scan text", Toast.LENGTH_SHORT).show()
-        }
-    }
-
+    // Audio recording trigger
     val toggleSpeech: (Boolean) -> Unit = { isCaption ->
         dictationTargetIsCaption = isCaption
         if (uiState.isVoiceRecording) {
@@ -230,47 +215,86 @@ fun NoteEditorScreen(
                 audioRecorder.startRecording()
                 speechHelper.startListening()
             } else {
-                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                Toast.makeText(context, "Audio permission needed for voice notes", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    // Handle initial journaling mode triggers
-    LaunchedEffect(Unit) {
-        if (!hasLaunchedInitialMode) {
-            hasLaunchedInitialMode = true
-            when (initialMode) {
-                "voice" -> toggleSpeech(false)
-                "image" -> imagePickerLauncher.launch("image/*")
-                "camera" -> {
-                    val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                    if (hasPerm) launchCameraHighRes() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                }
-                "ocr" -> {
-                    val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                    if (hasPerm) launchOcrHighRes() else ocrPermissionLauncher.launch(Manifest.permission.CAMERA)
-                }
-            }
+    val launchCameraHighRes: () -> Unit = {
+        val uri = createHighResPhotoUri()
+        activeCameraPhotoUri = uri
+        cameraLauncher.launch(uri)
+    }
+
+    val launchOcrHighRes: () -> Unit = {
+        val uri = createHighResPhotoUri()
+        activeOcrPhotoUri = uri
+        ocrCameraLauncher.launch(uri)
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) launchCameraHighRes()
+        else Toast.makeText(context, "Camera permission needed to snap photos", Toast.LENGTH_SHORT).show()
+    }
+
+    val ocrPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) launchOcrHighRes()
+        else Toast.makeText(context, "Camera permission needed to scan text", Toast.LENGTH_SHORT).show()
+    }
+
+    // IMPORTANT FIX: For OCR mode, do NOT launch camera directly on screen entry!
+    // Instead, the screen opens with a prominent camera scan button ready for the user.
+
+    // Markdown Selection-Aware Formatting Helpers
+    fun wrapSelection(prefix: String, suffix: String = prefix) {
+        val text = contentValue.text
+        val selection = contentValue.selection
+        if (!selection.collapsed) {
+            val start = selection.min
+            val end = selection.max
+            val selected = text.substring(start, end)
+            val newText = text.substring(0, start) + prefix + selected + suffix + text.substring(end)
+            contentValue = TextFieldValue(
+                text = newText,
+                selection = TextRange(start + prefix.length, end + prefix.length)
+            )
+            viewModel.updateContent(newText)
+        } else {
+            val cursor = selection.start
+            val newText = text.substring(0, cursor) + prefix + suffix + text.substring(cursor)
+            contentValue = TextFieldValue(
+                text = newText,
+                selection = TextRange(cursor + prefix.length)
+            )
+            viewModel.updateContent(newText)
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse_anim")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(700, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_scale"
-    )
+    fun insertLinePrefix(prefix: String) {
+        val text = contentValue.text
+        val cursor = contentValue.selection.start
+        val lineStart = text.lastIndexOf('\n', (cursor - 1).coerceAtLeast(0)).let { if (it == -1) 0 else it + 1 }
+        val newText = text.substring(0, lineStart) + prefix + text.substring(lineStart)
+        contentValue = TextFieldValue(
+            text = newText,
+            selection = TextRange(cursor + prefix.length)
+        )
+        viewModel.updateContent(newText)
+    }
 
     DisposableEffect(Unit) {
         onDispose {
             speechHelper.stopListening()
             audioRecorder.cancelRecording()
+            mediaPlayer?.release()
         }
     }
+
+    val currentFontFamily = resolveNoteFontFamily(uiState.fontFamily)
 
     Scaffold(
         topBar = {
@@ -289,6 +313,23 @@ fun NoteEditorScreen(
                     }
                 },
                 actions = {
+                    // Less prominent, sleek voice recording icon in top bar
+                    IconButton(
+                        onClick = { toggleSpeech(false) },
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .clip(CircleShape)
+                            .background(if (uiState.isVoiceRecording) PastelRose.copy(alpha = 0.25f) else Color.Transparent)
+                    ) {
+                        Icon(
+                            imageVector = if (uiState.isVoiceRecording) Icons.Default.MicOff else Icons.Default.Mic,
+                            contentDescription = "Voice Record",
+                            tint = if (uiState.isVoiceRecording) PastelRose else PastelLavender,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Save Button
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MindGlassButtonContainer,
@@ -303,41 +344,14 @@ fun NoteEditorScreen(
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Check, contentDescription = "Save", tint = PastelLavender, modifier = Modifier.size(17.dp))
+                            Icon(Icons.Default.Check, contentDescription = "Save", tint = PastelLavender, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Save", fontWeight = FontWeight.Bold, color = MindGlassButtonText, fontSize = 14.sp)
+                            Text("Save", fontWeight = FontWeight.Bold, color = MindGlassButtonText, fontSize = 13.5.sp)
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MindBackgroundAmoled)
             )
-        },
-        floatingActionButton = {
-            // Floating Mic Button with pulse animation when recording
-            Box(contentAlignment = Alignment.Center) {
-                if (uiState.isVoiceRecording) {
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .scale(pulseScale)
-                            .background(MindRose.copy(alpha = 0.35f), CircleShape)
-                    )
-                }
-
-                FloatingActionButton(
-                    onClick = { toggleSpeech(false) },
-                    containerColor = if (uiState.isVoiceRecording) MindRose else MindIndigo,
-                    contentColor = Color.White,
-                    shape = CircleShape,
-                    elevation = FloatingActionButtonDefaults.elevation(6.dp)
-                ) {
-                    Icon(
-                        imageVector = if (uiState.isVoiceRecording) Icons.Default.MicOff else Icons.Default.Mic,
-                        contentDescription = "Voice Input",
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-            }
         },
         containerColor = MindBackgroundAmoled
     ) { paddingValues ->
@@ -345,7 +359,7 @@ fun NoteEditorScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .imePadding() // CRITICAL FIX: Keyboard will not obscure input fields
+                .imePadding()
         ) {
             // Live Voice Streaming Bar
             AnimatedVisibility(visible = uiState.isVoiceRecording || uiState.speechPartialText.isNotBlank()) {
@@ -372,7 +386,7 @@ fun NoteEditorScreen(
                             text = if (uiState.speechPartialText.isNotBlank())
                                 "\"${uiState.speechPartialText}\""
                             else
-                                "Listening & recording voice note... speak naturally",
+                                "Recording audio & listening... speak naturally",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MindRose,
                             fontWeight = FontWeight.Medium
@@ -402,7 +416,7 @@ fun NoteEditorScreen(
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Scanning document text on-device & polishing notes...",
+                            text = "Scanning document text with on-device OCR...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = PastelLavender,
                             fontWeight = FontWeight.Medium
@@ -411,93 +425,121 @@ fun NoteEditorScreen(
                 }
             }
 
-            // Glassy Prismatic Media Toolbar
+            // Glassy Formatting & Media Toolbar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MindGlassSurfaceVariant)
                     .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 1. Gallery
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MindGlassButtonContainer,
-                    border = BorderStroke(1.dp, MindGlassButtonBorder),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { imagePickerLauncher.launch("image/*") }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                // Font Selector Pills
+                NoteFontOption.entries.forEach { option ->
+                    val isSelected = uiState.fontFamily.equals(option.key, ignoreCase = true)
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) MindIndigo.copy(alpha = 0.35f) else MindGlassButtonContainer,
+                        border = BorderStroke(0.8.dp, if (isSelected) PastelLavender else MindGlassButtonBorder),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { viewModel.setFontFamily(option.key) }
                     ) {
-                        Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text("Gallery", fontSize = 12.sp, color = PastelLavender, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = option.label,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) PastelLavender else MindTextSecondary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
                     }
                 }
 
-                // 2. Camera Snap
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MindGlassButtonContainer,
-                    border = BorderStroke(1.dp, MindGlassButtonBorder),
+                Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable {
-                            val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                            if (hasPerm) launchCameraHighRes() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                        }
+                        .height(20.dp)
+                        .width(1.dp)
+                        .background(MindGlassBorderSubtle)
+                )
+
+                // Gallery Attach
+                IconButton(onClick = { imagePickerLauncher.launch("image/*") }, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Default.PhotoLibrary, contentDescription = "Gallery", tint = PastelLavender, modifier = Modifier.size(18.dp))
+                }
+
+                // Camera Snap
+                IconButton(onClick = {
+                    val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                    if (hasPerm) launchCameraHighRes() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                }, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Default.PhotoCamera, contentDescription = "Camera", tint = PastelSky, modifier = Modifier.size(18.dp))
+                }
+
+                Box(
+                    modifier = Modifier
+                        .height(20.dp)
+                        .width(1.dp)
+                        .background(MindGlassBorderSubtle)
+                )
+
+                // Bold
+                IconButton(onClick = { wrapSelection("**") }, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Default.FormatBold, contentDescription = "Bold", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                }
+
+                // Italic
+                IconButton(onClick = { wrapSelection("*") }, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Default.FormatItalic, contentDescription = "Italic", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                }
+
+                // Strikethrough
+                IconButton(onClick = { wrapSelection("~~") }, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Default.FormatStrikethrough, contentDescription = "Strikethrough", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                }
+
+                // H3
+                IconButton(onClick = { insertLinePrefix("### ") }, modifier = Modifier.size(34.dp)) {
+                    Text("H3", fontWeight = FontWeight.Bold, color = MindTextPrimary, fontSize = 13.sp)
+                }
+
+                // Quote
+                IconButton(onClick = { insertLinePrefix("> ") }, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Default.FormatQuote, contentDescription = "Quote", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                }
+
+                // Bullet List
+                IconButton(onClick = { insertLinePrefix("- ") }, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Default.FormatListBulleted, contentDescription = "Bullet List", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                }
+
+                // Interactive Task Checkbox Button
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MindGlassButtonContainer,
+                    border = BorderStroke(0.8.dp, MindGlassButtonBorder),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { viewModel.addChecklistItem("") }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = PastelSky, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text("Camera", fontSize = 12.sp, color = PastelSky, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.TaskAlt, contentDescription = null, tint = PastelMint, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("+ Task", fontSize = 11.sp, color = PastelMint, fontWeight = FontWeight.Bold)
                     }
                 }
 
-                // 3. Camera OCR Scanner
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MindGlassButtonContainer,
-                    border = BorderStroke(1.dp, MindGlassButtonBorder),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable {
-                            val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                            if (hasPerm) launchOcrHighRes() else ocrPermissionLauncher.launch(Manifest.permission.CAMERA)
-                        }
+                // Select All
+                IconButton(
+                    onClick = {
+                        contentValue = contentValue.copy(selection = TextRange(0, contentValue.text.length))
+                    },
+                    modifier = Modifier.size(34.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.DocumentScanner, contentDescription = null, tint = PastelViolet, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text("Scan Text", fontSize = 12.sp, color = PastelViolet, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                IconButton(onClick = { viewModel.insertMarkdown("**", "**") }) {
-                    Icon(Icons.Default.FormatBold, contentDescription = "Bold", tint = MindTextSecondary)
-                }
-                IconButton(onClick = { viewModel.insertMarkdown("### ") }) {
-                    Text("H3", fontWeight = FontWeight.Bold, color = MindTextSecondary, fontSize = 14.sp)
-                }
-                IconButton(onClick = { viewModel.insertMarkdown("- [ ] ") }) {
-                    Icon(Icons.Default.TaskAlt, contentDescription = "Task Checkbox", tint = PastelMint)
-                }
-                IconButton(onClick = { viewModel.insertMarkdown("- ") }) {
-                    Icon(Icons.Default.FormatListBulleted, contentDescription = "Bullet List", tint = MindTextSecondary)
-                }
-                IconButton(onClick = { viewModel.insertMarkdown("> ") }) {
-                    Icon(Icons.Default.FormatQuote, contentDescription = "Quote", tint = MindTextSecondary)
+                    Icon(Icons.Default.SelectAll, contentDescription = "Select All", tint = MindTextSecondary, modifier = Modifier.size(18.dp))
                 }
             }
 
@@ -507,44 +549,203 @@ fun NoteEditorScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Attached Voice Note Preview Bar
-                if (uiState.audioUri != null) {
-                    val durationSec = uiState.audioDurationMs / 1000
-                    val formatted = "${durationSec / 60}:${String.format("%02d", durationSec % 60)}"
+                // OCR Hero Card (Prominent and directly accessible when in OCR mode or opened for scanning)
+                if (initialMode == "ocr" || uiState.imageUri == null) {
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = MindGlassSurfaceElevated,
-                        border = BorderStroke(1.dp, MindPrismGlassCardBorder),
-                        modifier = Modifier.fillMaxWidth()
+                        border = BorderStroke(1.2.dp, PastelViolet.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable {
+                                val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                                if (hasPerm) launchOcrHighRes() else ocrPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Mic, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        text = "Voice Note Attached",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MindTextPrimary
-                                    )
-                                    Text(
-                                        text = "Duration: $formatted · Saved locally in high-efficiency AAC",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MindTextTertiary
+                            Surface(
+                                shape = CircleShape,
+                                color = PastelViolet.copy(alpha = 0.2f),
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.DocumentScanner,
+                                        contentDescription = "Scan Document",
+                                        tint = PastelViolet,
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
-                            IconButton(onClick = { viewModel.removeAudio() }) {
-                                Icon(Icons.Default.DeleteOutline, contentDescription = "Remove audio", tint = MindRose)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Scan Document / Whiteboard",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MindTextPrimary
+                                )
+                                Text(
+                                    text = "Snap photo to extract printed or handwritten text with OCR",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MindTextSecondary
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.PhotoCamera,
+                                contentDescription = null,
+                                tint = PastelViolet,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
+                // In-Editor Audio Player & Review Card (Listen & Decide Before Saving)
+                if (uiState.audioUri != null) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MindGlassSurfaceElevated,
+                        border = BorderStroke(1.2.dp, MindIndigo.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = if (isPlayingAudio) PastelRose else PastelLavender,
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .clickable {
+                                                try {
+                                                    if (isPlayingAudio) {
+                                                        mediaPlayer?.pause()
+                                                        isPlayingAudio = false
+                                                    } else {
+                                                        if (mediaPlayer == null) {
+                                                            val player = MediaPlayer.create(context, Uri.parse(uiState.audioUri))
+                                                            player.setOnCompletionListener {
+                                                                isPlayingAudio = false
+                                                            }
+                                                            mediaPlayer = player
+                                                        }
+                                                        mediaPlayer?.start()
+                                                        isPlayingAudio = true
+                                                    }
+                                                } catch (e: Exception) {
+                                                    isPlayingAudio = false
+                                                }
+                                            }
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = if (isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                                contentDescription = if (isPlayingAudio) "Pause" else "Play",
+                                                tint = Color.Black,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = if (isPlayingAudio) "Playing Audio Note..." else "Recorded Audio Preview",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MindTextPrimary
+                                        )
+                                        val durationSec = uiState.audioDurationMs / 1000
+                                        val formatted = "${durationSec / 60}:${String.format("%02d", durationSec % 60)}"
+                                        Text(
+                                            text = "Duration: $formatted · Listen & decide before saving",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MindTextSecondary
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        mediaPlayer?.stop()
+                                        mediaPlayer?.release()
+                                        mediaPlayer = null
+                                        isPlayingAudio = false
+                                        viewModel.removeAudio()
+                                    }
+                                ) {
+                                    Icon(Icons.Default.DeleteOutline, contentDescription = "Discard Audio", tint = PastelRose)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Decision & Transcribe Action Buttons
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Transcribe Option
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MindGlassButtonContainer,
+                                    border = BorderStroke(1.dp, MindGlassButtonBorder),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            viewModel.transcribeAudio()
+                                            Toast.makeText(context, "Audio transcribed and added to note", Toast.LENGTH_SHORT).show()
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 10.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.RecordVoiceOver, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(15.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Transcribe to Text", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PastelLavender)
+                                    }
+                                }
+
+                                // Discard Option
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MindGlassSurfaceVariant,
+                                    border = BorderStroke(0.8.dp, PastelRose.copy(alpha = 0.4f)),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            mediaPlayer?.stop()
+                                            mediaPlayer?.release()
+                                            mediaPlayer = null
+                                            isPlayingAudio = false
+                                            viewModel.removeAudio()
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = null, tint = PastelRose, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Discard", fontWeight = FontWeight.Medium, fontSize = 12.sp, color = PastelRose)
+                                    }
+                                }
                             }
                         }
                     }
@@ -583,7 +784,6 @@ fun NoteEditorScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Image Caption with Voice Dictation Button
                             OutlinedTextField(
                                 value = uiState.imageCaption ?: "",
                                 onValueChange = { viewModel.updateImageCaption(it) },
@@ -608,7 +808,7 @@ fun NoteEditorScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // On-demand OCR for uploaded/captured image (Classy Pastel Glass Button)
+                            // Extract Text Button for image
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = MindGlassButtonContainer,
@@ -646,29 +846,19 @@ fun NoteEditorScreen(
                                     horizontalArrangement = Arrangement.Center,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    if (isOcrScanning) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(16.dp),
-                                            strokeWidth = 2.dp,
-                                            color = PastelViolet
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Extracting Text with ML Kit...", fontSize = 13.sp, color = PastelViolet, fontWeight = FontWeight.Bold)
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.DocumentScanner,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(17.dp),
-                                            tint = PastelViolet
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "Extract Text from Image",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = PastelViolet
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.DocumentScanner,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(17.dp),
+                                        tint = PastelViolet
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Extract Text from Image",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PastelViolet
+                                    )
                                 }
                             }
                         }
@@ -683,10 +873,14 @@ fun NoteEditorScreen(
                         Text(
                             text = "Title of your thought...",
                             style = MaterialTheme.typography.headlineSmall,
-                            color = MindTextTertiary
+                            color = MindTextTertiary,
+                            fontFamily = currentFontFamily
                         )
                     },
-                    textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    textStyle = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = currentFontFamily
+                    ),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
@@ -702,10 +896,9 @@ fun NoteEditorScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 2.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Active Selected Tags (Glassy Pastel Pills)
                     if (uiState.tags.isNotEmpty()) {
                         Row(
                             modifier = Modifier
@@ -745,7 +938,7 @@ fun NoteEditorScreen(
                         }
                     }
 
-                    // Comfortable, Full-Width Hashtag Input Bar
+                    // Hashtag Input Bar
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = MindGlassSurfaceVariant,
@@ -758,22 +951,13 @@ fun NoteEditorScreen(
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Tag,
-                                contentDescription = null,
-                                tint = PastelLavender,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Icon(Icons.Default.Tag, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(10.dp))
                             Box(modifier = Modifier.weight(1f)) {
                                 if (uiState.tagInput.isEmpty()) {
-                                    Text(
-                                        text = "Add hashtag (e.g. ideas, work, journal)...",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MindTextTertiary
-                                    )
+                                    Text("Add hashtag (e.g. ideas, work, journal)...", style = MaterialTheme.typography.bodyMedium, color = MindTextTertiary)
                                 }
-                                androidx.compose.foundation.text.BasicTextField(
+                                BasicTextField(
                                     value = uiState.tagInput,
                                     onValueChange = { viewModel.updateTagInput(it) },
                                     textStyle = MaterialTheme.typography.bodyMedium.copy(color = MindTextPrimary),
@@ -793,72 +977,127 @@ fun NoteEditorScreen(
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable { viewModel.addTag() }
                                 ) {
-                                    Text(
-                                        text = "Add",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        color = PastelLavender,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Suggested Tags to Select
-                    val unselectedSuggestions = uiState.suggestedTags.filter { !uiState.tags.contains(it) }
-                    if (unselectedSuggestions.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Suggested:",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MindTextTertiary
-                            )
-                            unselectedSuggestions.take(8).forEach { tag ->
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = MindGlassSurfaceVariant,
-                                    border = BorderStroke(0.5.dp, MindGlassButtonBorder),
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable { viewModel.selectSuggestedTag(tag) }
-                                ) {
-                                    Text(
-                                        text = "+ #$tag",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = PastelLavender,
-                                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                                        fontWeight = FontWeight.Medium
-                                    )
+                                    Text("Add", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PastelLavender, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
                                 }
                             }
                         }
                     }
                 }
 
-                HorizontalDivider(
-                    color = MindBorderDark.copy(alpha = 0.5f),
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
+                // Interactive Action Items & Checklists Card (NO raw [] syntax!)
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MindGlassSurface,
+                    border = BorderStroke(1.dp, PastelMint.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.TaskAlt, contentDescription = null, tint = PastelMint, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Action Items & Checklists (${uiState.checklistItems.size})",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MindTextPrimary
+                                )
+                            }
 
-                // Markdown Body Field
+                            // "+ Add Task" button
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MindGlassButtonContainer,
+                                border = BorderStroke(0.8.dp, MindGlassButtonBorder),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { viewModel.addChecklistItem("") }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = PastelMint, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text("Add Task", fontSize = 11.5.sp, color = PastelMint, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        if (uiState.checklistItems.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                uiState.checklistItems.forEach { item ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(MindGlassSurfaceVariant, RoundedCornerShape(10.dp))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Checkbox(
+                                            checked = item.isChecked,
+                                            onCheckedChange = { viewModel.toggleChecklistItem(item.id) },
+                                            colors = CheckboxDefaults.colors(
+                                                checkedColor = PastelMint,
+                                                uncheckedColor = MindTextTertiary
+                                            ),
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            if (item.text.isEmpty()) {
+                                                Text("Type action item or task...", color = MindTextTertiary, fontSize = 13.sp)
+                                            }
+                                            BasicTextField(
+                                                value = item.text,
+                                                onValueChange = { viewModel.updateChecklistItem(item.id, it) },
+                                                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                                    color = if (item.isChecked) MindTextTertiary else MindTextPrimary,
+                                                    textDecoration = if (item.isChecked) TextDecoration.LineThrough else null,
+                                                    fontFamily = currentFontFamily
+                                                ),
+                                                cursorBrush = SolidColor(PastelMint),
+                                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                                                keyboardActions = KeyboardActions(onNext = { viewModel.addChecklistItem("") }),
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { viewModel.removeChecklistItem(item.id) },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(Icons.Default.Close, contentDescription = "Delete Task", tint = MindTextTertiary, modifier = Modifier.size(14.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = MindBorderDark.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 2.dp))
+
+                // Markdown Body Field (Selection-Aware!)
                 TextField(
-                    value = uiState.content,
-                    onValueChange = { viewModel.updateContent(it) },
+                    value = contentValue,
+                    onValueChange = { newValue ->
+                        contentValue = newValue
+                        viewModel.updateContent(newValue.text)
+                    },
                     placeholder = {
                         Text(
                             text = "Write your thoughts freely. Dictate with the mic, snap photos, or scan documents with OCR...",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MindTextTertiary
+                            color = MindTextTertiary,
+                            fontFamily = currentFontFamily
                         )
                     },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = currentFontFamily),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
@@ -872,7 +1111,7 @@ fun NoteEditorScreen(
                         .defaultMinSize(minHeight = 350.dp)
                 )
 
-                Spacer(modifier = Modifier.height(120.dp))
+                Spacer(modifier = Modifier.height(100.dp))
             }
         }
     }

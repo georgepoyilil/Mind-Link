@@ -622,7 +622,8 @@ fun NotesListScreen(
                 ) {
                     items(
                         items = uiState.filteredNotes,
-                        key = { it.id }
+                        key = { it.id },
+                        contentType = { "note_item" }
                     ) { note ->
                         Column(modifier = Modifier.fillMaxWidth()) {
                             NoteCard(

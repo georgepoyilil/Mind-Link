@@ -53,6 +53,8 @@ fun NoteStandardCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val cardFont = resolveNoteFontFamily(note.fontFamily)
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -130,7 +132,7 @@ fun NoteStandardCard(
             // Title
             Text(
                 text = note.title.ifBlank { "Untitled Thought" },
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleMedium.copy(fontFamily = cardFont),
                 fontWeight = FontWeight.Bold,
                 color = MindTextPrimary,
                 maxLines = 1,
@@ -142,7 +144,7 @@ fun NoteStandardCard(
             // AI TL;DR or Preview
             Text(
                 text = note.previewText,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = cardFont),
                 color = if (note.summary != null) MindTextSecondary else MindTextTertiary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis

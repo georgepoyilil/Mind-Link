@@ -1,5 +1,6 @@
 package com.mindlink.journal.ui.secondbrain.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,7 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,9 +30,16 @@ fun HybridSearchSection(
 ) {
     if (results.isEmpty()) return
 
+    var isExpanded by remember { mutableStateOf(false) }
+    val initialPreviewCount = 3
+    val displayedResults = if (isExpanded) results else results.take(initialPreviewCount)
+
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { isExpanded = !isExpanded },
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -61,7 +69,7 @@ fun HybridSearchSection(
                     }
                 }
                 Text(
-                    text = "Raw entries retrieved from vector & keyword index",
+                    text = if (isExpanded) "Showing all ${results.size} matches" else "Top relevant matches (tap to expand)",
                     style = MaterialTheme.typography.labelSmall,
                     color = MindTextTertiary
                 )
@@ -73,26 +81,31 @@ fun HybridSearchSection(
                 border = BorderStroke(0.5.dp, MindGlassButtonBorder)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Bolt, contentDescription = null, tint = PastelSky, modifier = Modifier.size(12.dp))
-                    Spacer(modifier = Modifier.width(3.dp))
                     Text(
-                        text = "Hybrid Search",
+                        text = if (isExpanded) "Collapse" else "Expand (${results.size})",
                         style = MaterialTheme.typography.labelSmall,
                         color = PastelSky,
                         fontWeight = FontWeight.Bold,
                         fontSize = 10.sp
                     )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = PastelSky,
+                        modifier = Modifier.size(13.dp)
+                    )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            results.forEach { result ->
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            displayedResults.forEach { result ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -104,7 +117,7 @@ fun HybridSearchSection(
                     ),
                     border = BorderStroke(1.dp, MindGlassCardBorder)
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
+                    Column(modifier = Modifier.padding(12.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -174,7 +187,7 @@ fun HybridSearchSection(
                             overflow = TextOverflow.Ellipsis
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -191,9 +204,44 @@ fun HybridSearchSection(
                                 imageVector = Icons.Default.ChevronRight,
                                 contentDescription = "View Note",
                                 tint = MindTextTertiary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                         }
+                    }
+                }
+            }
+
+            // Expand / Collapse Bar when more than 3 results
+            if (results.size > initialPreviewCount) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MindGlassSurfaceVariant,
+                    border = BorderStroke(0.8.dp, MindGlassBorderSubtle),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { isExpanded = !isExpanded }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 9.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isExpanded) "Collapse Matched Entries" else "View All ${results.size} Matched Entries",
+                            color = PastelLavender,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            tint = PastelLavender,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }

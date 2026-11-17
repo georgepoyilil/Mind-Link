@@ -12,7 +12,9 @@ data class NoteAnalysisResult(
 
 data class SynthesisResult(
     val answer: String,
-    val keyTakeaways: List<String>
+    val keyTakeaways: List<String>,
+    val patternAlert: String? = null,
+    val suggestedReminder: String? = null
 )
 
 /**

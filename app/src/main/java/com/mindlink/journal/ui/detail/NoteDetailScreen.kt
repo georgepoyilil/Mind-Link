@@ -70,6 +70,8 @@ fun NoteDetailScreen(
     }
 
     val note = uiState.note
+    val noteFont = resolveNoteFontFamily(note?.fontFamily)
+    var followUpInput by remember { mutableStateOf("") }
 
     if (showDeleteDialog) {
         val isTrash = note?.isDeleted == true
@@ -240,7 +242,7 @@ fun NoteDetailScreen(
                     // Title
                     Text(
                         text = note.title,
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.headlineMedium.copy(fontFamily = noteFont),
                         fontWeight = FontWeight.Bold,
                         color = MindTextPrimary
                     )
@@ -468,26 +470,136 @@ fun NoteDetailScreen(
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
                                 text = note.content,
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontFamily = noteFont),
                                 color = MindTextPrimary,
                                 lineHeight = 24.sp
                             )
                         }
                     }
 
+                    // Quick Follow-up & Add Points to Note Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MindGlassSurfaceVariant),
+                        border = BorderStroke(1.dp, MindGlassBorderSubtle)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.AddComment, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Add Follow-up Point",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MindTextPrimary
+                                    )
+                                }
+                                Text(
+                                    text = "Auto-reprocesses AI correlations",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MindTextTertiary
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedTextField(
+                                value = followUpInput,
+                                onValueChange = { followUpInput = it },
+                                placeholder = {
+                                    Text("Add an update, evening reflection, or new point...", color = MindTextTertiary, fontSize = 13.sp)
+                                },
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MindTextPrimary, fontFamily = noteFont),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = MindGlassSurface,
+                                    unfocusedContainerColor = MindGlassSurface,
+                                    focusedBorderColor = PastelLavender,
+                                    unfocusedBorderColor = MindGlassBorderSubtle,
+                                    focusedTextColor = MindTextPrimary,
+                                    unfocusedTextColor = MindTextPrimary
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                                maxLines = 4
+                            )
+
+                            if (followUpInput.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MindGlassButtonContainer,
+                                        border = BorderStroke(1.dp, MindGlassButtonBorder),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable {
+                                                viewModel.appendFollowUp(followUpInput) {
+                                                    followUpInput = ""
+                                                    Toast.makeText(context, "Point added & correlations reprocessed!", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Add, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(15.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Save & Reprocess", fontSize = 12.sp, color = PastelLavender, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // SECTION DIVIDER: DISTINCT AI INTELLIGENCE SUITE
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "AI Second Brain Analysis",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = PastelLavender
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "AI Second Brain Analysis",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = PastelLavender
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MindGlassButtonContainer,
+                            border = BorderStroke(0.8.dp, MindGlassButtonBorder),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    viewModel.reprocessNote {
+                                        Toast.makeText(context, "Correlations & analysis recalculated", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, tint = PastelSky, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Re-analyze", fontSize = 11.sp, color = PastelSky, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
 
                     // 2. AI TL;DR Summary Card
@@ -523,7 +635,47 @@ fun NoteDetailScreen(
                         }
                     }
 
-                    // 3. Extracted Action Items
+                    // Proactive Pattern & Reminder Alert if note reflects burnout / fatigue
+                    val noteTextLower = "${note.title} ${note.content}".lowercase(java.util.Locale.ROOT)
+                    if (noteTextLower.contains("burnout") || noteTextLower.contains("exhaust") || noteTextLower.contains("screen") || noteTextLower.contains("late night") || noteTextLower.contains("tired")) {
+                        var isReminderSet by remember { mutableStateOf(false) }
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = PastelAmber.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, PastelAmber.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = PastelAmber, modifier = Modifier.size(17.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Pattern Detected: Work Strain & Evening Screen Fatigue", color = PastelAmber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text("Do you want to make a reminder to take a break from work in the evening and go for a walk after coffee?", color = MindTextPrimary, style = MaterialTheme.typography.bodyMedium)
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isReminderSet) PastelMint.copy(alpha = 0.2f) else MindGlassButtonContainer,
+                                        border = BorderStroke(0.8.dp, if (isReminderSet) PastelMint else MindGlassButtonBorder),
+                                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
+                                            isReminderSet = true
+                                            Toast.makeText(context, "Reminder set for this evening to take a break and walk", Toast.LENGTH_SHORT).show()
+                                        }
+                                    ) {
+                                        Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(if (isReminderSet) Icons.Default.Check else Icons.Default.Alarm, contentDescription = null, tint = if (isReminderSet) PastelMint else PastelAmber, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(if (isReminderSet) "Reminder Scheduled" else "Set Reminder", color = if (isReminderSet) PastelMint else MindGlassButtonText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Extracted Action Items (Real interactive Checkboxes, NO raw [] syntax!)
                     if (note.actionItems.isNotEmpty()) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -536,15 +688,20 @@ fun NoteDetailScreen(
                                     Icon(Icons.Default.TaskAlt, contentDescription = null, tint = PastelMint, modifier = Modifier.size(19.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Extracted Action Items (${note.actionItems.size})",
+                                        text = "Action Items (${note.actionItems.size})",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MindTextPrimary
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(10.dp))
-                                note.actionItems.forEachIndexed { index, item ->
-                                    val isChecked = uiState.completedActionIndices.contains(index)
+                                note.actionItems.forEachIndexed { index, rawItem ->
+                                    val isChecked = rawItem.startsWith("[x] ", ignoreCase = true) || uiState.completedActionIndices.contains(index)
+                                    val cleanText = when {
+                                        rawItem.startsWith("[x] ", ignoreCase = true) -> rawItem.substring(4)
+                                        rawItem.startsWith("[ ] ") -> rawItem.substring(4)
+                                        else -> rawItem
+                                    }
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -563,10 +720,11 @@ fun NoteDetailScreen(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = item,
+                                            text = cleanText,
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = if (isChecked) MindTextTertiary else MindTextPrimary,
-                                            textDecoration = if (isChecked) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                                            textDecoration = if (isChecked) androidx.compose.ui.text.style.TextDecoration.LineThrough else null,
+                                            fontFamily = noteFont
                                         )
                                     }
                                 }

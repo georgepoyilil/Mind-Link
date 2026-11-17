@@ -57,10 +57,64 @@ class NoteDetailViewModel(
     }
 
     fun toggleActionItem(index: Int) {
+        val currentNote = _uiState.value.note ?: return
+        if (index !in currentNote.actionItems.indices) return
+
+        val currentRaw = currentNote.actionItems[index]
+        val isCurrentlyChecked = currentRaw.startsWith("[x] ", ignoreCase = true)
+        val textOnly = when {
+            currentRaw.startsWith("[x] ", ignoreCase = true) -> currentRaw.substring(4)
+            currentRaw.startsWith("[ ] ") -> currentRaw.substring(4)
+            else -> currentRaw
+        }
+        val updatedRaw = if (isCurrentlyChecked) "[ ] $textOnly" else "[x] $textOnly"
+        val newActionItems = currentNote.actionItems.toMutableList().apply {
+            set(index, updatedRaw)
+        }
+        val updatedNote = currentNote.copy(
+            actionItems = newActionItems,
+            updatedAt = System.currentTimeMillis()
+        )
+
         _uiState.update { state ->
             val set = state.completedActionIndices.toMutableSet()
-            if (set.contains(index)) set.remove(index) else set.add(index)
-            state.copy(completedActionIndices = set)
+            if (isCurrentlyChecked) set.remove(index) else set.add(index)
+            state.copy(note = updatedNote, completedActionIndices = set)
+        }
+
+        viewModelScope.launch {
+            repository.saveNote(updatedNote)
+        }
+    }
+
+    fun appendFollowUp(updateText: String, onDone: () -> Unit = {}) {
+        val currentNote = _uiState.value.note ?: return
+        if (updateText.isBlank()) return
+        val sdf = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault())
+        val timestamp = sdf.format(java.util.Date())
+        val newContent = if (currentNote.content.isBlank()) {
+            "**Update ($timestamp):**\n$updateText"
+        } else {
+            "${currentNote.content}\n\n**Update ($timestamp):**\n$updateText"
+        }
+        val updatedNote = currentNote.copy(
+            content = newContent,
+            updatedAt = System.currentTimeMillis()
+        )
+        viewModelScope.launch {
+            repository.saveNote(updatedNote)
+            loadRelatedThoughts(noteId)
+            onDone()
+        }
+    }
+
+    fun reprocessNote(onDone: () -> Unit = {}) {
+        val currentNote = _uiState.value.note ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingRelated = true) }
+            repository.saveNote(currentNote)
+            loadRelatedThoughts(noteId)
+            onDone()
         }
     }
 

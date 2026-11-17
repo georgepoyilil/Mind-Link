@@ -30,5 +30,7 @@ data class NoteEntity(
     @ColumnInfo(defaultValue = "0")
     val isDeleted: Boolean = false,
     @ColumnInfo(defaultValue = "NULL")
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    @ColumnInfo(defaultValue = "'Sans'")
+    val fontFamily: String = "Sans"
 )

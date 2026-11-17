@@ -23,13 +23,11 @@ data class Note(
     val audioDurationMs: Long = 0L,
     val isArchived: Boolean = false,
     val isDeleted: Boolean = false,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    val fontFamily: String = "Sans"
 ) {
     val formattedDate: String
-        get() {
-            val sdf = SimpleDateFormat("MMM d, yyyy · h:mm a", Locale.getDefault())
-            return sdf.format(Date(createdAt))
-        }
+        get() = dateCache.get()?.format(Date(createdAt)) ?: ""
 
     val moodEmoji: String
         get() = ""
@@ -73,11 +71,16 @@ data class Note(
             audioDurationMs = audioDurationMs,
             isArchived = isArchived,
             isDeleted = isDeleted,
-            deletedAt = deletedAt
+            deletedAt = deletedAt,
+            fontFamily = fontFamily
         )
     }
 
     companion object {
+        private val dateCache = ThreadLocal.withInitial {
+            SimpleDateFormat("MMM d, yyyy · h:mm a", Locale.getDefault())
+        }
+
         fun fromEntity(entity: NoteEntity): Note {
             return Note(
                 id = entity.id,
@@ -97,7 +100,8 @@ data class Note(
                 audioDurationMs = entity.audioDurationMs,
                 isArchived = entity.isArchived,
                 isDeleted = entity.isDeleted,
-                deletedAt = entity.deletedAt
+                deletedAt = entity.deletedAt,
+                fontFamily = entity.fontFamily
             )
         }
     }
