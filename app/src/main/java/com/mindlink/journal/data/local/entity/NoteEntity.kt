@@ -1,11 +1,12 @@
 package com.mindlink.journal.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
  * Core Note entity representing a journal entry with AI-extracted metadata,
- * image attachments with captions, and recorded voice audio.
+ * image attachments with captions, recorded voice audio, archiving, and trash lifecycle.
  */
 @Entity(tableName = "notes")
 data class NoteEntity(
@@ -23,5 +24,11 @@ data class NoteEntity(
     val imageUri: String? = null,
     val imageCaption: String? = null,
     val audioUri: String? = null,
-    val audioDurationMs: Long = 0L
+    val audioDurationMs: Long = 0L,
+    @ColumnInfo(defaultValue = "0")
+    val isArchived: Boolean = false,
+    @ColumnInfo(defaultValue = "0")
+    val isDeleted: Boolean = false,
+    @ColumnInfo(defaultValue = "NULL")
+    val deletedAt: Long? = null
 )

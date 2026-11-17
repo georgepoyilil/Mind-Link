@@ -20,7 +20,10 @@ data class Note(
     val imageUri: String? = null,
     val imageCaption: String? = null,
     val audioUri: String? = null,
-    val audioDurationMs: Long = 0L
+    val audioDurationMs: Long = 0L,
+    val isArchived: Boolean = false,
+    val isDeleted: Boolean = false,
+    val deletedAt: Long? = null
 ) {
     val formattedDate: String
         get() {
@@ -29,17 +32,14 @@ data class Note(
         }
 
     val moodEmoji: String
-        get() = when (mood?.lowercase(Locale.ROOT)?.trim()) {
-            "reflective" -> "🧘"
-            "analytical" -> "🧠"
-            "creative" -> "💡"
-            "energized" -> "⚡"
-            "stressed" -> "🌧️"
-            "calm" -> "🌿"
-            "focused" -> "🎯"
-            "vulnerable" -> "💔"
-            "grateful" -> "🌸"
-            else -> "✨"
+        get() = ""
+
+    val daysUntilExpiry: Int
+        get() {
+            val del = deletedAt ?: return 30
+            val elapsedMs = System.currentTimeMillis() - del
+            val elapsedDays = (elapsedMs / (1000L * 60 * 60 * 24)).toInt()
+            return (30 - elapsedDays).coerceAtLeast(0)
         }
 
     val previewText: String
@@ -70,7 +70,10 @@ data class Note(
             imageUri = imageUri,
             imageCaption = imageCaption,
             audioUri = audioUri,
-            audioDurationMs = audioDurationMs
+            audioDurationMs = audioDurationMs,
+            isArchived = isArchived,
+            isDeleted = isDeleted,
+            deletedAt = deletedAt
         )
     }
 
@@ -91,7 +94,10 @@ data class Note(
                 imageUri = entity.imageUri,
                 imageCaption = entity.imageCaption,
                 audioUri = entity.audioUri,
-                audioDurationMs = entity.audioDurationMs
+                audioDurationMs = entity.audioDurationMs,
+                isArchived = entity.isArchived,
+                isDeleted = entity.isDeleted,
+                deletedAt = entity.deletedAt
             )
         }
     }

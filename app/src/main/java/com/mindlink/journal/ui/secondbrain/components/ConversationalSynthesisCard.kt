@@ -4,10 +4,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,12 +48,12 @@ fun ConversationalSynthesisCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = MindIndigo.copy(alpha = 0.3f),
-                    border = BorderStroke(1.dp, MindIndigo.copy(alpha = 0.6f)),
+                    color = MindGlassButtonContainer,
+                    border = BorderStroke(1.dp, MindGlassButtonBorder),
                     modifier = Modifier.size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text("🤖", fontSize = 20.sp)
+                        Icon(Icons.Default.Psychology, contentDescription = null, tint = PastelSky, modifier = Modifier.size(20.dp))
                     }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
@@ -68,11 +68,11 @@ fun ConversationalSynthesisCard(
                         Spacer(modifier = Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = MindViolet.copy(alpha = 0.3f)
+                            color = MindGlassButtonContainer
                         ) {
                             Text(
-                                text = "✨ ON-DEVICE AI",
-                                color = Color.White,
+                                text = "ON-DEVICE AI",
+                                color = PastelLavender,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -109,11 +109,13 @@ fun ConversationalSynthesisCard(
             if (synthesis.keyTakeaways.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Insights, contentDescription = null, tint = PastelViolet, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "💡 Key Patterns & Realizations",
+                        text = "Key Patterns & Realizations",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MindViolet
+                        color = PastelViolet
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -129,8 +131,8 @@ fun ConversationalSynthesisCard(
                                 verticalAlignment = Alignment.Top,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
                             ) {
-                                Text(text = "⚡", fontSize = 14.sp)
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(Icons.Default.ArrowRight, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = takeaway,
                                     style = MaterialTheme.typography.bodyMedium,
@@ -146,12 +148,16 @@ fun ConversationalSynthesisCard(
             // Cited Notes Section
             if (synthesis.citedNotes.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(18.dp))
-                Text(
-                    text = "📚 Source Memories Cited (${synthesis.citedNotes.size})",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MindTextTertiary
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.LibraryBooks, contentDescription = null, tint = MindTextTertiary, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Source Memories Cited (${synthesis.citedNotes.size})",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MindTextTertiary
+                    )
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     synthesis.citedNotes.forEach { note ->
@@ -175,7 +181,11 @@ fun ConversationalSynthesisCard(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text(text = note.moodEmoji, fontSize = 14.sp)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .background(PastelLavender, CircleShape)
+                                    )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = note.title,

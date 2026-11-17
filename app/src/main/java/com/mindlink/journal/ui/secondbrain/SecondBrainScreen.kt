@@ -93,13 +93,13 @@ fun SecondBrainScreen(
     }
 
     val quickQuestions = listOf(
-        "💖 How is my love life?" to "how is my love life",
-        "🧘 How am I feeling?" to "how am I feeling",
-        "⚡ What blockers do I have?" to "What recurring blockers have I noted recently?",
-        "👨‍👩‍👦 Reflections on family" to "How do I feel about my family and parents?",
-        "💔 Failures & rejections" to "What failures or rejections have I noted?",
-        "📋 Pending action items" to "What action items are still open?",
-        "🌿 Moments of peace" to "What brings me peace and gratitude?"
+        "How is my love life?" to "how is my love life",
+        "How am I feeling?" to "how am I feeling",
+        "What blockers do I have?" to "What recurring blockers have I noted recently?",
+        "Reflections on family" to "How do I feel about my family and parents?",
+        "Failures & rejections" to "What failures or rejections have I noted?",
+        "Pending action items" to "What action items are still open?",
+        "Moments of peace" to "What brings me peace and gratitude?"
     )
 
     Scaffold(
@@ -107,8 +107,10 @@ fun SecondBrainScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Psychology, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "🧠 Second Brain",
+                            text = "Second Brain",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MindTextPrimary
@@ -116,12 +118,12 @@ fun SecondBrainScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = MindIndigo.copy(alpha = 0.2f),
-                            border = BorderStroke(0.5.dp, MindIndigo.copy(alpha = 0.4f))
+                            color = MindGlassButtonContainer,
+                            border = BorderStroke(0.5.dp, MindGlassButtonBorder)
                         ) {
                             Text(
                                 text = "Associative Q&A",
-                                color = MindIndigo,
+                                color = PastelLavender,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -166,12 +168,12 @@ fun SecondBrainScreen(
                         ) {
                             Surface(
                                 shape = CircleShape,
-                                color = MindIndigo.copy(alpha = 0.2f),
-                                border = BorderStroke(1.dp, MindIndigo.copy(alpha = 0.4f)),
+                                color = MindGlassButtonContainer,
+                                border = BorderStroke(1.dp, MindGlassButtonBorder),
                                 modifier = Modifier.size(64.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Text("🧠", fontSize = 28.sp)
+                                    Icon(Icons.Default.Psychology, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(32.dp))
                                 }
                             }
                             Spacer(modifier = Modifier.height(12.dp))
@@ -256,7 +258,7 @@ fun SecondBrainScreen(
                             Spacer(modifier = Modifier.width(14.dp))
                             Column {
                                 Text(
-                                    text = "✨ Synthesizing Memory Bank...",
+                                    text = "Synthesizing Memory Bank...",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MindTextPrimary
@@ -275,16 +277,22 @@ fun SecondBrainScreen(
                 if (uiState.errorMessage != null) {
                     Surface(
                         shape = RoundedCornerShape(14.dp),
-                        color = MindRose.copy(alpha = 0.2f),
-                        border = BorderStroke(1.dp, MindRose.copy(alpha = 0.4f)),
+                        color = PastelRose.copy(alpha = 0.16f),
+                        border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.4f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = "⚠️ ${uiState.errorMessage}",
-                            color = MindRose,
+                        Row(
                             modifier = Modifier.padding(14.dp),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = PastelRose, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = uiState.errorMessage ?: "",
+                                color = PastelRose,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
                     }
                 }
 

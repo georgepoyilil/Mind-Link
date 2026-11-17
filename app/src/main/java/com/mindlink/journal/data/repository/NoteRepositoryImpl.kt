@@ -9,11 +9,13 @@ import com.mindlink.journal.data.ai.VectorSearchEngine
 import com.mindlink.journal.data.local.MindLinkDatabase
 import com.mindlink.journal.data.worker.NoteProcessingWorker
 import com.mindlink.journal.domain.model.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class NoteRepositoryImpl(
@@ -31,11 +33,73 @@ class NoteRepositoryImpl(
     private val synapticGraphEngine = SynapticGraphEngine()
     private val workManager = WorkManager.getInstance(context)
 
+    init {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                purgeExpiredTrash()
+            } catch (_: Exception) {}
+        }
+    }
+
     override fun getAllNotes(): Flow<List<Note>> {
         return noteDao.getAllNotes().map { entities ->
             entities.map { Note.fromEntity(it) }
         }
     }
+
+    override fun getArchivedNotes(): Flow<List<Note>> {
+        return noteDao.getArchivedNotes().map { entities ->
+            entities.map { Note.fromEntity(it) }
+        }
+    }
+
+    override fun getTrashNotes(): Flow<List<Note>> {
+        return noteDao.getTrashNotes().map { entities ->
+            entities.map { Note.fromEntity(it) }
+        }
+    }
+
+    override suspend fun moveToTrash(id: Long) = withContext(Dispatchers.IO) {
+        noteDao.moveToTrash(id)
+        rebuildSynapticGraph()
+    }
+
+    override suspend fun restoreFromTrash(id: Long) = withContext(Dispatchers.IO) {
+        noteDao.restoreFromTrash(id)
+        rebuildSynapticGraph()
+    }
+
+    override suspend fun archiveNote(id: Long) = withContext(Dispatchers.IO) {
+        noteDao.archiveNote(id)
+        rebuildSynapticGraph()
+    }
+
+    override suspend fun unarchiveNote(id: Long) = withContext(Dispatchers.IO) {
+        noteDao.unarchiveNote(id)
+        rebuildSynapticGraph()
+    }
+
+    override suspend fun deleteNotePermanently(id: Long) = withContext(Dispatchers.IO) {
+        noteDao.deleteNoteById(id)
+        embeddingDao.deleteByNoteId(id)
+        noteLinkDao.deleteLinksForNote(id)
+        rebuildSynapticGraph()
+    }
+
+    override suspend fun emptyTrash() = withContext(Dispatchers.IO) {
+        noteDao.emptyTrash()
+        rebuildSynapticGraph()
+    }
+
+    override suspend fun purgeExpiredTrash() = withContext(Dispatchers.IO) {
+        val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000L)
+        noteDao.purgeExpiredTrash(thirtyDaysAgo)
+        rebuildSynapticGraph()
+    }
+
+    override fun getArchivedCount(): Flow<Int> = noteDao.getArchivedCount()
+
+    override fun getTrashCount(): Flow<Int> = noteDao.getTrashCount()
 
     override fun getNotesByMood(mood: String): Flow<List<Note>> {
         return noteDao.getNotesByMood(mood).map { entities ->
@@ -71,12 +135,7 @@ class NoteRepositoryImpl(
         noteId
     }
 
-    override suspend fun deleteNote(id: Long) = withContext(Dispatchers.IO) {
-        noteDao.deleteNoteById(id)
-        embeddingDao.deleteByNoteId(id)
-        noteLinkDao.deleteLinksForNote(id)
-        rebuildSynapticGraph()
-    }
+    override suspend fun deleteNote(id: Long) = moveToTrash(id)
 
     override suspend fun getRelatedThoughts(noteId: Long, topK: Int): List<RelatedThought> = withContext(Dispatchers.IO) {
         val currentEmbedding = embeddingDao.getEmbeddingByNoteId(noteId) ?: run {

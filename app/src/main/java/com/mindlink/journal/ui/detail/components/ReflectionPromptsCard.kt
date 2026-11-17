@@ -4,7 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -40,12 +40,12 @@ fun ReflectionPromptsCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = MindAmber.copy(alpha = 0.2f),
-                    border = BorderStroke(1.dp, MindAmber.copy(alpha = 0.4f)),
+                    color = MindGlassButtonContainer,
+                    border = BorderStroke(1.dp, MindGlassButtonBorder),
                     modifier = Modifier.size(36.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text("🔮", fontSize = 18.sp)
+                        Icon(Icons.Default.TipsAndUpdates, contentDescription = null, tint = PastelAmber, modifier = Modifier.size(18.dp))
                     }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
@@ -78,9 +78,13 @@ fun ReflectionPromptsCard(
                             verticalAlignment = Alignment.Top,
                             modifier = Modifier.padding(12.dp)
                         ) {
-                            Text(
-                                text = "💭",
-                                fontSize = 14.sp
+                            Icon(
+                                imageVector = Icons.Default.HelpOutline,
+                                contentDescription = null,
+                                tint = PastelLavender,
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(

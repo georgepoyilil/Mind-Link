@@ -7,11 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.ViewAgenda
-import androidx.compose.material.icons.filled.ViewStream
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -88,13 +84,17 @@ fun NoteStandardCard(
                     if (note.audioUri != null) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = MindIndigo.copy(alpha = 0.2f),
+                            color = MindGlassButtonContainer,
+                            border = BorderStroke(0.5.dp, MindGlassButtonBorder),
                             modifier = Modifier.padding(end = 4.dp)
                         ) {
-                            Text(
-                                text = "🎙️",
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                                fontSize = 9.sp
+                            Icon(
+                                imageVector = Icons.Default.Mic,
+                                contentDescription = "Voice Note",
+                                tint = PastelLavender,
+                                modifier = Modifier
+                                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                                    .size(11.dp)
                             )
                         }
                     }
@@ -102,13 +102,17 @@ fun NoteStandardCard(
                     if (note.imageUri != null) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = MindCyan.copy(alpha = 0.2f),
+                            color = MindGlassButtonContainer,
+                            border = BorderStroke(0.5.dp, MindGlassButtonBorder),
                             modifier = Modifier.padding(end = 4.dp)
                         ) {
-                            Text(
-                                text = "📷",
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                                fontSize = 9.sp
+                            Icon(
+                                imageVector = Icons.Default.PhotoCamera,
+                                contentDescription = "Image Attached",
+                                tint = PastelSky,
+                                modifier = Modifier
+                                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                                    .size(11.dp)
                             )
                         }
                     }
@@ -178,15 +182,22 @@ fun NoteStandardCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .background(
-                                color = MindEmerald.copy(alpha = 0.15f),
+                                color = PastelMint.copy(alpha = 0.15f),
                                 shape = RoundedCornerShape(8.dp)
                             )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.TaskAlt,
+                            contentDescription = null,
+                            tint = PastelMint,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "✅ ${note.actionItems.size} tasks",
+                            text = "${note.actionItems.size} tasks",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MindEmerald,
+                            color = PastelMint,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -225,8 +236,12 @@ fun NoteCompactItem(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                Text(text = note.moodEmoji, fontSize = 15.sp)
-                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(getMoodColor(note.mood), CircleShape)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
                         text = note.title.ifBlank { "Untitled Thought" },
@@ -251,11 +266,22 @@ fun NoteCompactItem(
                             )
                         }
                         if (note.actionItems.isNotEmpty()) {
-                            Text(
-                                text = " · ✅ ${note.actionItems.size}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MindEmerald
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = " · ", style = MaterialTheme.typography.labelSmall, color = MindTextTertiary)
+                                Icon(
+                                    imageVector = Icons.Default.TaskAlt,
+                                    contentDescription = null,
+                                    tint = PastelMint,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = "${note.actionItems.size}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = PastelMint,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
@@ -318,16 +344,28 @@ fun NoteFullWidthCard(
                         if (note.audioUri != null) {
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = MindIndigo.copy(alpha = 0.2f),
+                                color = MindGlassButtonContainer,
+                                border = BorderStroke(0.5.dp, MindGlassButtonBorder),
                                 modifier = Modifier.padding(end = 6.dp)
                             ) {
-                                Text(
-                                    text = "🎙️ ${note.formattedAudioDuration}",
-                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                    fontSize = 9.5.sp,
-                                    color = MindIndigo,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.GraphicEq,
+                                        contentDescription = null,
+                                        tint = PastelLavender,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = note.formattedAudioDuration,
+                                        fontSize = 10.sp,
+                                        color = PastelLavender,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
 
@@ -352,12 +390,21 @@ fun NoteFullWidthCard(
                 // Image Caption if present
                 if (!note.imageCaption.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "📷 ${note.imageCaption}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MindCyan,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = null,
+                            tint = PastelSky,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = note.imageCaption,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = PastelSky,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -375,17 +422,26 @@ fun NoteFullWidthCard(
                     Spacer(modifier = Modifier.height(12.dp))
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = MindEmerald.copy(alpha = 0.1f),
-                        border = BorderStroke(0.5.dp, MindEmerald.copy(alpha = 0.3f)),
+                        color = PastelMint.copy(alpha = 0.12f),
+                        border = BorderStroke(0.5.dp, PastelMint.copy(alpha = 0.35f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
-                            Text(
-                                text = "✅ Action Items (${note.actionItems.size})",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MindEmerald,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.TaskAlt,
+                                    contentDescription = null,
+                                    tint = PastelMint,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text(
+                                    text = "Action Items (${note.actionItems.size})",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = PastelMint,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                             Spacer(modifier = Modifier.height(4.dp))
                             note.actionItems.take(2).forEach { action ->
                                 Text(
@@ -429,36 +485,43 @@ fun NoteFullWidthCard(
 }
 
 @Composable
-fun MoodBadge(mood: String, emoji: String) {
-    val (bgColor, textColor) = when (mood.lowercase().trim()) {
-        "reflective" -> MindIndigo.copy(alpha = 0.2f) to MindIndigo
-        "analytical" -> MindCyan.copy(alpha = 0.2f) to MindCyan
-        "creative" -> MindPink.copy(alpha = 0.2f) to MindPink
-        "energized" -> MindAmber.copy(alpha = 0.2f) to MindAmber
-        "stressed" -> MindRose.copy(alpha = 0.2f) to MindRose
-        "calm" -> MindEmerald.copy(alpha = 0.2f) to MindEmerald
-        "vulnerable" -> MindRose.copy(alpha = 0.25f) to MindRose
-        "grateful" -> MindPink.copy(alpha = 0.25f) to MindPink
-        else -> MindEmerald.copy(alpha = 0.2f) to MindEmerald
-    }
+fun MoodBadge(mood: String, emoji: String = "") {
+    val textColor = getMoodColor(mood)
+    val bgColor = textColor.copy(alpha = 0.16f)
 
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = bgColor,
-        border = BorderStroke(0.5.dp, textColor.copy(alpha = 0.4f))
+        border = BorderStroke(0.6.dp, textColor.copy(alpha = 0.45f))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = emoji, fontSize = 13.sp)
-            Spacer(modifier = Modifier.width(4.dp))
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(textColor, CircleShape)
+            )
+            Spacer(modifier = Modifier.width(5.dp))
             Text(
                 text = mood,
                 style = MaterialTheme.typography.labelSmall,
                 color = textColor,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.SemiBold
             )
         }
     }
+}
+
+fun getMoodColor(mood: String?): Color = when (mood?.lowercase()?.trim()) {
+    "reflective" -> PastelLavender
+    "analytical" -> PastelSky
+    "creative" -> PastelViolet
+    "energized" -> PastelAmber
+    "stressed" -> PastelRose
+    "calm" -> PastelMint
+    "vulnerable" -> PastelPeach
+    "grateful" -> PastelRose
+    else -> PastelMint
 }

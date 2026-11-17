@@ -1,11 +1,13 @@
 package com.mindlink.journal.ui.detail.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -46,12 +48,12 @@ fun RelatedThoughtsCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = MindCyan.copy(alpha = 0.2f),
-                    border = BorderStroke(1.dp, MindCyan.copy(alpha = 0.4f)),
+                    color = MindGlassButtonContainer,
+                    border = BorderStroke(1.dp, MindGlassButtonBorder),
                     modifier = Modifier.size(36.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text("🧠", fontSize = 18.sp)
+                        Icon(Icons.Default.Hub, contentDescription = null, tint = PastelSky, modifier = Modifier.size(18.dp))
                     }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
@@ -97,7 +99,7 @@ fun RelatedThoughtsCard(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "🌱 No strong associative connections found yet. Add more notes to grow your neural graph!",
+                        text = "No associative connections found yet. Add more notes to grow your neural network.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MindTextSecondary,
                         modifier = Modifier.padding(14.dp)
@@ -127,7 +129,11 @@ fun RelatedThoughtsCard(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text(text = thought.note.moodEmoji, fontSize = 16.sp)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .background(PastelLavender, CircleShape)
+                                    )
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column {
                                         Text(
@@ -153,13 +159,13 @@ fun RelatedThoughtsCard(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
-                                        color = MindIndigo.copy(alpha = 0.2f),
-                                        border = BorderStroke(0.5.dp, MindIndigo.copy(alpha = 0.4f))
+                                        color = MindGlassButtonContainer,
+                                        border = BorderStroke(0.5.dp, MindGlassButtonBorder)
                                     ) {
                                         Text(
-                                            text = "🎯 $percent%",
+                                            text = "$percent% match",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MindIndigo,
+                                            color = PastelLavender,
                                             fontWeight = FontWeight.Bold,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                             fontSize = 10.sp

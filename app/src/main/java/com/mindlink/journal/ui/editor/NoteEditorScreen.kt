@@ -277,7 +277,7 @@ fun NoteEditorScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = if (uiState.id == 0L) "New Thought ✨" else "Edit Thought ✏️",
+                        text = if (uiState.id == 0L) "New Thought" else "Edit Thought",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MindTextPrimary
@@ -289,16 +289,24 @@ fun NoteEditorScreen(
                     }
                 },
                 actions = {
-                    Button(
-                        onClick = {
-                            viewModel.saveNote { id -> onSaveSuccess(id) }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = MindIndigo),
-                        shape = RoundedCornerShape(12.dp)
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MindGlassButtonContainer,
+                        border = BorderStroke(1.dp, MindGlassButtonBorder),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                viewModel.saveNote { id -> onSaveSuccess(id) }
+                            }
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = "Save", modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Save", fontWeight = FontWeight.Bold)
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = "Save", tint = PastelLavender, modifier = Modifier.size(17.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Save", fontWeight = FontWeight.Bold, color = MindGlassButtonText, fontSize = 14.sp)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MindBackgroundAmoled)
@@ -364,7 +372,7 @@ fun NoteEditorScreen(
                             text = if (uiState.speechPartialText.isNotBlank())
                                 "\"${uiState.speechPartialText}\""
                             else
-                                "🎙️ Listening & recording voice note... speak naturally",
+                                "Listening & recording voice note... speak naturally",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MindRose,
                             fontWeight = FontWeight.Medium
@@ -376,27 +384,27 @@ fun NoteEditorScreen(
             // OCR Scanning Spinner Bar
             AnimatedVisibility(visible = isOcrScanning) {
                 Surface(
-                    color = MindIndigo.copy(alpha = 0.15f),
+                    color = MindGlassButtonContainer,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp),
                     shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, MindIndigo.copy(alpha = 0.4f))
+                    border = BorderStroke(1.dp, MindGlassButtonBorder)
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         CircularProgressIndicator(
-                            color = MindIndigo,
+                            color = PastelLavender,
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "✨ Scanning document text on-device & polishing notes...",
+                            text = "Scanning document text on-device & polishing notes...",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MindIndigo,
+                            color = PastelLavender,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -409,44 +417,71 @@ fun NoteEditorScreen(
                     .fillMaxWidth()
                     .background(MindGlassSurfaceVariant)
                     .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 1. Gallery
-                FilledTonalButton(
-                    onClick = { imagePickerLauncher.launch("image/*") },
-                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = MindIndigo.copy(alpha = 0.2f)),
+                Surface(
                     shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    color = MindGlassButtonContainer,
+                    border = BorderStroke(1.dp, MindGlassButtonBorder),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { imagePickerLauncher.launch("image/*") }
                 ) {
-                    Text("Gallery", fontSize = 12.sp, color = MindIndigo, fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text("Gallery", fontSize = 12.sp, color = PastelLavender, fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 // 2. Camera Snap
-                FilledTonalButton(
-                    onClick = {
-                        val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                        if (hasPerm) launchCameraHighRes() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    },
-                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = MindCyan.copy(alpha = 0.2f)),
+                Surface(
                     shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    color = MindGlassButtonContainer,
+                    border = BorderStroke(1.dp, MindGlassButtonBorder),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable {
+                            val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                            if (hasPerm) launchCameraHighRes() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
                 ) {
-                    Text("Camera", fontSize = 12.sp, color = MindCyan, fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = PastelSky, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text("Camera", fontSize = 12.sp, color = PastelSky, fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 // 3. Camera OCR Scanner
-                FilledTonalButton(
-                    onClick = {
-                        val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                        if (hasPerm) launchOcrHighRes() else ocrPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    },
-                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = MindViolet.copy(alpha = 0.25f)),
+                Surface(
                     shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    color = MindGlassButtonContainer,
+                    border = BorderStroke(1.dp, MindGlassButtonBorder),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable {
+                            val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                            if (hasPerm) launchOcrHighRes() else ocrPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
                 ) {
-                    Text("Scan Text", fontSize = 12.sp, color = MindViolet, fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.DocumentScanner, contentDescription = null, tint = PastelViolet, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text("Scan Text", fontSize = 12.sp, color = PastelViolet, fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 IconButton(onClick = { viewModel.insertMarkdown("**", "**") }) {
@@ -456,7 +491,7 @@ fun NoteEditorScreen(
                     Text("H3", fontWeight = FontWeight.Bold, color = MindTextSecondary, fontSize = 14.sp)
                 }
                 IconButton(onClick = { viewModel.insertMarkdown("- [ ] ") }) {
-                    Icon(Icons.Default.CheckBox, contentDescription = "Task Checkbox", tint = MindTextSecondary)
+                    Icon(Icons.Default.TaskAlt, contentDescription = "Task Checkbox", tint = PastelMint)
                 }
                 IconButton(onClick = { viewModel.insertMarkdown("- ") }) {
                     Icon(Icons.Default.FormatListBulleted, contentDescription = "Bullet List", tint = MindTextSecondary)
@@ -492,7 +527,7 @@ fun NoteEditorScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("🎙️", fontSize = 18.sp)
+                                Icon(Icons.Default.Mic, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
@@ -552,19 +587,19 @@ fun NoteEditorScreen(
                             OutlinedTextField(
                                 value = uiState.imageCaption ?: "",
                                 onValueChange = { viewModel.updateImageCaption(it) },
-                                placeholder = { Text("📷 Add caption (voice or text)...", color = MindTextTertiary, fontSize = 13.sp) },
+                                placeholder = { Text("Add caption (voice or text)...", color = MindTextTertiary, fontSize = 13.sp) },
                                 shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedContainerColor = MindGlassSurfaceVariant,
                                     unfocusedContainerColor = MindGlassSurfaceVariant,
-                                    focusedBorderColor = MindIndigo,
+                                    focusedBorderColor = PastelLavender,
                                     unfocusedBorderColor = MindGlassBorderSubtle,
                                     focusedTextColor = MindTextPrimary,
                                     unfocusedTextColor = MindTextPrimary
                                 ),
                                 trailingIcon = {
                                     IconButton(onClick = { toggleSpeech(true) }) {
-                                        Text("🎙️", fontSize = 16.sp)
+                                        Icon(Icons.Default.Mic, contentDescription = "Dictate", tint = PastelLavender, modifier = Modifier.size(18.dp))
                                     }
                                 },
                                 singleLine = true,
@@ -573,60 +608,67 @@ fun NoteEditorScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // On-demand OCR for uploaded/captured image
-                            FilledTonalButton(
-                                onClick = {
-                                    val uriStr = uiState.imageUri ?: return@FilledTonalButton
-                                    val uri = Uri.parse(uriStr)
-                                    coroutineScope.launch {
-                                        isOcrScanning = true
-                                        val result = ocrHelper.extractTextFromImageUri(uri)
-                                        result.onSuccess { rawText ->
-                                            if (rawText.isNotBlank()) {
-                                                val (polishedTitle, polishedBody) = brainstormingEngine.polishOcrText(rawText)
-                                                if (uiState.title.isBlank()) viewModel.updateTitle(polishedTitle)
-                                                val merged = if (uiState.content.isBlank()) polishedBody else "${uiState.content}\n\n$polishedBody"
-                                                viewModel.updateContent(merged)
-                                                Toast.makeText(context, "Text extracted and polished into note", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                Toast.makeText(context, "No text detected in this image", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }.onFailure { err ->
-                                            Toast.makeText(context, "OCR failed: ${err.message}", Toast.LENGTH_SHORT).show()
-                                        }
-                                        isOcrScanning = false
-                                    }
-                                },
-                                enabled = !isOcrScanning,
-                                colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = MindViolet.copy(alpha = 0.25f),
-                                    contentColor = MindViolet
-                                ),
+                            // On-demand OCR for uploaded/captured image (Classy Pastel Glass Button)
+                            Surface(
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                color = MindGlassButtonContainer,
+                                border = BorderStroke(1.dp, MindGlassButtonBorder),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable(enabled = !isOcrScanning) {
+                                        val uriStr = uiState.imageUri ?: return@clickable
+                                        val uri = Uri.parse(uriStr)
+                                        coroutineScope.launch {
+                                            isOcrScanning = true
+                                            val result = ocrHelper.extractTextFromImageUri(uri)
+                                            result.onSuccess { rawText ->
+                                                if (rawText.isNotBlank()) {
+                                                    val (polishedTitle, polishedBody) = brainstormingEngine.polishOcrText(rawText)
+                                                    if (uiState.title.isBlank()) viewModel.updateTitle(polishedTitle)
+                                                    val merged = if (uiState.content.isBlank()) polishedBody else "${uiState.content}\n\n$polishedBody"
+                                                    viewModel.updateContent(merged)
+                                                    Toast.makeText(context, "Text extracted and polished into note", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, "No text detected in this image", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }.onFailure { err ->
+                                                Toast.makeText(context, "OCR failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                            isOcrScanning = false
+                                        }
+                                    }
                             ) {
-                                if (isOcrScanning) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MindViolet
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Extracting Text with ML Kit...", fontSize = 12.sp, color = MindViolet)
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Default.DocumentScanner,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MindViolet
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Extract Text from Image",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MindViolet
-                                    )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 11.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (isOcrScanning) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp,
+                                            color = PastelViolet
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Extracting Text with ML Kit...", fontSize = 13.sp, color = PastelViolet, fontWeight = FontWeight.Bold)
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.DocumentScanner,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(17.dp),
+                                            tint = PastelViolet
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Extract Text from Image",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = PastelViolet
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -656,103 +698,145 @@ fun NoteEditorScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Tags Row & Input
-                Row(
+                // Hashtags Section
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    // Active Selected Tags (Glassy Pastel Pills)
+                    if (uiState.tags.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            uiState.tags.forEach { tag ->
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MindGlassButtonContainer,
+                                    border = BorderStroke(0.8.dp, MindGlassButtonBorder)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "#$tag",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = PastelLavender
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Remove tag",
+                                            tint = PastelRose,
+                                            modifier = Modifier
+                                                .size(14.dp)
+                                                .clickable { viewModel.removeTag(tag) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Comfortable, Full-Width Hashtag Input Bar
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MindGlassSurfaceVariant,
+                        border = BorderStroke(1.dp, MindGlassBorderSubtle),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        uiState.tags.forEach { tag ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MindGlassSurfaceVariant,
-                                border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tag,
+                                contentDescription = null,
+                                tint = PastelLavender,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Box(modifier = Modifier.weight(1f)) {
+                                if (uiState.tagInput.isEmpty()) {
+                                    Text(
+                                        text = "Add hashtag (e.g. ideas, work, journal)...",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MindTextTertiary
+                                    )
+                                }
+                                androidx.compose.foundation.text.BasicTextField(
+                                    value = uiState.tagInput,
+                                    onValueChange = { viewModel.updateTagInput(it) },
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MindTextPrimary),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                    keyboardActions = KeyboardActions(onDone = { viewModel.addTag() }),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            if (uiState.tagInput.isNotBlank()) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MindGlassButtonContainer,
+                                    border = BorderStroke(0.8.dp, MindGlassButtonBorder),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { viewModel.addTag() }
                                 ) {
                                     Text(
-                                        text = "#$tag",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MindTextSecondary
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Remove tag",
-                                        tint = MindTextTertiary,
-                                        modifier = Modifier
-                                            .size(12.dp)
-                                            .clickable { viewModel.removeTag(tag) }
+                                        text = "Add",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = PastelLavender,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                                     )
                                 }
                             }
                         }
-
-                        // Add Tag inline
-                        OutlinedTextField(
-                            value = uiState.tagInput,
-                            onValueChange = { viewModel.updateTagInput(it) },
-                            placeholder = { Text("+tag", color = MindTextTertiary, fontSize = 12.sp) },
-                            modifier = Modifier
-                                .width(90.dp)
-                                .height(38.dp),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = { viewModel.addTag() }),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = MindGlassSurfaceVariant,
-                                unfocusedContainerColor = MindGlassSurfaceVariant,
-                                focusedBorderColor = MindIndigo,
-                                unfocusedBorderColor = MindGlassBorderSubtle,
-                                focusedTextColor = MindTextPrimary,
-                                unfocusedTextColor = MindTextPrimary
-                            )
-                        )
                     }
-                }
 
-                // Suggested Tags to Select
-                val unselectedSuggestions = uiState.suggestedTags.filter { !uiState.tags.contains(it) }
-                if (unselectedSuggestions.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Suggested:",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MindTextTertiary
-                        )
-                        unselectedSuggestions.take(8).forEach { tag ->
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MindGlassSurfaceVariant,
-                                border = BorderStroke(0.5.dp, MindIndigo.copy(alpha = 0.35f)),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { viewModel.selectSuggestedTag(tag) }
-                            ) {
-                                Text(
-                                    text = "+ #$tag",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MindIndigo,
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                                    fontWeight = FontWeight.Medium
-                                )
+                    // Suggested Tags to Select
+                    val unselectedSuggestions = uiState.suggestedTags.filter { !uiState.tags.contains(it) }
+                    if (unselectedSuggestions.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Suggested:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MindTextTertiary
+                            )
+                            unselectedSuggestions.take(8).forEach { tag ->
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MindGlassSurfaceVariant,
+                                    border = BorderStroke(0.5.dp, MindGlassButtonBorder),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable { viewModel.selectSuggestedTag(tag) }
+                                ) {
+                                    Text(
+                                        text = "+ #$tag",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = PastelLavender,
+                                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
                     }

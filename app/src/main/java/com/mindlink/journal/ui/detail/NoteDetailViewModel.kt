@@ -80,12 +80,45 @@ class NoteDetailViewModel(
         }
     }
 
-    fun deleteNote(onDeleted: () -> Unit) {
+    fun archiveNote(onSuccess: () -> Unit) {
         viewModelScope.launch {
-            repository.deleteNote(noteId)
+            repository.archiveNote(noteId)
+            onSuccess()
+        }
+    }
+
+    fun unarchiveNote(onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            repository.unarchiveNote(noteId)
+            onSuccess()
+        }
+    }
+
+    fun moveToTrash(onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            repository.moveToTrash(noteId)
+            _uiState.update { it.copy(isDeleted = true) }
+            onSuccess()
+        }
+    }
+
+    fun restoreFromTrash(onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            repository.restoreFromTrash(noteId)
+            onSuccess()
+        }
+    }
+
+    fun deletePermanently(onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            repository.deleteNotePermanently(noteId)
             _uiState.update { it.copy(isDeleted = true) }
             onDeleted()
         }
+    }
+
+    fun deleteNote(onDeleted: () -> Unit) {
+        moveToTrash(onDeleted)
     }
 
     class Factory(

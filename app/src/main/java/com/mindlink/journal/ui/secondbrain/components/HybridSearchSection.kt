@@ -1,11 +1,13 @@
 package com.mindlink.journal.ui.secondbrain.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,8 +37,10 @@ fun HybridSearchSection(
         ) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.FindInPage, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "📄 Matched Journal Entries",
+                        text = "Matched Journal Entries",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MindTextPrimary
@@ -65,17 +69,23 @@ fun HybridSearchSection(
 
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = MindCyan.copy(alpha = 0.15f),
-                border = BorderStroke(0.5.dp, MindCyan.copy(alpha = 0.3f))
+                color = MindGlassButtonContainer,
+                border = BorderStroke(0.5.dp, MindGlassButtonBorder)
             ) {
-                Text(
-                    text = "⚡ Hybrid Search",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MindCyan,
-                    fontWeight = FontWeight.Bold,
+                Row(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                    fontSize = 10.sp
-                )
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Bolt, contentDescription = null, tint = PastelSky, modifier = Modifier.size(12.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = "Hybrid Search",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = PastelSky,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp
+                    )
+                }
             }
         }
 
@@ -104,7 +114,11 @@ fun HybridSearchSection(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text(text = result.note.moodEmoji, fontSize = 16.sp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(PastelLavender, CircleShape)
+                                )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = result.note.title,
@@ -120,13 +134,13 @@ fun HybridSearchSection(
                                 if (result.isSemanticMatch) {
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
-                                        color = MindIndigo.copy(alpha = 0.2f),
-                                        border = BorderStroke(0.5.dp, MindIndigo.copy(alpha = 0.3f))
+                                        color = MindGlassButtonContainer,
+                                        border = BorderStroke(0.5.dp, MindGlassButtonBorder)
                                     ) {
                                         Text(
-                                            text = "🎯 Semantic",
+                                            text = "Semantic",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MindIndigo,
+                                            color = PastelLavender,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                             fontSize = 9.sp
                                         )
@@ -135,13 +149,13 @@ fun HybridSearchSection(
                                 if (result.isKeywordMatch) {
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
-                                        color = MindCyan.copy(alpha = 0.2f),
-                                        border = BorderStroke(0.5.dp, MindCyan.copy(alpha = 0.3f))
+                                        color = MindGlassButtonContainer,
+                                        border = BorderStroke(0.5.dp, MindGlassButtonBorder)
                                     ) {
                                         Text(
-                                            text = "🔍 FTS",
+                                            text = "FTS",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MindCyan,
+                                            color = PastelSky,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                             fontSize = 9.sp
                                         )
@@ -168,7 +182,7 @@ fun HybridSearchSection(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "📅 ${result.note.formattedDate}",
+                                text = result.note.formattedDate,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MindTextTertiary
                             )

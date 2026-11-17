@@ -69,19 +69,34 @@ fun NoteDetailScreen(
         }
     }
 
+    val note = uiState.note
+
     if (showDeleteDialog) {
+        val isTrash = note?.isDeleted == true
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Thought", color = MindTextPrimary) },
-            text = { Text("Are you sure you want to delete this entry and its semantic embeddings from your Second Brain?", color = MindTextSecondary) },
+            title = { Text(if (isTrash) "Delete Thought Forever" else "Move to Trash", color = MindTextPrimary) },
+            text = {
+                Text(
+                    text = if (isTrash)
+                        "Permanently delete this thought and its embeddings? This action cannot be undone."
+                    else
+                        "Move this thought to Trash? Items in Trash are automatically deleted after 30 days.",
+                    color = MindTextSecondary
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showDeleteDialog = false
-                        viewModel.deleteNote { onNavigateBack() }
+                        if (isTrash) {
+                            viewModel.deletePermanently { onNavigateBack() }
+                        } else {
+                            viewModel.moveToTrash { onNavigateBack() }
+                        }
                     }
                 ) {
-                    Text("Delete", color = MindRose, fontWeight = FontWeight.Bold)
+                    Text(if (isTrash) "Delete Forever" else "Move to Trash", color = MindRose, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -94,8 +109,6 @@ fun NoteDetailScreen(
         )
     }
 
-    val note = uiState.note
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -107,8 +120,30 @@ fun NoteDetailScreen(
                 },
                 actions = {
                     if (note != null) {
-                        IconButton(onClick = { showDeleteDialog = true }) {
-                            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", tint = MindRose)
+                        if (note.isDeleted) {
+                            // Restore from Trash
+                            IconButton(onClick = { viewModel.restoreFromTrash { onNavigateBack() } }) {
+                                Icon(Icons.Default.Restore, contentDescription = "Restore", tint = PastelMint)
+                            }
+                            // Delete Permanently
+                            IconButton(onClick = { showDeleteDialog = true }) {
+                                Icon(Icons.Default.DeleteForever, contentDescription = "Delete Forever", tint = PastelRose)
+                            }
+                        } else {
+                            // Archive / Unarchive
+                            if (note.isArchived) {
+                                IconButton(onClick = { viewModel.unarchiveNote { onNavigateBack() } }) {
+                                    Icon(Icons.Default.Unarchive, contentDescription = "Unarchive", tint = PastelAmber)
+                                }
+                            } else {
+                                IconButton(onClick = { viewModel.archiveNote { onNavigateBack() } }) {
+                                    Icon(Icons.Default.Archive, contentDescription = "Archive", tint = PastelAmber)
+                                }
+                            }
+                            // Move to Trash
+                            IconButton(onClick = { showDeleteDialog = true }) {
+                                Icon(Icons.Default.DeleteOutline, contentDescription = "Move to Trash", tint = PastelRose)
+                            }
                         }
                     }
                 },
@@ -141,6 +176,51 @@ fun NoteDetailScreen(
                         .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    // Status Banners (Trash Lifecycle with 30-Day Auto-Purge or Archived)
+                    if (note.isDeleted) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = PastelRose.copy(alpha = 0.16f),
+                            border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Schedule, contentDescription = null, tint = PastelRose, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "In Trash · Auto-purges in ${note.daysUntilExpiry} days",
+                                    color = PastelRose,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    } else if (note.isArchived) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = PastelAmber.copy(alpha = 0.16f),
+                            border = BorderStroke(1.dp, PastelAmber.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Archive, contentDescription = null, tint = PastelAmber, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Archived Thought · Kept safe outside main journal",
+                                    color = PastelAmber,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
                     // Header: Mood badge & Date
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -183,7 +263,7 @@ fun NoteDetailScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Surface(
                                         shape = CircleShape,
-                                        color = if (isPlayingAudio) MindRose else MindIndigo,
+                                        color = if (isPlayingAudio) PastelRose else PastelLavender,
                                         modifier = Modifier
                                             .size(42.dp)
                                             .clip(CircleShape)
@@ -209,9 +289,11 @@ fun NoteDetailScreen(
                                             }
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                text = if (isPlayingAudio) "⏸️" else "▶️",
-                                                fontSize = 18.sp
+                                            Icon(
+                                                imageVector = if (isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                                contentDescription = if (isPlayingAudio) "Pause" else "Play",
+                                                tint = Color.Black,
+                                                modifier = Modifier.size(22.dp)
                                             )
                                         }
                                     }
@@ -224,7 +306,7 @@ fun NoteDetailScreen(
                                             color = MindTextPrimary
                                         )
                                         Text(
-                                            text = "🎙️ Duration: ${note.formattedAudioDuration} · High-efficiency AAC",
+                                            text = "Duration: ${note.formattedAudioDuration} · High-efficiency AAC",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MindTextSecondary
                                         )
@@ -257,7 +339,12 @@ fun NoteDetailScreen(
                                 if (!note.imageCaption.isNullOrBlank()) {
                                     Spacer(modifier = Modifier.height(10.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("📷", fontSize = 14.sp)
+                                        Icon(
+                                            imageVector = Icons.Default.Image,
+                                            contentDescription = null,
+                                            tint = PastelSky,
+                                            modifier = Modifier.size(14.dp)
+                                        )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = note.imageCaption,
@@ -269,61 +356,68 @@ fun NoteDetailScreen(
                                 }
 
                                 Spacer(modifier = Modifier.height(10.dp))
-                                FilledTonalButton(
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            isOcrScanning = true
-                                            try {
-                                                val uri = Uri.parse(note.imageUri)
-                                                val result = ocrHelper.extractTextFromImageUri(uri)
-                                                result.onSuccess { rawText ->
-                                                    if (rawText.isNotBlank()) {
-                                                        val (_, polishedBody) = brainstormingEngine.polishOcrText(rawText)
-                                                        viewModel.appendContent(polishedBody)
-                                                        Toast.makeText(context, "Text extracted & saved to thought", Toast.LENGTH_SHORT).show()
-                                                    } else {
-                                                        Toast.makeText(context, "No text detected in this image", Toast.LENGTH_SHORT).show()
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MindGlassButtonContainer,
+                                    border = BorderStroke(1.dp, MindGlassButtonBorder),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable(enabled = !isOcrScanning) {
+                                            coroutineScope.launch {
+                                                isOcrScanning = true
+                                                try {
+                                                    val uri = Uri.parse(note.imageUri)
+                                                    val result = ocrHelper.extractTextFromImageUri(uri)
+                                                    result.onSuccess { rawText ->
+                                                        if (rawText.isNotBlank()) {
+                                                            val (_, polishedBody) = brainstormingEngine.polishOcrText(rawText)
+                                                            viewModel.appendContent(polishedBody)
+                                                            Toast.makeText(context, "Text extracted & saved to thought", Toast.LENGTH_SHORT).show()
+                                                        } else {
+                                                            Toast.makeText(context, "No text detected in this image", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }.onFailure { err ->
+                                                        Toast.makeText(context, "OCR failed: ${err.message}", Toast.LENGTH_SHORT).show()
                                                     }
-                                                }.onFailure { err ->
-                                                    Toast.makeText(context, "OCR failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                } finally {
+                                                    isOcrScanning = false
                                                 }
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                            } finally {
-                                                isOcrScanning = false
                                             }
                                         }
-                                    },
-                                    enabled = !isOcrScanning,
-                                    colors = ButtonDefaults.filledTonalButtonColors(
-                                        containerColor = MindViolet.copy(alpha = 0.25f),
-                                        contentColor = MindViolet
-                                    ),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    if (isOcrScanning) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(16.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MindViolet
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Extracting Text...", fontSize = 12.sp, color = MindViolet)
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.DocumentScanner,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = MindViolet
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "Extract Text from Image",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MindViolet
-                                        )
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 11.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (isOcrScanning) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp,
+                                                color = PastelViolet
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Extracting Text...", fontSize = 13.sp, color = PastelViolet, fontWeight = FontWeight.Bold)
+                                        } else {
+                                            Icon(
+                                                imageVector = Icons.Default.DocumentScanner,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(17.dp),
+                                                tint = PastelViolet
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "Extract Text from Image",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = PastelViolet
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -362,7 +456,7 @@ fun NoteDetailScreen(
                     ) {
                         Column(modifier = Modifier.padding(18.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("📝", fontSize = 16.sp)
+                                Icon(Icons.Default.Notes, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(17.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "Journal Entry",
@@ -386,13 +480,13 @@ fun NoteDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(top = 8.dp)
                     ) {
-                        Text("✨", fontSize = 18.sp)
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "AI Second Brain Analysis",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MindIndigo
+                            color = PastelLavender
                         )
                     }
 
@@ -408,13 +502,13 @@ fun NoteDetailScreen(
                                 modifier = Modifier.padding(16.dp),
                                 verticalAlignment = Alignment.Top
                             ) {
-                                Text("🤖", fontSize = 20.sp)
+                                Icon(Icons.Default.Psychology, contentDescription = null, tint = PastelSky, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
                                         text = "AI TL;DR Summary",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MindIndigo,
+                                        color = PastelSky,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
@@ -435,11 +529,11 @@ fun NoteDetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(containerColor = MindGlassSurface),
-                            border = BorderStroke(1.dp, MindEmerald.copy(alpha = 0.35f))
+                            border = BorderStroke(1.dp, PastelMint.copy(alpha = 0.35f))
                         ) {
                             Column(modifier = Modifier.padding(18.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("✅", fontSize = 18.sp)
+                                    Icon(Icons.Default.TaskAlt, contentDescription = null, tint = PastelMint, modifier = Modifier.size(19.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "Extracted Action Items (${note.actionItems.size})",
@@ -463,7 +557,7 @@ fun NoteDetailScreen(
                                             checked = isChecked,
                                             onCheckedChange = { viewModel.toggleActionItem(index) },
                                             colors = CheckboxDefaults.colors(
-                                                checkedColor = MindEmerald,
+                                                checkedColor = PastelMint,
                                                 uncheckedColor = MindTextTertiary
                                             )
                                         )
@@ -511,12 +605,24 @@ fun NoteDetailScreen(
                             Text("← Back", color = MindTextSecondary)
                         }
 
-                        Button(
-                            onClick = { onEditClick(note.id) },
-                            colors = ButtonDefaults.buttonColors(containerColor = MindIndigo),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Text("Edit Thought", fontWeight = FontWeight.Bold)
+                        if (!note.isDeleted) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MindGlassButtonContainer,
+                                border = BorderStroke(1.dp, MindGlassButtonBorder),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { onEditClick(note.id) }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Edit Thought", fontWeight = FontWeight.Bold, color = MindGlassButtonText, fontSize = 14.sp)
+                                }
+                            }
                         }
                     }
                 }

@@ -14,9 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CenterFocusStrong
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -333,7 +331,11 @@ fun ThoughtGraphScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(node.moodEmoji, fontSize = 22.sp)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .background(Color(node.colorLong), CircleShape)
+                                    )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = node.mood ?: "Thought Node",
@@ -341,18 +343,25 @@ fun ThoughtGraphScreen(
                                         fontWeight = FontWeight.Bold,
                                         color = Color(node.colorLong)
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Surface(
                                         shape = RoundedCornerShape(8.dp),
-                                        color = MindIndigo.copy(alpha = 0.2f)
+                                        color = MindGlassButtonContainer,
+                                        border = BorderStroke(0.5.dp, MindGlassButtonBorder)
                                     ) {
-                                        Text(
-                                            text = "🔗 ${node.degree} synapses",
+                                        Row(
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                            fontSize = 10.sp,
-                                            color = MindIndigo,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Hub, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(11.dp))
+                                            Spacer(modifier = Modifier.width(3.dp))
+                                            Text(
+                                                text = "${node.degree} synapses",
+                                                fontSize = 10.sp,
+                                                color = PastelLavender,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
                                     }
                                 }
 

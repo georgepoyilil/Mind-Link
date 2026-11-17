@@ -13,6 +13,27 @@ val MindEmerald = Color(0xFF10B981)
 val MindAmber = Color(0xFFF59E0B)
 val MindRose = Color(0xFFF43F5E)
 
+// Unified Pastel Glass Palette (Classy, Apple Glass / VisionOS / Nothing OS aesthetic)
+val PastelLavender = Color(0xFFA5B4FC)   // Primary soft lavender
+val PastelViolet = Color(0xFFC4B5FD)     // Secondary soft violet
+val PastelMint = Color(0xFF6EE7B7)       // Fresh muted mint (tasks & completion)
+val PastelSky = Color(0xFF7DD3FC)        // Subtle airy sky blue (media & attachments)
+val PastelPeach = Color(0xFFFDBA74)      // Warm pastel peach (notes & summaries)
+val PastelRose = Color(0xFFFDA4AF)       // Soft muted rose (delete & trash)
+val PastelAmber = Color(0xFFFDE68A)      // Soft pastel amber (archive & highlights)
+
+// Unified Classy Glass Button Styles
+val MindGlassButtonContainer = Color(0x2AA5B4FC)  // ~16% opacity soft lavender glass
+val MindGlassButtonBorder = Color(0x4DA5B4FC)     // 30% opacity frosted lavender border
+val MindGlassButtonText = Color(0xFFE2E8F0)       // Pure, crisp high-readability text
+val MindGlassButtonBorderBrush = Brush.linearGradient(
+    listOf(
+        Color(0x66A5B4FC),
+        Color(0x33FFFFFF),
+        Color(0x44C4B5FD)
+    )
+)
+
 // AMOLED Pitch Black Surfaces (Nothing Phone Essential Space inspired)
 val MindBackgroundAmoled = Color(0xFF000000)          // Pure Pitch Black #000000 (Pixels Off)
 val MindSurfaceAmoled = Color(0xFF070A12)             // Deep Obsidian Slate

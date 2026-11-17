@@ -468,7 +468,7 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
 
         val bodyLines = if (cleanLines.size > 1) cleanLines.drop(1) else cleanLines
         val contentBuilder = StringBuilder()
-        contentBuilder.append("### 🔍 Scanned & Polished Thought\n\n")
+        contentBuilder.append("### Scanned & Polished Thought\n\n")
 
         for (line in bodyLines) {
             if (line.startsWith("-") || line.startsWith("•") || line.startsWith("*")) {

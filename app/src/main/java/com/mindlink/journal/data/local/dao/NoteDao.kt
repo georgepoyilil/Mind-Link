@@ -25,11 +25,35 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE id = :id")
     suspend fun getNoteByIdSync(id: Long): NoteEntity?
 
-    @Query("SELECT * FROM notes ORDER BY createdAt DESC")
+    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND isArchived = 0 ORDER BY createdAt DESC")
     fun getAllNotes(): Flow<List<NoteEntity>>
 
-    @Query("SELECT * FROM notes WHERE mood = :mood ORDER BY createdAt DESC")
+    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND isArchived = 1 ORDER BY updatedAt DESC")
+    fun getArchivedNotes(): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes WHERE isDeleted = 1 ORDER BY deletedAt DESC")
+    fun getTrashNotes(): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes WHERE mood = :mood AND isDeleted = 0 AND isArchived = 0 ORDER BY createdAt DESC")
     fun getNotesByMood(mood: String): Flow<List<NoteEntity>>
+
+    @Query("UPDATE notes SET isDeleted = 1, deletedAt = :deletedAt WHERE id = :id")
+    suspend fun moveToTrash(id: Long, deletedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE notes SET isDeleted = 0, deletedAt = NULL WHERE id = :id")
+    suspend fun restoreFromTrash(id: Long)
+
+    @Query("UPDATE notes SET isArchived = 1, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun archiveNote(id: Long, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE notes SET isArchived = 0, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun unarchiveNote(id: Long, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("DELETE FROM notes WHERE isDeleted = 1")
+    suspend fun emptyTrash()
+
+    @Query("DELETE FROM notes WHERE isDeleted = 1 AND deletedAt IS NOT NULL AND deletedAt <= :cutoffTimestamp")
+    suspend fun purgeExpiredTrash(cutoffTimestamp: Long)
 
     @Query("SELECT * FROM notes WHERE id IN (:ids)")
     suspend fun getNotesByIds(ids: List<Long>): List<NoteEntity>
@@ -59,6 +83,12 @@ interface NoteDao {
         updatedAt: Long = System.currentTimeMillis()
     )
 
-    @Query("SELECT COUNT(*) FROM notes")
+    @Query("SELECT COUNT(*) FROM notes WHERE isDeleted = 0 AND isArchived = 0")
     fun getNotesCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM notes WHERE isDeleted = 0 AND isArchived = 1")
+    fun getArchivedCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM notes WHERE isDeleted = 1")
+    fun getTrashCount(): Flow<Int>
 }

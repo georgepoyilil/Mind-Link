@@ -8,8 +8,17 @@ import com.mindlink.journal.domain.model.Note
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+enum class NotesTab(val label: String) {
+    JOURNAL("Journal"),
+    ARCHIVE("Archive"),
+    TRASH("Trash")
+}
+
 data class NotesUiState(
+    val selectedTab: NotesTab = NotesTab.JOURNAL,
     val notes: List<Note> = emptyList(),
+    val archivedNotes: List<Note> = emptyList(),
+    val trashNotes: List<Note> = emptyList(),
     val filteredNotes: List<Note> = emptyList(),
     val selectedMood: String? = null,
     val searchQuery: String = "",
@@ -25,11 +34,24 @@ class NotesViewModel(
 
     init {
         viewModelScope.launch {
-            repository.getAllNotes().collect { notesList ->
+            combine(
+                repository.getAllNotes(),
+                repository.getArchivedNotes(),
+                repository.getTrashNotes()
+            ) { active, archived, trash ->
+                Triple(active, archived, trash)
+            }.collect { (active, archived, trash) ->
                 _uiState.update { state ->
-                    val filtered = applyFilter(notesList, state.selectedMood, state.searchQuery)
+                    val currentSource = when (state.selectedTab) {
+                        NotesTab.JOURNAL -> active
+                        NotesTab.ARCHIVE -> archived
+                        NotesTab.TRASH -> trash
+                    }
+                    val filtered = applyFilter(currentSource, state.selectedMood, state.searchQuery)
                     state.copy(
-                        notes = notesList,
+                        notes = active,
+                        archivedNotes = archived,
+                        trashNotes = trash,
                         filteredNotes = filtered,
                         isLoading = false
                     )
@@ -38,25 +60,81 @@ class NotesViewModel(
         }
     }
 
+    fun selectTab(tab: NotesTab) {
+        _uiState.update { state ->
+            val sourceList = when (tab) {
+                NotesTab.JOURNAL -> state.notes
+                NotesTab.ARCHIVE -> state.archivedNotes
+                NotesTab.TRASH -> state.trashNotes
+            }
+            val filtered = applyFilter(sourceList, state.selectedMood, state.searchQuery)
+            state.copy(selectedTab = tab, filteredNotes = filtered)
+        }
+    }
+
     fun selectMoodFilter(mood: String?) {
         _uiState.update { state ->
             val newMood = if (state.selectedMood == mood) null else mood
-            val filtered = applyFilter(state.notes, newMood, state.searchQuery)
+            val sourceList = when (state.selectedTab) {
+                NotesTab.JOURNAL -> state.notes
+                NotesTab.ARCHIVE -> state.archivedNotes
+                NotesTab.TRASH -> state.trashNotes
+            }
+            val filtered = applyFilter(sourceList, newMood, state.searchQuery)
             state.copy(selectedMood = newMood, filteredNotes = filtered)
         }
     }
 
     fun updateSearchQuery(query: String) {
         _uiState.update { state ->
-            val filtered = applyFilter(state.notes, state.selectedMood, query)
+            val sourceList = when (state.selectedTab) {
+                NotesTab.JOURNAL -> state.notes
+                NotesTab.ARCHIVE -> state.archivedNotes
+                NotesTab.TRASH -> state.trashNotes
+            }
+            val filtered = applyFilter(sourceList, state.selectedMood, query)
             state.copy(searchQuery = query, filteredNotes = filtered)
         }
     }
 
-    fun deleteNote(noteId: Long) {
+    fun archiveNote(noteId: Long) {
         viewModelScope.launch {
-            repository.deleteNote(noteId)
+            repository.archiveNote(noteId)
         }
+    }
+
+    fun unarchiveNote(noteId: Long) {
+        viewModelScope.launch {
+            repository.unarchiveNote(noteId)
+        }
+    }
+
+    fun moveToTrash(noteId: Long) {
+        viewModelScope.launch {
+            repository.moveToTrash(noteId)
+        }
+    }
+
+    fun restoreFromTrash(noteId: Long) {
+        viewModelScope.launch {
+            repository.restoreFromTrash(noteId)
+        }
+    }
+
+    fun deletePermanently(noteId: Long) {
+        viewModelScope.launch {
+            repository.deleteNotePermanently(noteId)
+        }
+    }
+
+    fun emptyTrash() {
+        viewModelScope.launch {
+            repository.emptyTrash()
+        }
+    }
+
+    fun deleteNote(noteId: Long) {
+        moveToTrash(noteId)
     }
 
     fun seedSampleData() {
