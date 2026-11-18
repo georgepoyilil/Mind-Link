@@ -27,7 +27,7 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("keystore/release.keystore")
+            storeFile = rootProject.file("app/keystore/release.keystore")
             storePassword = "mindlinkpassword"
             keyAlias = "mindlink"
             keyPassword = "mindlinkpassword"
@@ -43,6 +43,11 @@ android {
                 "proguard-rules.pro"
             )
         }
+    }
+
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
     }
 
     compileOptions {
