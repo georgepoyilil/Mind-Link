@@ -2,12 +2,19 @@ package com.mindlink.journal.data.ai
 
 import com.mindlink.journal.domain.model.Note
 
+data class ContextualReminder(
+    val triggerPattern: String,
+    val question: String,
+    val suggestedDelayMinutes: Long = 120
+)
+
 data class NoteAnalysisResult(
     val summary: String,
     val mood: String,
     val tags: List<String>,
     val actionItems: List<String>,
-    val reflectionPrompts: List<String>
+    val reflectionPrompts: List<String>,
+    val contextualReminder: ContextualReminder? = null
 )
 
 data class SynthesisResult(

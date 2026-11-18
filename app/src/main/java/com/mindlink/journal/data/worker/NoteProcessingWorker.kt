@@ -53,13 +53,24 @@ class NoteProcessingWorker(
                 )
             )
 
+            // Merge action items: preserve existing user checklist items and their checked status
+            val mergedActionItems = if (note.actionItems.isNotEmpty()) {
+                val existingClean = note.actionItems.map { it.removePrefix("[x] ").removePrefix("[ ] ").trim().lowercase(java.util.Locale.ROOT) }
+                val newItems = analysis.actionItems.filter { extracted ->
+                    !existingClean.contains(extracted.removePrefix("[x] ").removePrefix("[ ] ").trim().lowercase(java.util.Locale.ROOT))
+                }
+                note.actionItems + newItems
+            } else {
+                analysis.actionItems
+            }
+
             // 4. Update Note Entity in Room Database
             noteDao.updateProcessingMetadata(
                 id = noteId,
                 summary = analysis.summary,
                 mood = analysis.mood,
                 tags = combinedTags,
-                actionItems = analysis.actionItems,
+                actionItems = mergedActionItems,
                 reflectionPrompts = analysis.reflectionPrompts,
                 isProcessed = true,
                 updatedAt = System.currentTimeMillis()

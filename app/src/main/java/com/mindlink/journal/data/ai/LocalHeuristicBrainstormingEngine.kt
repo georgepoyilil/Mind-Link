@@ -22,15 +22,19 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
         // 4. Generate 1-sentence TL;DR Summary
         val summary = generateSummary(title, content)
 
-        // 5. Generate 2-3 Reflection Prompts / Counter-arguments
+        // 5. Generate 2-3 Dynamic Contextual Reflection Prompts
         val reflectionPrompts = generateReflectionPrompts(title, content, mood)
+
+        // 6. Extract Proactive Contextual Reminder (if note exhibits physical/relational strain)
+        val contextualReminder = extractContextualReminder(title, content)
 
         NoteAnalysisResult(
             summary = summary,
             mood = mood,
             tags = tags,
             actionItems = actionItems,
-            reflectionPrompts = reflectionPrompts
+            reflectionPrompts = reflectionPrompts,
+            contextualReminder = contextualReminder
         )
     }
 
@@ -190,33 +194,14 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
     }
 
     private fun detectPatternAndReminder(query: String, notes: List<Note>): Pair<String?, String?> {
-        val fullCorpus = notes.joinToString(" ") { "${it.title} ${it.content} ${it.tags.joinToString(" ")}" }.lowercase(Locale.ROOT)
-        val hasFatigue = fullCorpus.contains("burnout") || fullCorpus.contains("exhaust") || fullCorpus.contains("tired") || fullCorpus.contains("fatigue") || fullCorpus.contains("screen") || query.contains("feel") || query.contains("burnout")
-        val hasWorkStress = fullCorpus.contains("work") || fullCorpus.contains("deadline") || fullCorpus.contains("debug") || fullCorpus.contains("blocker") || query.contains("blocker")
-        val hasLateNight = fullCorpus.contains("late night") || fullCorpus.contains("midnight") || fullCorpus.contains("1am") || fullCorpus.contains("2am") || fullCorpus.contains("sleep")
-        val hasLoneliness = fullCorpus.contains("lonel") || fullCorpus.contains("alone") || fullCorpus.contains("isolated") || query.contains("lonel")
-
-        return when {
-            hasFatigue || hasWorkStress -> {
-                Pair(
-                    "Pattern Detected: Work Strain & Evening Screen Fatigue",
-                    "Do you want to make a reminder to take a break from work in the evening and go for a walk after coffee?"
-                )
+        // Find the first genuine contextual reminder present in the retrieved notes
+        for (note in notes) {
+            val reminder = extractContextualReminder(note.title, note.content)
+            if (reminder != null) {
+                return Pair(reminder.triggerPattern, reminder.question)
             }
-            hasLateNight -> {
-                Pair(
-                    "Pattern Detected: Disrupted Sleep & Late-Night Coding",
-                    "Do you want to make a reminder to wind down work by 10:00 PM and protect your sleep?"
-                )
-            }
-            hasLoneliness -> {
-                Pair(
-                    "Pattern Detected: High Isolation & Tunnel Vision",
-                    "Do you want to set a reminder to step out this weekend, meet Elena or a friend, and unwind without work screens?"
-                )
-            }
-            else -> Pair(null, null)
         }
+        return Pair(null, null)
     }
 
     private fun extractActionItems(content: String): List<String> {
@@ -481,33 +466,176 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
         return if (synthesized.length > 150) synthesized.take(147) + "..." else synthesized
     }
 
-    private fun generateReflectionPrompts(title: String, content: String, mood: String): List<String> {
-        return when (mood) {
-            "Analytical" -> listOf(
-                "What hidden assumption or blind spot could invalidate this reasoning?",
-                "What quantitative metric will clearly prove this solution is working?",
-                "How can this process be simplified before optimizing it further?"
-            )
-            "Stressed" -> listOf(
-                "What single part of this situation is entirely within your direct control today?",
-                "What is the realistic worst-case scenario, and how would you adapt?",
-                "Can any of these commitments be safely renegotiated or postponed?"
-            )
-            "Creative" -> listOf(
-                "What would the exact opposite of this idea look like?",
-                "How would you explain this concept to someone with zero domain knowledge?",
-                "What is the simplest prototype you could validate in under 2 hours?"
-            )
-            "Energized" -> listOf(
-                "How can you harness this current momentum to tackle your biggest outstanding bottleneck?",
-                "What system or ritual can you put in place to retain this level of focus?"
-            )
-            else -> listOf(
-                "How does this thought connect with your overarching long-term vision?",
-                "What would you tell a close friend if they came to you with this exact reflection?",
-                "What is one concrete action step that honors this insight?"
+    fun extractContextualReminder(title: String, content: String): ContextualReminder? {
+        val fullText = "$title\n$content"
+        val lowerText = fullText.lowercase(Locale.ROOT)
+
+        // 1. Postural & Ergonomic Strain
+        if (lowerText.contains("neck") || lowerText.contains("back") || lowerText.contains("shoulder") || lowerText.contains("sitting") || lowerText.contains("desk")) {
+            val symptom = when {
+                lowerText.contains("neck") -> "neck stiffness"
+                lowerText.contains("back") -> "lower back strain"
+                lowerText.contains("shoulder") -> "shoulder tightness"
+                else -> "prolonged sitting fatigue"
+            }
+            return ContextualReminder(
+                triggerPattern = "Physical Strain: $symptom",
+                question = "You noted $symptom while working: Do you want to set a reminder at 4:30 PM to stand up, do 5 minutes of spine mobility stretches, and reset your posture?",
+                suggestedDelayMinutes = 90
             )
         }
+
+        // 2. Eye Strain & Screen Glare
+        if (lowerText.contains("eye") || lowerText.contains("staring at") || (lowerText.contains("screen") && (lowerText.contains("tired") || lowerText.contains("burn") || lowerText.contains("headache")))) {
+            return ContextualReminder(
+                triggerPattern = "Sensory Overload: Screen & Eye Fatigue",
+                question = "You observed eye burn and heavy screen time: Do you want to set a reminder in 45 minutes for a 10-minute screen-free rest and distant focal break?",
+                suggestedDelayMinutes = 45
+            )
+        }
+
+        // 3. Late-Night Grinding & Sleep Protection
+        if (lowerText.contains("late night") || lowerText.contains("2 am") || lowerText.contains("1 am") || lowerText.contains("midnight") || (lowerText.contains("sleep") && lowerText.contains("exhaust"))) {
+            return ContextualReminder(
+                triggerPattern = "Sleep Protection & Late-Night Coding",
+                question = "You noted exhaustion from working past midnight: Do you want to set a reminder at 10:15 PM tonight to shut down your laptop and protect your rest?",
+                suggestedDelayMinutes = 180
+            )
+        }
+
+        // 4. Loved Ones & Relationship Check-ins
+        if (lowerText.contains("elena") && (lowerText.contains("miss") || lowerText.contains("dinner") || lowerText.contains("distract") || lowerText.contains("guilt") || lowerText.contains("argument") || lowerText.contains("swamped"))) {
+            return ContextualReminder(
+                triggerPattern = "Relational Presence: Quality Time with Elena",
+                question = "You reflected on feeling pulled away from Elena: Do you want a reminder this evening at 7:00 PM to step away from screens and connect without work talk?",
+                suggestedDelayMinutes = 120
+            )
+        }
+
+        if ((lowerText.contains("mom") || lowerText.contains("dad") || lowerText.contains("parents") || lowerText.contains("grandpa")) && (lowerText.contains("call") || lowerText.contains("miss") || lowerText.contains("visit") || lowerText.contains("check in") || lowerText.contains("guilt"))) {
+            val familyMember = when {
+                lowerText.contains("mom") -> "Mom"
+                lowerText.contains("dad") -> "Dad"
+                lowerText.contains("grandpa") -> "Grandpa"
+                else -> "your family"
+            }
+            return ContextualReminder(
+                triggerPattern = "Family Connection: Check in with $familyMember",
+                question = "You noted wanting to stay in touch with $familyMember: Do you want a reminder for tomorrow afternoon to give them a calm, unhurried phone call?",
+                suggestedDelayMinutes = 240
+            )
+        }
+
+        // 5. Excessive Caffeine or Skipping Meals
+        if (lowerText.contains("caffeine") || (lowerText.contains("coffee") && (lowerText.contains("jitter") || lowerText.contains("crash") || lowerText.contains("cup"))) || lowerText.contains("skipped lunch") || lowerText.contains("forgot to eat")) {
+            return ContextualReminder(
+                triggerPattern = "Physical Recovery: Hydration & Nutrition",
+                question = "You noticed physical jitters or skipped meals during work: Do you want a reminder in 30 minutes to drink a large glass of water and have a healthy snack?",
+                suggestedDelayMinutes = 30
+            )
+        }
+
+        // 6. Bottleneck Overwhelm & Deep Work Breaks
+        if (lowerText.contains("stuck") || lowerText.contains("overwhelm") || lowerText.contains("burnout") || lowerText.contains("frustrat")) {
+            return ContextualReminder(
+                triggerPattern = "Cognitive Reset: Overcoming Mental Blockers",
+                question = "You noted feeling stuck and overwhelmed by this problem: Do you want to set a 25-minute timer to step away, take a short walk, and return with fresh perspective?",
+                suggestedDelayMinutes = 25
+            )
+        }
+
+        return null
+    }
+
+    fun generateReflectionPrompts(title: String, content: String, mood: String): List<String> {
+        val fullText = "$title\n$content"
+        val lowerText = fullText.lowercase(Locale.ROOT)
+        val prompts = mutableListOf<String>()
+
+        // 1. CHECK FOR EVOLUTION STAGE (Has the user already answered a previous reflection?)
+        val hasPreviousReflection = content.contains("> **Reflection") || content.contains("**Insight:**") || content.contains("*My Reflection:*")
+        if (hasPreviousReflection) {
+            val latestInsight = content.lines()
+                .filter { it.contains("**Insight:**") || it.contains("*My Reflection:*") }
+                .lastOrNull()
+                ?.replace(Regex(".*(\\*\\*Insight:\\*\\*|\\*My Reflection:\\*)"), "")
+                ?.trim()
+
+            if (!latestInsight.isNullOrBlank()) {
+                val insightSnippet = if (latestInsight.length > 50) latestInsight.take(47) + "..." else latestInsight
+                prompts.add("You reflected: \"$insightSnippet\". What is one tangible, 15-minute experiment you can run in the next 24 hours to test this?")
+                prompts.add("If a trusted mentor evaluated this realization, what blind spot would they immediately push back on?")
+                prompts.add("What will be the hardest obstacle to remaining consistent with this insight when unexpected stress hits?")
+                return prompts
+            }
+        }
+
+        // 2. EXTRACT ENTITIES & PEOPLE
+        val relationalEntities = listOf("elena", "mom", "dad", "father", "mother", "sarah", "alex", "partner", "wife", "husband", "boss", "manager", "team", "investor", "client")
+            .filter { lowerText.contains(it) }
+
+        if (relationalEntities.isNotEmpty()) {
+            val entity = relationalEntities.first().replaceFirstChar { it.uppercase() }
+            if (lowerText.contains("guilt") || lowerText.contains("miss") || lowerText.contains("argument") || lowerText.contains("distract") || lowerText.contains("dinner") || lowerText.contains("time")) {
+                prompts.add("You mentioned $entity and feeling pulled away: what unspoken expectation is making it hard to be fully present with them?")
+            } else {
+                prompts.add("How might $entity perceive the situation described here, and is there an unvoiced assumption between you two?")
+            }
+        }
+
+        // 3. EXTRACT DECISIONS & DILEMMAS
+        val hasDecision = lowerText.contains("decid") || lowerText.contains("choice") || lowerText.contains("should i") || lowerText.contains("trade-off") || lowerText.contains("risk") || lowerText.contains("pivot")
+        if (hasDecision) {
+            prompts.add("If you were forced to make this decision before midnight with zero extra information, what does your gut choose, and why?")
+            prompts.add("What is the boldest 10x upside path here that you might be subconsciously avoiding out of fear of discomfort?")
+        }
+
+        // 4. EXTRACT ROADBLOCKS, FRICTIONS & BUGS
+        val hasFriction = lowerText.contains("leak") || lowerText.contains("bug") || lowerText.contains("fail") || lowerText.contains("reject") || lowerText.contains("pass") || lowerText.contains("stuck") || lowerText.contains("bottleneck") || lowerText.contains("timeout")
+        if (hasFriction) {
+            val techKeywords = listOf("vulkan", "shader", "memory", "database", "api", "pitch", "sequoia", "code", "architecture", "build", "pipeline")
+                .filter { lowerText.contains(it) }
+            val subject = techKeywords.firstOrNull()?.replaceFirstChar { it.uppercase() } ?: "this bottleneck"
+            prompts.add("If you completely stepped back from $subject for 24 hours, what fundamental architectural assumption would you question?")
+            prompts.add("What would a radically simpler 'good-enough' solution look like that unblocks you today?")
+        }
+
+        // 5. EXTRACT PHYSICAL & EMOTIONAL STRAIN
+        val hasPhysicalOrBurnout = lowerText.contains("neck") || lowerText.contains("eye") || lowerText.contains("burnout") || lowerText.contains("exhaust") || lowerText.contains("sitting") || lowerText.contains("headache") || lowerText.contains("screen")
+        if (hasPhysicalOrBurnout) {
+            prompts.add("Your body is signaling fatigue here: what boundary or ritual can protect your physical energy before you burn out?")
+        }
+
+        // 6. EXTRACT CREATIVE & VISIONARY CONTEXT
+        val hasCreativeIdea = lowerText.contains("idea") || lowerText.contains("vision") || lowerText.contains("future") || lowerText.contains("prototype") || lowerText.contains("build")
+        if (hasCreativeIdea && prompts.size < 3) {
+            prompts.add("What is the smallest, most stripped-down version of this idea you could put in front of an actual user by Friday?")
+        }
+
+        // 7. ENSURE AT LEAST 3 HIGH-QUALITY CONTEXTUAL QUESTIONS
+        if (prompts.size < 3) {
+            val titleTopic = title.ifBlank { "this reflection" }.removePrefix("Untitled Entry").trim()
+            when (mood) {
+                "Analytical" -> {
+                    prompts.add("Looking critically at \"$titleTopic\": what hidden premise must be true for this reasoning to hold?")
+                    prompts.add("What counter-evidence or alternative explanation would most easily disprove your conclusion here?")
+                }
+                "Stressed" -> {
+                    prompts.add("Of everything mentioned in \"$titleTopic\", what single aspect is completely within your control in the next 2 hours?")
+                    prompts.add("What is the worst realistic outcome here, and why are you actually capable of surviving it?")
+                }
+                "Creative" -> {
+                    prompts.add("What would the polar opposite approach to \"$titleTopic\" reveal about what you truly value?")
+                    prompts.add("If you had zero resource constraints, what would be the most audacious expression of this thought?")
+                }
+                else -> {
+                    prompts.add("What will \"$titleTopic\" look like one year from now if you act on this today?")
+                    prompts.add("What is the most honest truth about this thought that you haven't explicitly typed out yet?")
+                }
+            }
+        }
+
+        return prompts.distinct().take(3)
     }
 
     /**

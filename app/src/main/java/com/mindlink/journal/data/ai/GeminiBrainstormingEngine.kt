@@ -37,7 +37,9 @@ class GeminiBrainstormingEngine(
             - "mood": The single dominant mood/sentiment (one of: "Reflective", "Analytical", "Creative", "Energized", "Stressed", "Calm").
             - "tags": Array of 2 to 5 relevant topic or category strings.
             - "actionItems": Array of concrete extracted follow-up tasks or to-dos mentioned in or implied by the note (if none, return empty array).
-            - "reflectionPrompts": Array of 2 to 3 thought-provoking follow-up reflection questions or constructive counter-arguments to deepen the user's thinking.
+            - "reflectionPrompts": Array of 2 to 3 deeply contextual, Socratic questions anchored directly in the entities, people, technical dilemmas, and emotional tensions in the note (or evolving from previous Q&As if present).
+            - "contextualReminder": Optional object (or null) if the note reveals physical strain (neck/back/eye), boundary erosion, neglected loved ones, or caffeine/meal crashes:
+              {"triggerPattern": "string describing the pattern", "question": "thoughtful question asking to set a specific reminder with time/action", "suggestedDelayMinutes": 120}
 
             Journal Title: $title
             Journal Content:
@@ -138,12 +140,22 @@ class GeminiBrainstormingEngine(
     private fun parseAnalysisResponse(text: String): NoteAnalysisResult {
         val clean = cleanJsonMarkdown(text)
         val dto = gson.fromJson(clean, NoteAnalysisDto::class.java)
+        val reminder = dto.contextualReminder?.let {
+            if (!it.question.isNullOrBlank()) {
+                ContextualReminder(
+                    triggerPattern = it.triggerPattern ?: "Mindful Pattern Detected",
+                    question = it.question,
+                    suggestedDelayMinutes = it.suggestedDelayMinutes ?: 120
+                )
+            } else null
+        }
         return NoteAnalysisResult(
             summary = dto.summary ?: "",
             mood = dto.mood ?: "Reflective",
             tags = dto.tags ?: emptyList(),
             actionItems = dto.actionItems ?: emptyList(),
-            reflectionPrompts = dto.reflectionPrompts ?: emptyList()
+            reflectionPrompts = dto.reflectionPrompts ?: emptyList(),
+            contextualReminder = reminder
         )
     }
 
@@ -152,7 +164,9 @@ class GeminiBrainstormingEngine(
         val dto = gson.fromJson(clean, SynthesisDto::class.java)
         return SynthesisResult(
             answer = dto.answer ?: clean,
-            keyTakeaways = dto.keyTakeaways ?: emptyList()
+            keyTakeaways = dto.keyTakeaways ?: emptyList(),
+            patternAlert = dto.patternAlert,
+            suggestedReminder = dto.suggestedReminder
         )
     }
 
@@ -169,17 +183,26 @@ class GeminiBrainstormingEngine(
         return trimmed
     }
 
+    private data class ContextualReminderDto(
+        @SerializedName("triggerPattern") val triggerPattern: String?,
+        @SerializedName("question") val question: String?,
+        @SerializedName("suggestedDelayMinutes") val suggestedDelayMinutes: Long?
+    )
+
     private data class NoteAnalysisDto(
         @SerializedName("summary") val summary: String?,
         @SerializedName("mood") val mood: String?,
         @SerializedName("tags") val tags: List<String>?,
         @SerializedName("actionItems") val actionItems: List<String>?,
-        @SerializedName("reflectionPrompts") val reflectionPrompts: List<String>?
+        @SerializedName("reflectionPrompts") val reflectionPrompts: List<String>?,
+        @SerializedName("contextualReminder") val contextualReminder: ContextualReminderDto?
     )
 
     private data class SynthesisDto(
         @SerializedName("answer") val answer: String?,
-        @SerializedName("keyTakeaways") val keyTakeaways: List<String>?
+        @SerializedName("keyTakeaways") val keyTakeaways: List<String>?,
+        @SerializedName("patternAlert") val patternAlert: String?,
+        @SerializedName("suggestedReminder") val suggestedReminder: String?
     )
 
     companion object {

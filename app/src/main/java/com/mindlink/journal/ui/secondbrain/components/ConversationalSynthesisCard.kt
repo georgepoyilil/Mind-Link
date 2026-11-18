@@ -107,7 +107,9 @@ fun ConversationalSynthesisCard(
 
             // Proactive Wellness & Pattern Reminder Card
             if (synthesis.suggestedReminder != null) {
+                val context = androidx.compose.ui.platform.LocalContext.current
                 var isReminderScheduled by remember { mutableStateOf(false) }
+                var scheduledLabel by remember { mutableStateOf("") }
                 var isReminderDismissed by remember { mutableStateOf(false) }
 
                 if (!isReminderDismissed) {
@@ -169,7 +171,19 @@ fun ConversationalSynthesisCard(
                                     border = BorderStroke(1.dp, if (isReminderScheduled) PastelMint else MindGlassButtonBorder),
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(10.dp))
-                                        .clickable { isReminderScheduled = true }
+                                        .clickable {
+                                            val targetMs = com.mindlink.journal.data.worker.ReminderWorker.schedule(
+                                                context = context,
+                                                title = synthesis.patternAlert ?: "MindLink Mindful Reminder",
+                                                message = synthesis.suggestedReminder,
+                                                noteId = synthesis.citedNotes.firstOrNull()?.id ?: 0L,
+                                                delayMinutes = 90
+                                            )
+                                            val timeFmt = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(targetMs))
+                                            scheduledLabel = "Scheduled for $timeFmt"
+                                            isReminderScheduled = true
+                                            android.widget.Toast.makeText(context, "System notification scheduled for $timeFmt", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
@@ -183,7 +197,7 @@ fun ConversationalSynthesisCard(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = if (isReminderScheduled) "Reminder Scheduled" else "Set Reminder",
+                                            text = if (isReminderScheduled) scheduledLabel else "Set Reminder",
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 12.sp,
                                             color = if (isReminderScheduled) PastelMint else MindGlassButtonText

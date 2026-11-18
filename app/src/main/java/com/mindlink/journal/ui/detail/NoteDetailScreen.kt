@@ -635,24 +635,27 @@ fun NoteDetailScreen(
                         }
                     }
 
-                    // Proactive Pattern & Reminder Alert if note reflects burnout / fatigue
-                    val noteTextLower = "${note.title} ${note.content}".lowercase(java.util.Locale.ROOT)
-                    if (noteTextLower.contains("burnout") || noteTextLower.contains("exhaust") || noteTextLower.contains("screen") || noteTextLower.contains("late night") || noteTextLower.contains("tired")) {
+                    // Proactive Pattern & Contextual Reminder Alert (Extracted from Note Context)
+                    val contextualReminder = remember(note.title, note.content) {
+                        brainstormingEngine.extractContextualReminder(note.title, note.content)
+                    }
+                    if (contextualReminder != null) {
                         var isReminderSet by remember { mutableStateOf(false) }
+                        var scheduledTimeText by remember { mutableStateOf("") }
                         Surface(
                             shape = RoundedCornerShape(14.dp),
                             color = PastelAmber.copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, PastelAmber.copy(alpha = 0.4f)),
+                            border = BorderStroke(1.2.dp, PastelAmber.copy(alpha = 0.45f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = PastelAmber, modifier = Modifier.size(17.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Pattern Detected: Work Strain & Evening Screen Fatigue", color = PastelAmber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                    Text(contextualReminder.triggerPattern, color = PastelAmber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                                 }
                                 Spacer(modifier = Modifier.height(6.dp))
-                                Text("Do you want to make a reminder to take a break from work in the evening and go for a walk after coffee?", color = MindTextPrimary, style = MaterialTheme.typography.bodyMedium)
+                                Text(contextualReminder.question, color = MindTextPrimary, style = MaterialTheme.typography.bodyMedium, lineHeight = 20.sp)
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                     Surface(
@@ -660,14 +663,23 @@ fun NoteDetailScreen(
                                         color = if (isReminderSet) PastelMint.copy(alpha = 0.2f) else MindGlassButtonContainer,
                                         border = BorderStroke(0.8.dp, if (isReminderSet) PastelMint else MindGlassButtonBorder),
                                         modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
+                                            val targetMs = com.mindlink.journal.data.worker.ReminderWorker.schedule(
+                                                context = context,
+                                                title = contextualReminder.triggerPattern,
+                                                message = contextualReminder.question,
+                                                noteId = note.id,
+                                                delayMinutes = contextualReminder.suggestedDelayMinutes
+                                            )
+                                            val timeFmt = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(targetMs))
+                                            scheduledTimeText = "Scheduled for $timeFmt"
                                             isReminderSet = true
-                                            Toast.makeText(context, "Reminder set for this evening to take a break and walk", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "System notification scheduled for $timeFmt", Toast.LENGTH_SHORT).show()
                                         }
                                     ) {
                                         Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Icon(if (isReminderSet) Icons.Default.Check else Icons.Default.Alarm, contentDescription = null, tint = if (isReminderSet) PastelMint else PastelAmber, modifier = Modifier.size(14.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
-                                            Text(if (isReminderSet) "Reminder Scheduled" else "Set Reminder", color = if (isReminderSet) PastelMint else MindGlassButtonText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                            Text(if (isReminderSet) scheduledTimeText else "Schedule Reminder", color = if (isReminderSet) PastelMint else MindGlassButtonText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
@@ -732,8 +744,17 @@ fun NoteDetailScreen(
                         }
                     }
 
-                    // 4. Brainstorming & Reflection Prompts
-                    ReflectionPromptsCard(prompts = note.reflectionPrompts)
+                    // 4. Brainstorming & Dynamic Evolving Socratic Reflection Prompts
+                    ReflectionPromptsCard(
+                        prompts = note.reflectionPrompts.ifEmpty {
+                            brainstormingEngine.generateReflectionPrompts(note.title, note.content, note.mood ?: "Reflective")
+                        },
+                        onAnswerSubmitted = { question, answer ->
+                            viewModel.submitPromptReflection(question, answer) {
+                                Toast.makeText(context, "Reflection integrated! Context & correlations evolved.", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
 
                     // 5. Contextual "Related Thoughts" Card (Cosine similarity vector search)
                     RelatedThoughtsCard(

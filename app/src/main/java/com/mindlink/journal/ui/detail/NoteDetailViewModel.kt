@@ -108,6 +108,36 @@ class NoteDetailViewModel(
         }
     }
 
+    fun submitPromptReflection(promptQuestion: String, userAnswer: String, onDone: () -> Unit = {}) {
+        val currentNote = _uiState.value.note ?: return
+        if (userAnswer.isBlank()) return
+        val sdf = java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.getDefault())
+        val timestamp = sdf.format(java.util.Date())
+        val formattedReflection = """
+            
+            > **Reflection Question:** $promptQuestion
+            > **Insight ($timestamp):** $userAnswer
+        """.trimIndent()
+
+        val newContent = if (currentNote.content.isBlank()) {
+            formattedReflection
+        } else {
+            "${currentNote.content}\n\n$formattedReflection"
+        }
+
+        val updatedNote = currentNote.copy(
+            content = newContent,
+            updatedAt = System.currentTimeMillis()
+        )
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingRelated = true, note = updatedNote) }
+            repository.saveNote(updatedNote)
+            loadRelatedThoughts(noteId)
+            onDone()
+        }
+    }
+
     fun reprocessNote(onDone: () -> Unit = {}) {
         val currentNote = _uiState.value.note ?: return
         viewModelScope.launch {

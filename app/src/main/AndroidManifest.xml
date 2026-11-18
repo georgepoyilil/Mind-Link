@@ -10,6 +10,8 @@
     <!-- Network access for optional Gemini Cloud Brainstorming -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- System notifications for proactive mindful reminders -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".MindLinkApplication"

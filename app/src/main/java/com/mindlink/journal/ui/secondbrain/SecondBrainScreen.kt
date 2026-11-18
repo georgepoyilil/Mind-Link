@@ -92,16 +92,6 @@ fun SecondBrainScreen(
         }
     }
 
-    val quickQuestions = listOf(
-        "How is my love life?" to "how is my love life",
-        "How am I feeling?" to "how am I feeling",
-        "What blockers do I have?" to "What recurring blockers have I noted recently?",
-        "Reflections on family" to "How do I feel about my family and parents?",
-        "Failures & rejections" to "What failures or rejections have I noted?",
-        "Pending action items" to "What action items are still open?",
-        "Moments of peace" to "What brings me peace and gratitude?"
-    )
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -193,14 +183,14 @@ fun SecondBrainScreen(
 
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "Try tapping one of these:",
+                                text = "Dynamic inquiries synthesized from your thoughts:",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MindTextTertiary,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            quickQuestions.take(4).forEach { (display, query) ->
+                            uiState.dynamicInquiries.take(4).forEach { inquiry ->
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
                                     color = MindGlassSurfaceVariant,
@@ -210,8 +200,8 @@ fun SecondBrainScreen(
                                         .padding(vertical = 4.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .clickable {
-                                            viewModel.updateQuery(query)
-                                            viewModel.submitQuery(query)
+                                            viewModel.updateQuery(inquiry.query)
+                                            viewModel.submitQuery(inquiry.query)
                                         }
                                 ) {
                                     Row(
@@ -219,12 +209,28 @@ fun SecondBrainScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = display,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MindTextPrimary,
-                                            fontWeight = FontWeight.Medium
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = MindGlassButtonContainer,
+                                                border = BorderStroke(0.5.dp, MindGlassButtonBorder)
+                                            ) {
+                                                Text(
+                                                    text = inquiry.category,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = PastelSky,
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = inquiry.display,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MindTextPrimary,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
                                         Icon(
                                             imageVector = Icons.Default.ArrowForward,
                                             contentDescription = "Ask",
@@ -334,7 +340,7 @@ fun SecondBrainScreen(
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        quickQuestions.forEach { (display, query) ->
+                        uiState.dynamicInquiries.forEach { inquiry ->
                             Surface(
                                 shape = RoundedCornerShape(14.dp),
                                 color = MindGlassSurfaceVariant,
@@ -342,17 +348,21 @@ fun SecondBrainScreen(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(14.dp))
                                     .clickable {
-                                        viewModel.updateQuery(query)
-                                        viewModel.submitQuery(query)
+                                        viewModel.updateQuery(inquiry.query)
+                                        viewModel.submitQuery(inquiry.query)
                                     }
                             ) {
-                                Text(
-                                    text = display,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MindTextSecondary,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = inquiry.display,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MindTextSecondary
+                                    )
+                                }
                             }
                         }
                     }
