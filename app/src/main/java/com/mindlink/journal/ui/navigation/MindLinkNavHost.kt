@@ -149,7 +149,8 @@ fun MindLinkNavHost(
                 factory = SettingsViewModel.Factory(
                     repository = repository,
                     preferences = serviceLocator.preferences,
-                    compositeEngine = serviceLocator.brainstormingEngine
+                    compositeEngine = serviceLocator.brainstormingEngine,
+                    appContext = serviceLocator.applicationContext
                 )
             )
             SettingsScreen(

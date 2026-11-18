@@ -39,6 +39,9 @@ class ServiceLocator private constructor(context: Context) {
             hasApiKey = {
                 val key = preferences.getString(PREF_GEMINI_API_KEY, null)
                 !key.isNullOrBlank()
+            },
+            engineModeProvider = {
+                preferences.getString(PREF_ENGINE_MODE, "AUTO") ?: "AUTO"
             }
         )
     }
@@ -56,6 +59,7 @@ class ServiceLocator private constructor(context: Context) {
     companion object {
         const val PREF_GEMINI_API_KEY = "pref_gemini_api_key"
         const val PREF_ON_DEVICE_ONLY = "pref_on_device_only"
+        const val PREF_ENGINE_MODE = "pref_engine_mode" // "AUTO", "SLM", "GEMINI", "LOCAL"
 
         @Volatile
         private var INSTANCE: ServiceLocator? = null

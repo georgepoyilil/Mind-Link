@@ -4,24 +4,55 @@ import android.util.Log
 import com.mindlink.journal.domain.model.Note
 
 /**
- * Intelligent Tri-Tier Brainstorming Engine:
- * 1. Cloud Tier: Gemini Flash (if API key is present and device is online)
- * 2. On-Device SLM Tier: MediaPipe GenAI (Qwen 2.5 / Gemma / SmolLM2) running 100% locally
- * 3. Domain-Siloed Local Tier: Instant, zero-weight semantic classifier with Life Spheres
+ * Intelligent Tri-Tier Brainstorming Engine with User Engine Switching:
+ * - "AUTO": Gemini Cloud (if key) -> MediaPipe SLM (if model file) -> Local NLP
+ * - "SLM": Forces On-Device SLM (MediaPipe Tasks GenAI)
+ * - "GEMINI": Forces Gemini Flash API
+ * - "LOCAL": Forces Local Life-Sphere NLP Engine
  */
 class CompositeBrainstormingEngine(
     private val geminiEngine: GeminiBrainstormingEngine,
     val mediaPipeEngine: MediaPipeSlmEngine,
     val localEngine: LocalHeuristicBrainstormingEngine = LocalHeuristicBrainstormingEngine(),
-    private val hasApiKey: () -> Boolean
+    private val hasApiKey: () -> Boolean,
+    private val engineModeProvider: () -> String = { "AUTO" }
 ) : BrainstormingEngine {
 
     override suspend fun analyzeNote(title: String, content: String): NoteAnalysisResult {
+        val mode = engineModeProvider()
+
+        if (mode == "SLM") {
+            if (mediaPipeEngine.isModelAvailable()) {
+                try {
+                    return mediaPipeEngine.analyzeNote(title, content)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Forced SLM failed: ${e.message}, falling back to local engine")
+                }
+            }
+            return localEngine.analyzeNote(title, content)
+        }
+
+        if (mode == "GEMINI") {
+            if (hasApiKey()) {
+                try {
+                    return geminiEngine.analyzeNote(title, content)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Forced Gemini failed: ${e.message}, falling back to local engine")
+                }
+            }
+            return localEngine.analyzeNote(title, content)
+        }
+
+        if (mode == "LOCAL") {
+            return localEngine.analyzeNote(title, content)
+        }
+
+        // Default "AUTO" mode
         if (hasApiKey()) {
             try {
                 return geminiEngine.analyzeNote(title, content)
             } catch (e: Exception) {
-                Log.w(TAG, "Gemini analysis failed (${e.message}), trying on-device engines")
+                Log.w(TAG, "Gemini analysis failed (${e.message}), trying on-device SLM")
             }
         }
 
@@ -37,11 +68,40 @@ class CompositeBrainstormingEngine(
     }
 
     override suspend fun synthesizeNotes(query: String, notes: List<Note>): SynthesisResult {
+        val mode = engineModeProvider()
+
+        if (mode == "SLM") {
+            if (mediaPipeEngine.isModelAvailable()) {
+                try {
+                    return mediaPipeEngine.synthesizeNotes(query, notes)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Forced SLM synthesis failed: ${e.message}")
+                }
+            }
+            return localEngine.synthesizeNotes(query, notes)
+        }
+
+        if (mode == "GEMINI") {
+            if (hasApiKey()) {
+                try {
+                    return geminiEngine.synthesizeNotes(query, notes)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Forced Gemini synthesis failed: ${e.message}")
+                }
+            }
+            return localEngine.synthesizeNotes(query, notes)
+        }
+
+        if (mode == "LOCAL") {
+            return localEngine.synthesizeNotes(query, notes)
+        }
+
+        // AUTO
         if (hasApiKey()) {
             try {
                 return geminiEngine.synthesizeNotes(query, notes)
             } catch (e: Exception) {
-                Log.w(TAG, "Gemini synthesis failed (${e.message}), trying on-device engines")
+                Log.w(TAG, "Gemini synthesis failed (${e.message}), trying on-device SLM")
             }
         }
 
@@ -57,10 +117,18 @@ class CompositeBrainstormingEngine(
     }
 
     fun getActiveEngineName(): String {
-        return when {
-            hasApiKey() -> "Gemini 2.0 Flash (Cloud SOTA)"
-            mediaPipeEngine.isModelAvailable() -> "On-Device SLM (${mediaPipeEngine.getModelInfo()})"
-            else -> "Local Life-Sphere NLP Engine (Zero Weights)"
+        val mode = engineModeProvider()
+        return when (mode) {
+            "SLM" -> "On-Device SLM (Forced: ${mediaPipeEngine.getModelInfo()})"
+            "GEMINI" -> "Gemini 2.0 Flash (Forced Cloud)"
+            "LOCAL" -> "Local Life-Sphere NLP Engine (Forced)"
+            else -> {
+                when {
+                    hasApiKey() -> "Auto: Gemini 2.0 Flash (Cloud SOTA)"
+                    mediaPipeEngine.isModelAvailable() -> "Auto: On-Device SLM (${mediaPipeEngine.getModelInfo()})"
+                    else -> "Auto: Local Life-Sphere NLP Engine (Zero Weights)"
+                }
+            }
         }
     }
 

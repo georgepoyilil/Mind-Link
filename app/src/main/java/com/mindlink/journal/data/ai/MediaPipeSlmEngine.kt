@@ -25,9 +25,7 @@ class MediaPipeSlmEngine(
     private var llmInference: LlmInference? = null
     private var activeModelFile: File? = null
 
-    init {
-        findAndInitModel()
-    }
+    // Lazy initialization: SLM is loaded strictly on-demand, never on app startup.
 
     /**
      * Locates any valid SLM model (.bin or .task) in internal filesDir or external app storage.
@@ -63,7 +61,29 @@ class MediaPipeSlmEngine(
     }
 
     @Synchronized
-    private fun findAndInitModel(): Boolean {
+    fun reloadModel(): Boolean {
+        try {
+            llmInference?.close()
+        } catch (_: Exception) {}
+        llmInference = null
+        activeModelFile = null
+        return findAndInitModel()
+    }
+
+    suspend fun generateRawResponse(prompt: String): String = withContext(Dispatchers.IO) {
+        val initialized = synchronized(this@MediaPipeSlmEngine) { findAndInitModel() }
+        if (!initialized || llmInference == null) {
+            return@withContext "SLM model not loaded or unavailable on device."
+        }
+        try {
+            llmInference?.generateResponse(prompt) ?: "Empty response from on-device SLM."
+        } catch (e: Exception) {
+            "Inference error: ${e.message}"
+        }
+    }
+
+    @Synchronized
+    fun findAndInitModel(): Boolean {
         if (llmInference != null) return true
         val modelFile = findModelFile() ?: return false
         return try {
