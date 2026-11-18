@@ -87,20 +87,35 @@ class MediaPipeSlmEngine(
         if (llmInference != null) return true
         val modelFile = findModelFile() ?: return false
         return try {
+            Log.i(TAG, "Initializing MediaPipe SLM (CPU backend, maxTokens=1280) with ${modelFile.name}...")
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.absolutePath)
-                .setMaxTokens(512)
-                .setTemperature(0.7f)
-                .setTopK(40)
+                .setMaxTokens(1280)
+                .setMaxTopK(40)
+                .setPreferredBackend(LlmInference.Backend.CPU)
                 .build()
             llmInference = LlmInference.createFromOptions(context, options)
             activeModelFile = modelFile
-            Log.i(TAG, "MediaPipe SLM initialized successfully with ${modelFile.name}")
+            Log.i(TAG, "MediaPipe SLM initialized successfully on CPU with ${modelFile.name}")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize MediaPipe SLM with ${modelFile.name}: ${e.message}", e)
-            llmInference = null
-            false
+            Log.w(TAG, "CPU init failed (${e.message}), trying GPU backend...")
+            try {
+                val gpuOptions = LlmInference.LlmInferenceOptions.builder()
+                    .setModelPath(modelFile.absolutePath)
+                    .setMaxTokens(1280)
+                    .setMaxTopK(40)
+                    .setPreferredBackend(LlmInference.Backend.GPU)
+                    .build()
+                llmInference = LlmInference.createFromOptions(context, gpuOptions)
+                activeModelFile = modelFile
+                Log.i(TAG, "MediaPipe SLM initialized on GPU with ${modelFile.name}")
+                true
+            } catch (eGpu: Exception) {
+                Log.e(TAG, "Failed to initialize MediaPipe SLM with ${modelFile.name}: ${eGpu.message}", eGpu)
+                llmInference = null
+                false
+            }
         }
     }
 
@@ -182,37 +197,95 @@ class MediaPipeSlmEngine(
     }
 
     private fun parseJsonResponse(raw: String): NoteAnalysisResult? {
-        return try {
-            val cleanJson = raw.substringAfter("{", "").substringBeforeLast("}", "")
-            if (cleanJson.isBlank()) return null
-            val jsonObject = gson.fromJson("{$cleanJson}", JsonObject::class.java)
+        Log.d(TAG, "Raw SLM output:\n$raw")
+        // 1. Try lenient JSON parsing
+        try {
+            val startIdx = raw.indexOf('{')
+            val endIdx = raw.lastIndexOf('}')
+            if (startIdx != -1 && endIdx > startIdx) {
+                val jsonSnippet = raw.substring(startIdx, endIdx + 1)
+                val jsonReader = com.google.gson.stream.JsonReader(java.io.StringReader(jsonSnippet)).apply {
+                    isLenient = true
+                }
+                val element = com.google.gson.JsonParser.parseReader(jsonReader)
+                if (element.isJsonObject) {
+                    val jsonObject = element.asJsonObject
 
-            val summary = jsonObject.get("summary")?.asString ?: "Thought synthesis"
-            val mood = jsonObject.get("mood")?.asString ?: "Reflective"
-            val tags = jsonObject.getAsJsonArray("tags")?.map { it.asString } ?: emptyList()
-            val actionItems = jsonObject.getAsJsonArray("actionItems")?.map { it.asString } ?: emptyList()
-            val reflectionPrompts = jsonObject.getAsJsonArray("reflectionPrompts")?.map { it.asString } ?: emptyList()
+                    val summary = jsonObject.get("summary")?.takeIf { !it.isJsonNull }?.asString ?: "Thought synthesis"
+                    val mood = jsonObject.get("mood")?.takeIf { !it.isJsonNull }?.asString ?: "Reflective"
 
-            var reminder: ContextualReminder? = null
-            val remObj = jsonObject.getAsJsonObject("contextualReminder")
-            if (remObj != null && !remObj.isJsonNull) {
-                reminder = ContextualReminder(
-                    triggerPattern = remObj.get("triggerPattern")?.asString ?: "Mindful Reminder",
-                    question = remObj.get("question")?.asString ?: "",
-                    suggestedDelayMinutes = remObj.get("suggestedDelayMinutes")?.asLong ?: 120L
-                )
+                    val tags = jsonObject.get("tags")?.let { t ->
+                        if (t.isJsonArray) t.asJsonArray.mapNotNull { it.takeIf { !it.isJsonNull }?.asString }
+                        else listOf(t.asString)
+                    } ?: emptyList()
+
+                    val actionItems = jsonObject.get("actionItems")?.let { a ->
+                        if (a.isJsonArray) a.asJsonArray.mapNotNull { it.takeIf { !it.isJsonNull }?.asString }
+                        else emptyList()
+                    } ?: emptyList()
+
+                    val reflectionPrompts = jsonObject.get("reflectionPrompts")?.let { r ->
+                        if (r.isJsonArray) r.asJsonArray.mapNotNull { it.takeIf { !it.isJsonNull }?.asString }
+                        else listOf(r.asString)
+                    } ?: emptyList()
+
+                    var reminder: ContextualReminder? = null
+                    val remObj = jsonObject.get("contextualReminder")?.takeIf { it.isJsonObject }?.asJsonObject
+                    if (remObj != null) {
+                        val delay = try {
+                            remObj.get("suggestedDelayMinutes")?.asString?.filter { it.isDigit() }?.toLongOrNull() ?: 120L
+                        } catch (_: Exception) {
+                            120L
+                        }
+                        val trigger = remObj.get("triggerPattern")?.takeIf { !it.isJsonNull }?.asString ?: "Mindful Reminder"
+                        val question = remObj.get("question")?.takeIf { !it.isJsonNull }?.asString ?: ""
+                        reminder = ContextualReminder(
+                            triggerPattern = trigger,
+                            question = question,
+                            suggestedDelayMinutes = delay
+                        )
+                    }
+
+                    return NoteAnalysisResult(
+                        summary = summary,
+                        mood = mood,
+                        tags = tags,
+                        actionItems = actionItems,
+                        reflectionPrompts = reflectionPrompts,
+                        contextualReminder = reminder
+                    )
+                }
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Lenient JSON parsing failed (${e.message}), attempting regex/line extraction")
+        }
+
+        // 2. Fallback resilient regex/line extraction directly from SLM output
+        return try {
+            val lines = raw.lines().map { it.trim() }.filter { it.isNotBlank() }
+            if (lines.isEmpty()) return null
+
+            val questions = lines.filter { it.endsWith("?") || it.matches(Regex("""^(\d+\.|\*|-)\s+.*\?""")) }
+                .take(3)
+            val actions = lines.filter { it.startsWith("- [ ]") || it.startsWith("-") || it.startsWith("•") }
+                .map { it.removePrefix("- [ ]").removePrefix("-").removePrefix("•").trim() }
+                .filter { it.isNotBlank() && !it.endsWith("?") }
+                .take(4)
+            val summaryCandidate = lines.firstOrNull { 
+                !it.trim().startsWith("{") && !it.trim().startsWith("}") && !it.trim().startsWith("#") && 
+                !it.contains("\"") && it.trim().length > 15 && !it.trim().endsWith("?") 
+            } ?: lines.firstOrNull { !it.trim().startsWith("{") && !it.trim().startsWith("}") }?.take(140) ?: "Reflective insight"
 
             NoteAnalysisResult(
-                summary = summary,
-                mood = mood,
-                tags = tags,
-                actionItems = actionItems,
-                reflectionPrompts = reflectionPrompts,
-                contextualReminder = reminder
+                summary = summaryCandidate,
+                mood = "Reflective",
+                tags = listOf("OnDeviceSLM", "Qwen"),
+                actionItems = actions,
+                reflectionPrompts = if (questions.isNotEmpty()) questions else listOf("What is the core insight from this reflection?"),
+                contextualReminder = null
             )
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse SLM JSON output: ${e.message}")
+            Log.w(TAG, "Failed fallback SLM text extraction: ${e.message}")
             null
         }
     }
