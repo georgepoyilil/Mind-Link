@@ -44,6 +44,7 @@ abstract class MindLinkDatabase : RoomDatabase() {
                     MindLinkDatabase::class.java,
                     "mindlink_database"
                 )
+                    .createFromAsset("database/mindlink_database.db")
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
