@@ -45,6 +45,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: dist/MindLink-v1.0.0.apk
           name: "MindLink ${{ github.ref_name }} (Preloaded with 36 Notes & On-Device AI)"
