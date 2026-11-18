@@ -146,7 +146,11 @@ fun MindLinkNavHost(
         // Settings & Engine Configuration
         composable(Screen.Settings.route) {
             val settingsViewModel: SettingsViewModel = viewModel(
-                factory = SettingsViewModel.Factory(repository, serviceLocator.preferences)
+                factory = SettingsViewModel.Factory(
+                    repository = repository,
+                    preferences = serviceLocator.preferences,
+                    compositeEngine = serviceLocator.brainstormingEngine
+                )
             )
             SettingsScreen(
                 viewModel = settingsViewModel,

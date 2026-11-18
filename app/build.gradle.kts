@@ -103,6 +103,9 @@ dependencies {
     implementation(libs.okhttp.logging.interceptor)
     implementation(libs.gson)
 
+    // Google MediaPipe Tasks GenAI for On-Device SLMs (Qwen / Gemma)
+    implementation("com.google.mediapipe:tasks-genai:0.10.14")
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

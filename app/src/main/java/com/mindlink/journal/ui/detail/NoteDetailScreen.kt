@@ -745,10 +745,19 @@ fun NoteDetailScreen(
                     }
 
                     // 4. Brainstorming & Dynamic Evolving Socratic Reflection Prompts
-                    ReflectionPromptsCard(
-                        prompts = note.reflectionPrompts.ifEmpty {
+                    val livePrompts = remember(note.title, note.content, note.reflectionPrompts) {
+                        val isLegacyMismatch = note.reflectionPrompts.any { 
+                            it.contains("bottleneck") || it.contains("architectural assumption") || it.contains("hidden premise") 
+                        }
+                        if (note.reflectionPrompts.isNotEmpty() && !isLegacyMismatch && !note.content.contains("> **Reflection")) {
+                            note.reflectionPrompts
+                        } else {
                             brainstormingEngine.generateReflectionPrompts(note.title, note.content, note.mood ?: "Reflective")
-                        },
+                        }
+                    }
+
+                    ReflectionPromptsCard(
+                        prompts = livePrompts,
                         onAnswerSubmitted = { question, answer ->
                             viewModel.submitPromptReflection(question, answer) {
                                 Toast.makeText(context, "Reflection integrated! Context & correlations evolved.", Toast.LENGTH_SHORT).show()

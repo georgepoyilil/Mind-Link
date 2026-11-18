@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.mindlink.journal.data.ai.CompositeBrainstormingEngine
 import com.mindlink.journal.data.repository.NoteRepository
 import com.mindlink.journal.di.ServiceLocator
 import kotlinx.coroutines.flow.*
@@ -14,12 +15,15 @@ data class SettingsUiState(
     val totalNotes: Int = 0,
     val totalEmbeddings: Int = 0,
     val isReindexing: Boolean = false,
-    val reindexMessage: String? = null
+    val reindexMessage: String? = null,
+    val activeEngineName: String = "Local Life-Sphere NLP Engine (Zero Weights)",
+    val slmModelInfo: String = "Not installed"
 )
 
 class SettingsViewModel(
     private val repository: NoteRepository,
-    private val preferences: SharedPreferences
+    private val preferences: SharedPreferences,
+    private val compositeEngine: CompositeBrainstormingEngine? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -28,6 +32,7 @@ class SettingsViewModel(
     init {
         val savedKey = preferences.getString(ServiceLocator.PREF_GEMINI_API_KEY, "") ?: ""
         _uiState.update { it.copy(apiKey = savedKey) }
+        refreshEngineStatus()
 
         viewModelScope.launch {
             repository.getNotesCount().collect { count ->
@@ -42,9 +47,16 @@ class SettingsViewModel(
         }
     }
 
+    fun refreshEngineStatus() {
+        val engineName = compositeEngine?.getActiveEngineName() ?: "Local Life-Sphere NLP Engine (Zero Weights)"
+        val slmInfo = compositeEngine?.mediaPipeEngine?.getModelInfo() ?: "Not installed"
+        _uiState.update { it.copy(activeEngineName = engineName, slmModelInfo = slmInfo) }
+    }
+
     fun updateApiKey(key: String) {
         _uiState.update { it.copy(apiKey = key) }
         preferences.edit().putString(ServiceLocator.PREF_GEMINI_API_KEY, key.trim()).apply()
+        refreshEngineStatus()
     }
 
     fun reindexAll() {
@@ -57,6 +69,7 @@ class SettingsViewModel(
                     reindexMessage = "Re-indexing tasks enqueued in background WorkManager!"
                 )
             }
+            refreshEngineStatus()
         }
     }
 
@@ -75,11 +88,12 @@ class SettingsViewModel(
 
     class Factory(
         private val repository: NoteRepository,
-        private val preferences: SharedPreferences
+        private val preferences: SharedPreferences,
+        private val compositeEngine: CompositeBrainstormingEngine? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return SettingsViewModel(repository, preferences) as T
+            return SettingsViewModel(repository, preferences, compositeEngine) as T
         }
     }
 }

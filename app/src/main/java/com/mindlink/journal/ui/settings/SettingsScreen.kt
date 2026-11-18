@@ -229,6 +229,76 @@ fun SettingsScreen(
                 }
             }
 
+            // On-Device SLM & Life Spheres Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Memory,
+                            contentDescription = "SLM",
+                            tint = PastelMint,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "On-Device SLM & Life Spheres",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MindTextPrimary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MindSurfaceVariantDark,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Active Intelligence Engine:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MindTextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = uiState.activeEngineName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = PastelMint
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "On-Device Model File: ${uiState.slmModelInfo}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MindTextSecondary
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Life Spheres (Context Separation):",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = PastelLavender
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "• Intimacy & Relationships: Isolates emotional presence with Elena and loved ones. Never mixes with server debugging or posture stretches.\n• Engineering & Work: Dedicated to architecture, schema migrations, and code bottlenecks.\n• Growth & Courage: Focuses on perfectionism, self-doubt, and decisive action.\n• Physical Wellbeing: Targeted strictly for actual eye strain and ergonomic fatigue.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MindTextSecondary,
+                        lineHeight = 20.sp
+                    )
+                }
+            }
+
             // Architecture & Privacy Card
             Card(
                 shape = RoundedCornerShape(16.dp),

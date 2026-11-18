@@ -27,12 +27,14 @@ class ServiceLocator private constructor(context: Context) {
         OnnxEmbeddingEngine(applicationContext)
     }
 
-    val brainstormingEngine: BrainstormingEngine by lazy {
+    val brainstormingEngine: CompositeBrainstormingEngine by lazy {
         val geminiEngine = GeminiBrainstormingEngine {
             preferences.getString(PREF_GEMINI_API_KEY, null)?.takeIf { it.isNotBlank() }
         }
+        val mediaPipeEngine = MediaPipeSlmEngine(applicationContext)
         CompositeBrainstormingEngine(
             geminiEngine = geminiEngine,
+            mediaPipeEngine = mediaPipeEngine,
             localEngine = LocalHeuristicBrainstormingEngine(),
             hasApiKey = {
                 val key = preferences.getString(PREF_GEMINI_API_KEY, null)
