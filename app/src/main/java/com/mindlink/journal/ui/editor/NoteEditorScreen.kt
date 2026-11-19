@@ -32,11 +32,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -196,14 +198,68 @@ fun NoteEditorScreen(
         }
     }
 
-    // Audio recording trigger
+    var isRecordingAudioMemo by remember { mutableStateOf(false) }
+
+    var performToggleSpeech: ((Boolean) -> Unit)? by remember { mutableStateOf(null) }
+
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            performToggleSpeech?.invoke(dictationTargetIsCaption)
+        } else {
+            Toast.makeText(context, "Audio permission needed for speech recognition", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Audio & Speech safe lifecycle disposal
+    DisposableEffect(Unit) {
+        onDispose {
+            speechHelper.stopListening()
+            if (isRecordingAudioMemo) {
+                audioRecorder.cancelRecording()
+                isRecordingAudioMemo = false
+            }
+            mediaPlayer?.release()
+            mediaPlayer = null
+        }
+    }
+
+    // Speech-to-Text Dictation trigger (uses SpeechRecognizer exclusively, never MediaRecorder!)
     val toggleSpeech: (Boolean) -> Unit = { isCaption ->
         dictationTargetIsCaption = isCaption
         if (uiState.isVoiceRecording) {
             speechHelper.stopListening()
+        } else {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (hasPermission) {
+                if (isRecordingAudioMemo) {
+                    audioRecorder.cancelRecording()
+                    isRecordingAudioMemo = false
+                }
+                speechHelper.startListening()
+            } else {
+                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+
+    LaunchedEffect(toggleSpeech) {
+        performToggleSpeech = toggleSpeech
+    }
+
+    // Voice Memo Attachment trigger (uses MediaRecorder exclusively, never SpeechRecognizer!)
+    val toggleAudioMemo: () -> Unit = {
+        if (isRecordingAudioMemo) {
             val (audioFile, duration) = audioRecorder.stopRecording()
-            if (audioFile != null && audioFile.exists() && duration > 500L && !isCaption) {
+            isRecordingAudioMemo = false
+            if (audioFile != null && audioFile.exists() && duration > 500L) {
                 viewModel.setAudio(Uri.fromFile(audioFile).toString(), duration)
+                Toast.makeText(context, "Voice memo attached (${duration / 1000}s)", Toast.LENGTH_SHORT).show()
             }
         } else {
             val hasPermission = ContextCompat.checkSelfPermission(
@@ -212,10 +268,16 @@ fun NoteEditorScreen(
             ) == PackageManager.PERMISSION_GRANTED
 
             if (hasPermission) {
-                audioRecorder.startRecording()
-                speechHelper.startListening()
+                speechHelper.stopListening()
+                val file = audioRecorder.startRecording()
+                if (file != null) {
+                    isRecordingAudioMemo = true
+                    Toast.makeText(context, "Recording voice memo...", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Could not start audio recorder", Toast.LENGTH_SHORT).show()
+                }
             } else {
-                Toast.makeText(context, "Audio permission needed for voice notes", Toast.LENGTH_SHORT).show()
+                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
         }
     }
@@ -463,6 +525,42 @@ fun NoteEditorScreen(
                         .background(MindGlassBorderSubtle)
                 )
 
+                // Font Size Selector Pills (Note override)
+                val noteFontScale = uiState.fontSizeScale
+                val fontSizeOptions = listOf(
+                    Pair(null, "App"),
+                    Pair(0.85f, "S"),
+                    Pair(1.0f, "M"),
+                    Pair(1.15f, "L"),
+                    Pair(1.30f, "XL")
+                )
+                fontSizeOptions.forEach { (scale, label) ->
+                    val isSelected = if (scale == null) noteFontScale == null else noteFontScale != null && Math.abs(noteFontScale - scale) < 0.05f
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) MindIndigo.copy(alpha = 0.35f) else MindGlassButtonContainer,
+                        border = BorderStroke(0.8.dp, if (isSelected) PastelMint else MindGlassButtonBorder),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { viewModel.setFontSizeScale(scale) }
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) PastelMint else MindTextSecondary,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .height(20.dp)
+                        .width(1.dp)
+                        .background(MindGlassBorderSubtle)
+                )
+
                 // Gallery Attach
                 IconButton(onClick = { imagePickerLauncher.launch("image/*") }, modifier = Modifier.size(34.dp)) {
                     Icon(Icons.Default.PhotoLibrary, contentDescription = "Gallery", tint = PastelLavender, modifier = Modifier.size(18.dp))
@@ -474,6 +572,22 @@ fun NoteEditorScreen(
                     if (hasPerm) launchCameraHighRes() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                 }, modifier = Modifier.size(34.dp)) {
                     Icon(Icons.Default.PhotoCamera, contentDescription = "Camera", tint = PastelSky, modifier = Modifier.size(18.dp))
+                }
+
+                // Voice Memo Recording
+                IconButton(
+                    onClick = { toggleAudioMemo() },
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(if (isRecordingAudioMemo) PastelRose.copy(alpha = 0.25f) else Color.Transparent)
+                ) {
+                    Icon(
+                        imageVector = if (isRecordingAudioMemo) Icons.Default.Stop else Icons.Default.GraphicEq,
+                        contentDescription = "Voice Memo",
+                        tint = if (isRecordingAudioMemo) PastelRose else PastelAmber,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
 
                 Box(
@@ -543,14 +657,23 @@ fun NoteEditorScreen(
                 }
             }
 
-            // Note Content Editor Area
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
+            val appFontScale = LocalAppFontScale.current
+            val activeFontScale = uiState.fontSizeScale ?: appFontScale
+            val currentDensity = LocalDensity.current
+            val relativeScale = activeFontScale / appFontScale
+            val effectiveDensity = remember(currentDensity, relativeScale) {
+                Density(currentDensity.density, fontScale = currentDensity.fontScale * relativeScale)
+            }
+
+            CompositionLocalProvider(LocalDensity provides effectiveDensity) {
+                // Note Content Editor Area
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
                 // OCR Hero Card (Prominent and directly accessible when in OCR mode or opened for scanning)
                 if (initialMode == "ocr" || uiState.imageUri == null) {
                     Surface(
@@ -609,6 +732,54 @@ fun NoteEditorScreen(
                     }
                 }
 
+                // Audio Recording Live Bar (When recording voice thought)
+                AnimatedVisibility(visible = isRecordingAudioMemo) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = PastelRose.copy(alpha = 0.15f),
+                        border = BorderStroke(1.2.dp, PastelRose.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = PastelRose,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Recording Voice Thought...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = PastelRose,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = PastelRose.copy(alpha = 0.3f),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { toggleAudioMemo() }
+                            ) {
+                                Text(
+                                    text = "Stop & Attach",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PastelRose,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // In-Editor Audio Player & Review Card (Listen & Decide Before Saving)
                 if (uiState.audioUri != null) {
                     Surface(
@@ -638,13 +809,24 @@ fun NoteEditorScreen(
                                                     } else {
                                                         if (mediaPlayer == null) {
                                                             val player = MediaPlayer.create(context, Uri.parse(uiState.audioUri))
-                                                            player.setOnCompletionListener {
+                                                            player?.setOnCompletionListener {
                                                                 isPlayingAudio = false
+                                                            }
+                                                            player?.setOnErrorListener { mp, _, _ ->
+                                                                mp.release()
+                                                                mediaPlayer = null
+                                                                isPlayingAudio = false
+                                                                true
                                                             }
                                                             mediaPlayer = player
                                                         }
-                                                        mediaPlayer?.start()
-                                                        isPlayingAudio = true
+                                                        mediaPlayer?.let { player ->
+                                                            if (player.currentPosition >= player.duration - 200) {
+                                                                player.seekTo(0)
+                                                            }
+                                                            player.start()
+                                                            isPlayingAudio = true
+                                                        }
                                                     }
                                                 } catch (e: Exception) {
                                                     isPlayingAudio = false
@@ -1115,4 +1297,5 @@ fun NoteEditorScreen(
             }
         }
     }
+}
 }

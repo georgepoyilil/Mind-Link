@@ -53,12 +53,12 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
         val answerBuilder = StringBuilder()
 
         // 1. Love, Relationships & Partnership
-        if (lowerQuery.contains("love") || lowerQuery.contains("relationship") || lowerQuery.contains("elena") || lowerQuery.contains("partner") || lowerQuery.contains("intima") || lowerQuery.contains("argument") || lowerQuery.contains("date night")) {
+        if (lowerQuery.contains("love") || lowerQuery.contains("relationship") || lowerQuery.contains("partner") || lowerQuery.contains("intima") || lowerQuery.contains("argument") || lowerQuery.contains("date night") || lowerQuery.contains("dating")) {
             answerBuilder.append("Based on your personal entries regarding love and relationships:\n\n")
             val loveNotes = notes.filter { n ->
-                n.tags.any { it == "love" || it.contains("relationship") || it.contains("elena") || it.contains("dating") || it.contains("presence") } ||
-                        n.title.lowercase(Locale.ROOT).contains("elena") ||
-                        n.title.lowercase(Locale.ROOT).contains("love")
+                n.tags.any { it == "love" || it.contains("relationship") || it.contains("dating") || it.contains("presence") || it.contains("partner") } ||
+                        n.title.lowercase(Locale.ROOT).contains("love") ||
+                        n.title.lowercase(Locale.ROOT).contains("relationship")
             }.ifEmpty { notes }
 
             for (note in loveNotes) {
@@ -66,7 +66,8 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
                 takeaways.add("${note.title}: $preview")
                 answerBuilder.append("• **${note.title}** (${note.formattedDate}):\n  $preview\n\n")
             }
-            answerBuilder.append("\n**Core Reflection:** You cherish deep presence and honest vulnerability with Elena, and you've recognized that protecting evening time without work screens is essential to your bond.")
+            val keyInsight = loveNotes.firstOrNull()?.summary ?: loveNotes.firstOrNull()?.previewText ?: "deep presence and honest communication."
+            answerBuilder.append("\n**Core Reflection:** Across your relational entries, your reflections emphasize: $keyInsight")
         }
         // 2. Emotional Vulnerability, Loneliness, Burnout & Mental Health
         else if (lowerQuery.contains("feel") || lowerQuery.contains("emotion") || lowerQuery.contains("vulnerab") || lowerQuery.contains("lonel") || lowerQuery.contains("burnout") || lowerQuery.contains("exhaust") || lowerQuery.contains("mental") || lowerQuery.contains("anxious") || lowerQuery.contains("anxiety") || lowerQuery.contains("fear")) {
@@ -76,7 +77,8 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
                 takeaways.add("${note.title}: $preview")
                 answerBuilder.append("• **${note.title}** [Mood: ${note.mood ?: "Reflective"}]:\n  $preview\n\n")
             }
-            answerBuilder.append("\n**Emotional Takeaway:** Your notes show high self-awareness around burnout, the ache of loneliness in a new city, and performance anxiety. Admitting exhaustion and seeking connection are healthy turning points.")
+            val emotionalTakeaway = notes.firstOrNull()?.summary ?: notes.firstOrNull()?.previewText ?: "acknowledging feelings with self-compassion and setting clear boundaries."
+            answerBuilder.append("\n**Emotional Takeaway:** Your notes highlight genuine emotional awareness: $emotionalTakeaway")
         }
         // 3. Failure, Rejection & Overcoming Setbacks
         else if (lowerQuery.contains("fail") || lowerQuery.contains("reject") || lowerQuery.contains("imposter") || lowerQuery.contains("setback") || lowerQuery.contains("pass") || lowerQuery.contains("regret")) {
@@ -86,13 +88,14 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
                 takeaways.add("${note.title}: $preview")
                 answerBuilder.append("• **${note.title}** (${note.formattedDate}):\n  $preview\n\n")
             }
-            answerBuilder.append("\n**Key Realization:** Rejections (like the Sequoia pre-seed pass or architecture imposter feelings) stung deeply, but you consistently reframed them from personal verdicts into catalysts for bootstrapping and self-trust.")
+            val resiliencePoint = notes.firstOrNull()?.summary ?: notes.firstOrNull()?.previewText ?: "reframing obstacles into valuable iteration and learning."
+            answerBuilder.append("\n**Key Realization:** Across these entries, you consistently work to reframe setbacks into practical learning: $resiliencePoint")
         }
         // 4. Family, Parents, Aging & Grief
-        else if (lowerQuery.contains("family") || lowerQuery.contains("parent") || lowerQuery.contains("dad") || lowerQuery.contains("mom") || lowerQuery.contains("grandpa") || lowerQuery.contains("grandma") || lowerQuery.contains("grief") || lowerQuery.contains("loss") || lowerQuery.contains("aging")) {
-            answerBuilder.append("Here is what your Second Brain holds regarding your family, memories, and aging parents:\n\n")
+        else if (lowerQuery.contains("family") || lowerQuery.contains("parent") || lowerQuery.contains("dad") || lowerQuery.contains("mom") || lowerQuery.contains("grief") || lowerQuery.contains("loss") || lowerQuery.contains("aging")) {
+            answerBuilder.append("Here is what your Second Brain holds regarding your family, memories, and loved ones:\n\n")
             val famNotes = notes.filter { n ->
-                n.tags.any { it.contains("family") || it.contains("parents") || it.contains("dad") || it.contains("mom") || it.contains("grief") || it.contains("grandpa") }
+                n.tags.any { it.contains("family") || it.contains("parents") || it.contains("dad") || it.contains("mom") || it.contains("grief") }
             }.ifEmpty { notes }
 
             for (note in famNotes) {
@@ -100,7 +103,8 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
                 takeaways.add("${note.title}: $preview")
                 answerBuilder.append("• **${note.title}** (${note.formattedDate}):\n  $preview\n\n")
             }
-            answerBuilder.append("\n**Heartfelt Insight:** Family occupies a profound emotional space in your life—from the quiet dread of watching Dad age, to honoring Grandpa Leo's wisdom on patience, to celebrating Mom's milestone 60th birthday.")
+            val familyInsight = famNotes.firstOrNull()?.summary ?: famNotes.firstOrNull()?.previewText ?: "cherishing memories and prioritizing connection with family."
+            answerBuilder.append("\n**Heartfelt Insight:** Your family reflections emphasize staying connected and honoring shared moments: $familyInsight")
         }
         // 5. Gratitude, Joy & Peace
         else if (lowerQuery.contains("gratitude") || lowerQuery.contains("peace") || lowerQuery.contains("joy") || lowerQuery.contains("content") || lowerQuery.contains("happy") || lowerQuery.contains("thankful")) {
@@ -111,7 +115,8 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
                 takeaways.add("${note.title}: $preview")
                 answerBuilder.append("• **${note.title}**:\n  $preview\n\n")
             }
-            answerBuilder.append("\n**Peaceful Reflection:** Your most profound contentment comes not from career milestones, but from unstructured stillness—warm coffee, amber morning light, and breathing beside someone you love.")
+            val peaceInsight = calmNotes.firstOrNull()?.summary ?: calmNotes.firstOrNull()?.previewText ?: "finding deep contentment in everyday stillness and mindful moments."
+            answerBuilder.append("\n**Peaceful Reflection:** Your thoughts highlight finding contentment in mindful moments: $peaceInsight")
         }
         // 6. Blocker / Issue detection
         else if (lowerQuery.contains("blocker") || lowerQuery.contains("issue") || lowerQuery.contains("stuck") || lowerQuery.contains("problem") || lowerQuery.contains("bottleneck")) {
@@ -475,7 +480,22 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
 
         when (classification.primarySphere) {
             LifeSphere.RELATIONAL -> {
-                val entity = classification.detectedEntities.firstOrNull()?.replaceFirstChar { it.uppercase() } ?: "Elena"
+                val entity = classification.detectedEntities.firstOrNull()?.replaceFirstChar { it.uppercase() }
+                if (entity == null) {
+                    return null
+                }
+
+                // Only suggest a relational presence reminder if there is genuine tension, distraction, conflict or desire to reconnect
+                val hasTensionOrDisconnect = listOf(
+                    "argument", "fight", "tension", "pulled away", "distract", "phone", "screen",
+                    "overwork", "guilt", "neglect", "miss", "distant", "cold", "unspoken", "conflict",
+                    "disagree", "frustrat", "busy", "hurried", "tired", "reconnect"
+                ).any { lowerText.contains(it) }
+
+                if (!hasTensionOrDisconnect) {
+                    return null
+                }
+
                 if (entity.equals("Elena", ignoreCase = true) || lowerText.contains("elena")) {
                     return ContextualReminder(
                         triggerPattern = "Relational Presence: Quality Time with Elena",
@@ -619,38 +639,128 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
     }
 
     /**
-     * Polishes raw OCR text extracted from Camera snapshots (books, whiteboards, handwritten notes)
-     * into clean structured markdown with an inferred title.
+     * Polishes raw OCR text extracted from Camera snapshots, book pages, or screenshots:
+     * - Strips status bar clutter (timestamps, battery, network indicators: LTE, 5G, Wi-Fi)
+     * - Removes app navigation chrome (Back, Cancel, Done, Save, Settings, etc.)
+     * - Filters camera watermarks (Shot on ..., AI Camera, etc.)
+     * - Removes page numbers and margin noise / OCR garbage lines
+     * - Re-joins hyphenated line wraps (e.g. "connec-\ntion" -> "connection")
+     * - Re-flows broken lines into coherent paragraphs and clean bullet points
+     * - Extracts a meaningful title from document headings
      */
     fun polishOcrText(rawText: String): Pair<String, String> {
-        val cleanLines = rawText.lines()
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-
-        if (cleanLines.isEmpty()) {
-            return Pair("Scanned Note", "No legible text found in scanned image.")
+        val lines = rawText.lines().map { it.trim() }.filter { it.isNotBlank() }
+        if (lines.isEmpty()) {
+            return Pair("Scanned Note", "No legible text found in image.")
         }
 
-        // Infer title from first line
-        val titleCandidate = cleanLines.first().take(60)
-            .replace(Regex("^[^a-zA-Z0-9]+"), "")
-            .trim()
-        val title = if (titleCandidate.length > 3) titleCandidate else "Scanned Note Insights"
+        // Noise filtering regexes
+        val timeRegex = Regex("""^(?:\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?|\d{1,2}\s*[.:]\s*\d{2})$""")
+        val batteryStatusRegex = Regex("""^(?:\d{1,3}%|LTE|5G|4G|VoLTE|VOLTE|Wi-?Fi|SIM\s*\d?|Roaming)$""", RegexOption.IGNORE_CASE)
+        val combinedStatusRegex = Regex("""^(?:\d{1,2}:\d{2}\s*)?(?:5G|4G|LTE|Wi-?Fi)?\s*(?:\|\s*)?\d{1,3}%$""", RegexOption.IGNORE_CASE)
+        val uiNavRegex = Regex("""^(?:<|>|Back|< Back|Cancel|Done|Save|Edit|Share|Settings|Search|Options|Menu|Close|Next|Skip)$""", RegexOption.IGNORE_CASE)
+        val watermarkRegex = Regex("""^.*(?:Shot on|AI Camera|Dual Camera|Triple Camera|Quad Camera|Watermark|Nothing Phone|Redmi Note|Galaxy S\d+|iPhone).*$""", RegexOption.IGNORE_CASE)
+        val pageNumRegex = Regex("""^(?:Page\s+\d+(?:\s+of\s+\d+)?|-?\s*\d+\s*-?|\d+\s*/\s*\d+)$""", RegexOption.IGNORE_CASE)
+        val copyrightRegex = Regex("""^(?:©|Copyright|All rights reserved|ISBN\b).*$""", RegexOption.IGNORE_CASE)
 
-        val bodyLines = if (cleanLines.size > 1) cleanLines.drop(1) else cleanLines
-        val contentBuilder = StringBuilder()
-        contentBuilder.append("### Scanned & Polished Thought\n\n")
+        val filteredLines = mutableListOf<String>()
+        for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed.length <= 1 && !trimmed[0].isLetterOrDigit()) continue // solitary punctuation
+            if (timeRegex.matches(trimmed)) continue
+            if (batteryStatusRegex.matches(trimmed)) continue
+            if (combinedStatusRegex.matches(trimmed)) continue
+            if (uiNavRegex.matches(trimmed)) continue
+            if (pageNumRegex.matches(trimmed)) continue
+            if (copyrightRegex.matches(trimmed)) continue
+            if (watermarkRegex.matches(trimmed) && trimmed.length < 50) continue
 
-        for (line in bodyLines) {
-            if (line.startsWith("-") || line.startsWith("•") || line.startsWith("*")) {
-                contentBuilder.append("$line\n")
-            } else if (line.length > 60) {
-                contentBuilder.append("$line\n\n")
+            // Filter lines with virtually no alphanumeric characters (sensor/margin noise)
+            val alnumCount = trimmed.count { it.isLetterOrDigit() }
+            if (alnumCount == 0 && trimmed.length > 1) continue
+            if (trimmed.length > 4 && alnumCount.toDouble() / trimmed.length < 0.35) continue
+
+            filteredLines.add(trimmed)
+        }
+
+        if (filteredLines.isEmpty()) {
+            return Pair("Scanned Note", "No legible text found in image.")
+        }
+
+        // Infer title from first line if it looks like a heading
+        val firstLine = filteredLines.first()
+        val isFirstLineTitleCandidate = firstLine.length in 3..70 &&
+                !firstLine.endsWith(".") &&
+                !firstLine.startsWith("-") &&
+                !firstLine.startsWith("•") &&
+                !firstLine.startsWith("*")
+
+        val titleCandidate = if (isFirstLineTitleCandidate) {
+            firstLine.replace(Regex("""^[^a-zA-Z0-9]+"""), "").trim()
+        } else {
+            "Scanned Document"
+        }
+        val title = if (titleCandidate.length in 3..70) titleCandidate else "Scanned Document"
+
+        val bodyLines = if (isFirstLineTitleCandidate && filteredLines.size > 1) {
+            filteredLines.drop(1)
+        } else {
+            filteredLines
+        }
+
+        // Re-assemble broken sentences and paragraphs
+        val paragraphBuilder = StringBuilder()
+        var currentParagraph = StringBuilder()
+
+        for (i in bodyLines.indices) {
+            val line = bodyLines[i]
+            val isBullet = line.startsWith("-") || line.startsWith("•") || line.startsWith("*") ||
+                    Regex("""^\d+[\.)]\s""").containsMatchIn(line)
+            val isHeader = line.startsWith("#")
+
+            if (isBullet || isHeader) {
+                if (currentParagraph.isNotEmpty()) {
+                    paragraphBuilder.append(currentParagraph.toString().trim()).append("\n\n")
+                    currentParagraph.clear()
+                }
+                // Normalize bullet symbol to markdown "- "
+                val normalizedBullet = if (line.startsWith("• ") || line.startsWith("* ")) {
+                    "- " + line.substring(2)
+                } else if (line.startsWith("•") || line.startsWith("*")) {
+                    "- " + line.substring(1).trim()
+                } else {
+                    line
+                }
+                paragraphBuilder.append(normalizedBullet).append("\n")
             } else {
-                contentBuilder.append("- $line\n")
+                if (currentParagraph.isEmpty()) {
+                    currentParagraph.append(line)
+                } else {
+                    // Check if previous line ended with a hyphen (broken word)
+                    val prevText = currentParagraph.toString()
+                    if (prevText.endsWith("-") && line.firstOrNull()?.isLetter() == true) {
+                        currentParagraph.setLength(currentParagraph.length - 1) // drop '-'
+                        currentParagraph.append(line)
+                    } else if (prevText.endsWith(".") || prevText.endsWith("!") || prevText.endsWith("?") || prevText.endsWith(":")) {
+                        // Previous line ended a sentence; start new paragraph
+                        paragraphBuilder.append(currentParagraph.toString().trim()).append("\n\n")
+                        currentParagraph.clear()
+                        currentParagraph.append(line)
+                    } else {
+                        // Mid-sentence wrap, join with space
+                        currentParagraph.append(" ").append(line)
+                    }
+                }
             }
         }
 
-        return Pair(title, contentBuilder.toString().trim())
+        if (currentParagraph.isNotEmpty()) {
+            paragraphBuilder.append(currentParagraph.toString().trim())
+        }
+
+        val cleanBody = paragraphBuilder.toString().trim()
+        val finalBody = if (cleanBody.isNotBlank()) cleanBody else "Scanned text contained only formatted markers."
+
+        return Pair(title, finalBody)
     }
 }

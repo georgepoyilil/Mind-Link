@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import com.mindlink.journal.domain.model.Note
+import com.mindlink.journal.ui.components.MindLinkOnboardingDialog
 import com.mindlink.journal.ui.notes.components.NoteCard
 import com.mindlink.journal.ui.notes.components.NoteViewMode
 import com.mindlink.journal.ui.theme.*
@@ -171,6 +172,14 @@ fun NotesListScreen(
                 )
             }
         }
+    }
+
+    // First-Time User Onboarding Modal
+    if (uiState.showOnboarding) {
+        MindLinkOnboardingDialog(
+            onDismiss = { viewModel.dismissOnboarding() },
+            onLoadSamples = { viewModel.loadSampleThoughtsAndDismiss() }
+        )
     }
 
     Scaffold(

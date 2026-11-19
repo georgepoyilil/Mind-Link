@@ -23,6 +23,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mindlink.journal.BuildConfig
+import com.mindlink.journal.ui.components.MindLinkOnboardingDialog
+import com.mindlink.journal.ui.components.MindLinkUserGuideDialog
 import com.mindlink.journal.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,6 +36,16 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var isKeyVisible by remember { mutableStateOf(false) }
+    var showUserGuideDialog by remember { mutableStateOf(false) }
+    var showOnboardingDialog by remember { mutableStateOf(false) }
+
+    if (showUserGuideDialog) {
+        MindLinkUserGuideDialog(onDismiss = { showUserGuideDialog = false })
+    }
+
+    if (showOnboardingDialog) {
+        MindLinkOnboardingDialog(onDismiss = { showOnboardingDialog = false })
+    }
 
     Scaffold(
         topBar = {
@@ -63,6 +76,111 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // 0. App Typography & Font Size Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.FormatSize,
+                            contentDescription = "Font Size",
+                            tint = PastelLavender,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "App Typography & Font Size",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MindTextPrimary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Global font size applied across the entire app. Individual notes can override this with their own size:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MindTextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val fontOptions = listOf(
+                        Triple(0.85f, "Small", "0.85x"),
+                        Triple(1.0f, "Default", "1.0x"),
+                        Triple(1.15f, "Large", "1.15x"),
+                        Triple(1.30f, "Huge", "1.30x")
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        fontOptions.forEach { (scale, label, sub) ->
+                            val isSelected = Math.abs(uiState.fontScale - scale) < 0.05f
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) MindSurfaceVariantDark else Color.Transparent,
+                                border = BorderStroke(
+                                    width = if (isSelected) 1.2.dp else 0.8.dp,
+                                    color = if (isSelected) PastelLavender else MindBorderDark.copy(alpha = 0.5f)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { viewModel.updateFontScale(scale) }
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) PastelLavender else MindTextPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = sub,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isSelected) PastelLavender.copy(alpha = 0.8f) else MindTextTertiary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Live Preview Area
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MindGlassSurfaceVariant,
+                        border = BorderStroke(0.8.dp, MindGlassBorderSubtle),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Preview Text",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MindTextTertiary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "MindLink captures thoughts into permanent clarity with on-device intelligence.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MindTextPrimary
+                            )
+                        }
+                    }
+                }
+            }
+
             // 1. Engine Mode Switcher Card
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -622,26 +740,269 @@ fun SettingsScreen(
                 }
             }
 
-            // 6. Architecture & Privacy Card
+            // 6. In-App OTA Updates Card
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SystemUpdate,
+                            contentDescription = "Updates",
+                            tint = PastelSky,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "MindLink Updates (OTA)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MindTextPrimary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MindGlassButtonContainer,
+                            border = BorderStroke(1.dp, MindGlassButtonBorder)
+                        ) {
+                            Text(
+                                text = "v${BuildConfig.VERSION_NAME}",
+                                color = PastelSky,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Local-First Architecture & Privacy",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MindTextPrimary
+                        text = "Seamless in-app updates powered directly by GitHub Releases (georgepoyilil/Mind-Link).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MindTextSecondary
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (uiState.appUpdateMessage != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = uiState.appUpdateMessage ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (uiState.appUpdateInfo?.isNewer == true) PastelMint else MindTextSecondary
+                        )
+                    }
+
+                    if (uiState.isCheckingAppUpdate) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = PastelSky
+                            )
+                            Text(
+                                text = "Checking GitHub Releases...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MindTextSecondary
+                            )
+                        }
+                    }
+
+                    val updateInfo = uiState.appUpdateInfo
+                    if (updateInfo != null && updateInfo.isNewer) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MindGlassSurface,
+                            border = BorderStroke(1.dp, PastelMint.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = updateInfo.tagName,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PastelMint
+                                    )
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    val sizeMb = if (updateInfo.sizeBytes > 0) {
+                                        String.format("%.1f MB", updateInfo.sizeBytes / (1024f * 1024f))
+                                    } else {
+                                        "APK"
+                                    }
+                                    Text(
+                                        text = sizeMb,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MindTextSecondary
+                                    )
+                                }
+
+                                if (updateInfo.changelog.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = updateInfo.changelog,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MindTextSecondary,
+                                        maxLines = 4
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                if (uiState.isDownloadingAppUpdate) {
+                                    LinearProgressIndicator(
+                                        progress = { uiState.appUpdateProgress },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = PastelMint,
+                                        trackColor = MindBorderDark
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Downloading APK update... ${(uiState.appUpdateProgress * 100).toInt()}%",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MindTextSecondary
+                                    )
+                                } else if (uiState.downloadedApkFile != null) {
+                                    Button(
+                                        onClick = { viewModel.installDownloadedApk() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = PastelMint,
+                                            contentColor = MindBackgroundDark
+                                        ),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.DownloadDone,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Install Update Now", fontWeight = FontWeight.Bold)
+                                    }
+                                } else {
+                                    Button(
+                                        onClick = { viewModel.downloadAndInstallAppUpdate() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = PastelMint,
+                                            contentColor = MindBackgroundDark
+                                        ),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Download,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Download & Install (${updateInfo.tagName})", fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (!uiState.isCheckingAppUpdate && (updateInfo == null || !updateInfo.isNewer)) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = { viewModel.checkForAppUpdate() },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelSky),
+                            border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.SystemUpdate,
+                                contentDescription = "Check for updates",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Check for MindLink Updates", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+
+            // 7. About MindLink & User Guide Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "About",
+                            tint = PastelLavender,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "About MindLink & User Guide",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MindTextPrimary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "• All notes and vector embeddings are stored locally in Room SQLite.\n• Full-text search runs completely offline via SQLite FTS.\n• WorkManager guarantees background note enrichment without UI freezes.\n• Embeddings run via ONNX Runtime Mobile (`all-MiniLM-L6-v2.onnx`).\n• SLMs run on device GPU via Google MediaPipe Tasks GenAI.",
+                        text = "• All notes and vector embeddings are stored locally in Room SQLite.\n• Full-text search runs completely offline via SQLite FTS.\n• WorkManager guarantees background note enrichment without UI freezes.\n• Embeddings run via Fallback/ONNX 384-d semantic projection.\n• SLMs run on device GPU via Google MediaPipe Tasks GenAI.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MindTextSecondary,
                         lineHeight = 22.sp
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = { showUserGuideDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PastelSky,
+                            contentColor = MindBackgroundDark
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MenuBook,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Read MindLink User Guide & Instructions", fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = { showOnboardingDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelLavender),
+                        border = BorderStroke(1.dp, PastelLavender.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Replay Onboarding Tour", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }

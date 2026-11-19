@@ -43,6 +43,12 @@ fun ThoughtGraphScreen(
 
     var scale by remember { mutableFloatStateOf(1.0f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    val nativePaint = remember {
+        Paint().apply {
+            isAntiAlias = true
+            textAlign = Paint.Align.CENTER
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -175,11 +181,6 @@ fun ThoughtGraphScreen(
                 }
 
                 // 2. Draw Nodes
-                val nativePaint = Paint().apply {
-                    isAntiAlias = true
-                    textAlign = Paint.Align.CENTER
-                }
-
                 for (node in uiState.graph.nodes) {
                     val nx = centerX + node.x * scale
                     val ny = centerY + node.y * scale

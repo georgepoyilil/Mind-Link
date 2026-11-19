@@ -35,7 +35,13 @@ data class NoteEditorUiState(
     val suggestedTags: List<String> = emptyList(),
     val checklistItems: List<ChecklistItem> = emptyList(),
     val fontFamily: String = "Sans",
-    val recordedAudioTranscript: String = ""
+    val fontSizeScale: Float? = null,
+    val recordedAudioTranscript: String = "",
+    val originalCreatedAt: Long? = null,
+    val summary: String? = null,
+    val mood: String? = null,
+    val reflectionPrompts: List<String> = emptyList(),
+    val isProcessed: Boolean = false
 )
 
 class NoteEditorViewModel(
@@ -106,7 +112,13 @@ class NoteEditorViewModel(
                         audioUri = note.audioUri,
                         audioDurationMs = note.audioDurationMs,
                         checklistItems = parsedItems,
-                        fontFamily = note.fontFamily
+                        fontFamily = note.fontFamily,
+                        fontSizeScale = note.fontSizeScale,
+                        originalCreatedAt = note.createdAt,
+                        summary = note.summary,
+                        mood = note.mood,
+                        reflectionPrompts = note.reflectionPrompts,
+                        isProcessed = note.isProcessed
                     )
                 }
             }
@@ -123,6 +135,10 @@ class NoteEditorViewModel(
 
     fun setFontFamily(font: String) {
         _uiState.update { it.copy(fontFamily = font) }
+    }
+
+    fun setFontSizeScale(scale: Float?) {
+        _uiState.update { it.copy(fontSizeScale = scale) }
     }
 
     // --- Interactive Checklist Item Management ---
@@ -272,13 +288,20 @@ class NoteEditorViewModel(
                 id = state.id,
                 title = titleToSave,
                 content = state.content,
+                createdAt = state.originalCreatedAt ?: System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
+                summary = state.summary,
+                mood = state.mood,
                 tags = state.tags,
                 actionItems = actionItemsToSave,
+                reflectionPrompts = state.reflectionPrompts,
+                isProcessed = state.isProcessed,
                 imageUri = state.imageUri,
                 imageCaption = state.imageCaption,
                 audioUri = state.audioUri,
                 audioDurationMs = state.audioDurationMs,
-                fontFamily = state.fontFamily
+                fontFamily = state.fontFamily,
+                fontSizeScale = state.fontSizeScale
             )
 
             val savedId = repository.saveNote(note)

@@ -25,11 +25,17 @@ object LifeSphereClassifier {
         var relationalScore = 0
         if (relationalEntities.isNotEmpty()) relationalScore += 5
         val relationalKeywords = listOf(
-            "argument", "dishes", "dinner", "couch", "living room", "held hands", "tears",
-            "miss", "love", "relationship", "intimacy", "unspoken", "vulnerab", "guilt",
-            "distract", "connected", "disconnection", "date night", "partner", "spouse"
+            "argument", "held hands", "tears", "miss", "love", "relationship",
+            "intimacy", "unspoken", "vulnerab", "guilt", "distract", "connected",
+            "disconnection", "date night", "partner", "spouse", "marriage", "dating"
         )
         relationalKeywords.forEach { if (fullText.contains(it)) relationalScore += 2 }
+
+        // Domestic context keywords only contribute to relational score if a person or relationship keyword is present!
+        val domesticKeywords = listOf("dinner", "couch", "living room", "dishes", "cooking together")
+        if (relationalEntities.isNotEmpty() || relationalScore > 0) {
+            domesticKeywords.forEach { if (fullText.contains(it)) relationalScore += 1 }
+        }
 
         var physicalScore = 0
         // Physical strain must have explicit symptom words, NOT just sitting down on a couch!

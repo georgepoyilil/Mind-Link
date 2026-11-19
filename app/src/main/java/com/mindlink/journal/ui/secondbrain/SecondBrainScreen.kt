@@ -51,6 +51,12 @@ fun SecondBrainScreen(
     val speechState by speechHelper.speechState.collectAsState()
     var isRecordingQuery by remember { mutableStateOf(false) }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            speechHelper.stopListening()
+        }
+    }
+
     LaunchedEffect(speechState) {
         when (val state = speechState) {
             is SpeechState.Listening -> {

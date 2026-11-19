@@ -25,7 +25,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -132,6 +134,47 @@ fun NoteDetailScreen(
                                 Icon(Icons.Default.DeleteForever, contentDescription = "Delete Forever", tint = PastelRose)
                             }
                         } else {
+                            // Font Size Override Menu
+                            var showFontSizeMenu by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(onClick = { showFontSizeMenu = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.FormatSize,
+                                        contentDescription = "Font Size",
+                                        tint = if (note.fontSizeScale != null) PastelMint else PastelLavender
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = showFontSizeMenu,
+                                    onDismissRequest = { showFontSizeMenu = false },
+                                    modifier = Modifier.background(MindSurfaceDark)
+                                ) {
+                                    val sizeChoices = listOf(
+                                        Pair(null, "Follow App Size"),
+                                        Pair(0.85f, "Small (0.85x)"),
+                                        Pair(1.0f, "Standard (1.0x)"),
+                                        Pair(1.15f, "Large (1.15x)"),
+                                        Pair(1.30f, "Huge (1.30x)")
+                                    )
+                                    sizeChoices.forEach { (scale, label) ->
+                                        val isCurrent = if (scale == null) note.fontSizeScale == null else note.fontSizeScale != null && Math.abs(note.fontSizeScale - scale) < 0.05f
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = label,
+                                                    color = if (isCurrent) PastelMint else MindTextPrimary,
+                                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            onClick = {
+                                                showFontSizeMenu = false
+                                                viewModel.updateFontSizeScale(scale)
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
                             // Archive / Unarchive
                             if (note.isArchived) {
                                 IconButton(onClick = { viewModel.unarchiveNote { onNavigateBack() } }) {
@@ -166,11 +209,20 @@ fun NoteDetailScreen(
                 CircularProgressIndicator(color = MindIndigo)
             }
         } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
+            val appFontScale = LocalAppFontScale.current
+            val activeFontScale = note.fontSizeScale ?: appFontScale
+            val currentDensity = LocalDensity.current
+            val relativeScale = activeFontScale / appFontScale
+            val effectiveDensity = remember(currentDensity, relativeScale) {
+                Density(currentDensity.density, fontScale = currentDensity.fontScale * relativeScale)
+            }
+
+            CompositionLocalProvider(LocalDensity provides effectiveDensity) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -277,13 +329,24 @@ fun NoteDetailScreen(
                                                     } else {
                                                         if (mediaPlayer == null) {
                                                             val player = MediaPlayer.create(context, Uri.parse(note.audioUri))
-                                                            player.setOnCompletionListener {
+                                                            player?.setOnCompletionListener {
                                                                 isPlayingAudio = false
+                                                            }
+                                                            player?.setOnErrorListener { mp, _, _ ->
+                                                                mp.release()
+                                                                mediaPlayer = null
+                                                                isPlayingAudio = false
+                                                                true
                                                             }
                                                             mediaPlayer = player
                                                         }
-                                                        mediaPlayer?.start()
-                                                        isPlayingAudio = true
+                                                        mediaPlayer?.let { player ->
+                                                            if (player.currentPosition >= player.duration - 200) {
+                                                                player.seekTo(0)
+                                                            }
+                                                            player.start()
+                                                            isPlayingAudio = true
+                                                        }
                                                     }
                                                 } catch (e: Exception) {
                                                     isPlayingAudio = false
@@ -918,4 +981,5 @@ fun NoteDetailScreen(
             }
         }
     }
+}
 }

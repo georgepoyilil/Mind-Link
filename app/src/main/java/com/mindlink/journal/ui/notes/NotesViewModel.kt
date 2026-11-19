@@ -1,9 +1,11 @@
 package com.mindlink.journal.ui.notes
 
+import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.mindlink.journal.data.repository.NoteRepository
+import com.mindlink.journal.di.ServiceLocator
 import com.mindlink.journal.domain.model.Note
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -22,17 +24,24 @@ data class NotesUiState(
     val filteredNotes: List<Note> = emptyList(),
     val selectedMood: String? = null,
     val searchQuery: String = "",
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val showOnboarding: Boolean = false
 )
 
 class NotesViewModel(
-    private val repository: NoteRepository
+    private val repository: NoteRepository,
+    private val preferences: SharedPreferences? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(NotesUiState())
     val uiState: StateFlow<NotesUiState> = _uiState.asStateFlow()
 
     init {
+        val hasSeen = preferences?.getBoolean(ServiceLocator.PREF_HAS_SEEN_ONBOARDING, false) ?: false
+        if (!hasSeen) {
+            _uiState.update { it.copy(showOnboarding = true) }
+        }
+
         viewModelScope.launch {
             combine(
                 repository.getAllNotes(),
@@ -144,6 +153,21 @@ class NotesViewModel(
         }
     }
 
+    fun dismissOnboarding() {
+        preferences?.edit()?.putBoolean(ServiceLocator.PREF_HAS_SEEN_ONBOARDING, true)?.apply()
+        _uiState.update { it.copy(showOnboarding = false) }
+    }
+
+    fun loadSampleThoughtsAndDismiss() {
+        preferences?.edit()?.putBoolean(ServiceLocator.PREF_HAS_SEEN_ONBOARDING, true)?.apply()
+        _uiState.update { it.copy(showOnboarding = false) }
+        seedSampleData()
+    }
+
+    fun showOnboarding() {
+        _uiState.update { it.copy(showOnboarding = true) }
+    }
+
     private fun applyFilter(notes: List<Note>, mood: String?, query: String): List<Note> {
         return notes.filter { note ->
             val matchesMood = mood == null || note.mood?.equals(mood, ignoreCase = true) == true
@@ -156,10 +180,13 @@ class NotesViewModel(
         }
     }
 
-    class Factory(private val repository: NoteRepository) : ViewModelProvider.Factory {
+    class Factory(
+        private val repository: NoteRepository,
+        private val preferences: SharedPreferences? = null
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return NotesViewModel(repository) as T
+            return NotesViewModel(repository, preferences) as T
         }
     }
 }

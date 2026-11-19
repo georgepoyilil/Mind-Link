@@ -25,7 +25,7 @@ interface NoteRepository {
     suspend fun purgeExpiredTrash()
     suspend fun getRelatedThoughts(noteId: Long, topK: Int = 3): List<RelatedThought>
     suspend fun searchNotesHybrid(query: String): List<SearchResult>
-    suspend fun synthesizeSecondBrain(query: String): SynthesisResponse
+    suspend fun synthesizeSecondBrain(query: String, precomputedSearchResults: List<SearchResult>? = null): SynthesisResponse
     suspend fun reindexAllNotes()
     fun getNotesCount(): Flow<Int>
     fun getArchivedCount(): Flow<Int>

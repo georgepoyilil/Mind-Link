@@ -19,6 +19,9 @@ interface EmbeddingDao {
     @Query("DELETE FROM note_embeddings WHERE noteId = :noteId")
     suspend fun deleteByNoteId(noteId: Long)
 
+    @Query("DELETE FROM note_embeddings WHERE noteId NOT IN (SELECT id FROM notes)")
+    suspend fun deleteOrphanedEmbeddings()
+
     @Query("DELETE FROM note_embeddings")
     suspend fun deleteAll()
 

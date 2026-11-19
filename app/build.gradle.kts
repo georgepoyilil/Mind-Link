@@ -27,10 +27,14 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = rootProject.file("app/keystore/release.keystore")
-            storePassword = "mindlinkpassword"
-            keyAlias = "mindlink"
-            keyPassword = "mindlinkpassword"
+            val keystorePath = System.getenv("KEYSTORE_PATH") ?: "app/keystore/release.keystore"
+            val keystoreFile = rootProject.file(keystorePath)
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "mindlinkpassword"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "mindlink"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "mindlinkpassword"
+            }
         }
     }
 
@@ -120,6 +124,9 @@ dependencies {
 
     // Google MediaPipe Tasks GenAI for On-Device SLMs (Qwen / Gemma / LiteRT)
     implementation("com.google.mediapipe:tasks-genai:0.10.35")
+
+    // Security & EncryptedSharedPreferences for API Keys
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Testing
     testImplementation(libs.junit)

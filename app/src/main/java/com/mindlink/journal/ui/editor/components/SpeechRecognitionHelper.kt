@@ -60,6 +60,14 @@ class SpeechRecognitionHelper(private val context: Context) {
 
                     override fun onError(error: Int) {
                         isListening = false
+                        try {
+                            speechRecognizer?.cancel()
+                            speechRecognizer?.destroy()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error cleaning up recognizer after error: ${e.message}")
+                        } finally {
+                            speechRecognizer = null
+                        }
                         val message = when (error) {
                             SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
                             SpeechRecognizer.ERROR_CLIENT -> "Client side error"
@@ -80,6 +88,13 @@ class SpeechRecognitionHelper(private val context: Context) {
                         isListening = false
                         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         val text = matches?.firstOrNull() ?: ""
+                        try {
+                            speechRecognizer?.destroy()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error cleaning up recognizer on results: ${e.message}")
+                        } finally {
+                            speechRecognizer = null
+                        }
                         _speechState.value = SpeechState.Result(text)
                     }
 

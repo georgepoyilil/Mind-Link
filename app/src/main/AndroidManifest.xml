@@ -12,6 +12,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- System notifications for proactive mindful reminders -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- In-app OTA package installer permission -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".MindLinkApplication"

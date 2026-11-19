@@ -500,12 +500,17 @@ fun MoodBadge(mood: String, emoji: String = "") {
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .background(textColor, CircleShape)
-            )
-            Spacer(modifier = Modifier.width(5.dp))
+            if (emoji.isNotBlank()) {
+                Text(text = emoji, fontSize = 11.sp)
+                Spacer(modifier = Modifier.width(4.dp))
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(textColor, CircleShape)
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+            }
             Text(
                 text = mood,
                 style = MaterialTheme.typography.labelSmall,

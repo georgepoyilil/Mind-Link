@@ -14,20 +14,7 @@ class MindLinkApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "Initializing MindLink Intelligent Journal & Second Brain")
-        val serviceLocator = ServiceLocator.getInstance(this)
-
-        // Pre-populate with sample notes if database is empty on first launch
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val notes = serviceLocator.noteRepository.getAllNotes().firstOrNull() ?: emptyList()
-                if (notes.isEmpty()) {
-                    Log.i(TAG, "Database is empty. Automatically seeding sample Second Brain notes...")
-                    SampleDataSeeder.seedSampleNotes(serviceLocator.noteRepository)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error checking or seeding notes: ${e.message}")
-            }
-        }
+        ServiceLocator.getInstance(this)
     }
 
     companion object {

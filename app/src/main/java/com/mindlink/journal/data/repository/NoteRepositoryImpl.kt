@@ -61,40 +61,41 @@ class NoteRepositoryImpl(
 
     override suspend fun moveToTrash(id: Long) = withContext(Dispatchers.IO) {
         noteDao.moveToTrash(id)
-        rebuildSynapticGraph()
+        noteLinkDao.deleteLinksForNote(id)
     }
 
     override suspend fun restoreFromTrash(id: Long) = withContext(Dispatchers.IO) {
         noteDao.restoreFromTrash(id)
-        rebuildSynapticGraph()
+        updateSynapticLinksForNote(id)
     }
 
     override suspend fun archiveNote(id: Long) = withContext(Dispatchers.IO) {
         noteDao.archiveNote(id)
-        rebuildSynapticGraph()
+        noteLinkDao.deleteLinksForNote(id)
     }
 
     override suspend fun unarchiveNote(id: Long) = withContext(Dispatchers.IO) {
         noteDao.unarchiveNote(id)
-        rebuildSynapticGraph()
+        updateSynapticLinksForNote(id)
     }
 
     override suspend fun deleteNotePermanently(id: Long) = withContext(Dispatchers.IO) {
         noteDao.deleteNoteById(id)
         embeddingDao.deleteByNoteId(id)
         noteLinkDao.deleteLinksForNote(id)
-        rebuildSynapticGraph()
     }
 
     override suspend fun emptyTrash() = withContext(Dispatchers.IO) {
         noteDao.emptyTrash()
-        rebuildSynapticGraph()
+        embeddingDao.deleteOrphanedEmbeddings()
+        noteLinkDao.deleteOrphanedLinks()
     }
 
     override suspend fun purgeExpiredTrash() = withContext(Dispatchers.IO) {
         val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000L)
         noteDao.purgeExpiredTrash(thirtyDaysAgo)
-        rebuildSynapticGraph()
+        embeddingDao.deleteOrphanedEmbeddings()
+        noteLinkDao.deleteOrphanedLinks()
     }
 
     override fun getArchivedCount(): Flow<Int> = noteDao.getArchivedCount()
@@ -130,9 +131,21 @@ class NoteRepositoryImpl(
 
         // Trigger WorkManager background pipeline asynchronously (does NOT block UI)
         triggerAsyncAiProcessing(noteId)
-        rebuildSynapticGraph()
+        updateSynapticLinksForNote(noteId)
 
         noteId
+    }
+
+    private suspend fun updateSynapticLinksForNote(noteId: Long) {
+        noteLinkDao.deleteLinksForNote(noteId)
+        val noteEntity = noteDao.getNoteByIdSync(noteId) ?: return
+        if (noteEntity.isDeleted || noteEntity.isArchived) return
+        val allOtherNotes = (noteDao.getAllNotes().firstOrNull() ?: emptyList())
+            .filter { it.id != noteId && !it.isDeleted && !it.isArchived }
+        val incrementalLinks = synapticGraphEngine.computeIncrementalLinks(noteEntity, allOtherNotes)
+        if (incrementalLinks.isNotEmpty()) {
+            noteLinkDao.insertLinks(incrementalLinks)
+        }
     }
 
     override suspend fun deleteNote(id: Long) = moveToTrash(id)
@@ -203,29 +216,29 @@ class NoteRepositoryImpl(
             semanticRankedMatches = semanticMatches
         )
 
-        // 4. Intent & Thematic Expansion
+        // 4. Intent & Thematic Expansion (Generic journaling semantics)
         val lowerQuery = cleanQuery.lowercase(java.util.Locale.ROOT)
         val expandedTokens = mutableSetOf<String>()
-        if (lowerQuery.contains("love") || lowerQuery.contains("dating") || lowerQuery.contains("relationship") || lowerQuery.contains("elena") || lowerQuery.contains("partner")) {
-            expandedTokens.addAll(listOf("love", "relationship", "elena", "partner", "dating", "presence"))
+        if (lowerQuery.contains("love") || lowerQuery.contains("dating") || lowerQuery.contains("relationship") || lowerQuery.contains("partner") || lowerQuery.contains("spouse")) {
+            expandedTokens.addAll(listOf("love", "relationship", "partner", "dating", "spouse", "presence", "intimacy"))
         }
-        if (lowerQuery.contains("fail") || lowerQuery.contains("reject") || lowerQuery.contains("pass") || lowerQuery.contains("setback")) {
-            expandedTokens.addAll(listOf("failure", "rejection", "investor", "pass", "setback", "sequoia"))
+        if (lowerQuery.contains("fail") || lowerQuery.contains("reject") || lowerQuery.contains("pass") || lowerQuery.contains("setback") || lowerQuery.contains("mistake")) {
+            expandedTokens.addAll(listOf("failure", "rejection", "setback", "mistake", "struggle", "obstacle"))
         }
-        if (lowerQuery.contains("family") || lowerQuery.contains("parent") || lowerQuery.contains("dad") || lowerQuery.contains("mom") || lowerQuery.contains("grandpa") || lowerQuery.contains("aging")) {
-            expandedTokens.addAll(listOf("family", "parents", "dad", "mom", "grandpa", "aging", "grief"))
+        if (lowerQuery.contains("family") || lowerQuery.contains("parent") || lowerQuery.contains("dad") || lowerQuery.contains("mom") || lowerQuery.contains("child") || lowerQuery.contains("sibling")) {
+            expandedTokens.addAll(listOf("family", "parents", "father", "mother", "aging", "home"))
         }
-        if (lowerQuery.contains("lonel") || lowerQuery.contains("burnout") || lowerQuery.contains("exhaust") || lowerQuery.contains("mental") || lowerQuery.contains("tired")) {
-            expandedTokens.addAll(listOf("loneliness", "burnout", "exhaustion", "mental", "pto", "tired"))
+        if (lowerQuery.contains("lonel") || lowerQuery.contains("burnout") || lowerQuery.contains("exhaust") || lowerQuery.contains("mental") || lowerQuery.contains("tired") || lowerQuery.contains("stress")) {
+            expandedTokens.addAll(listOf("loneliness", "burnout", "exhaustion", "mental", "rest", "tired", "stress", "recovery"))
         }
-        if (lowerQuery.contains("blocker") || lowerQuery.contains("bottleneck") || lowerQuery.contains("issue") || lowerQuery.contains("stuck")) {
-            expandedTokens.addAll(listOf("blocker", "bottleneck", "timeout", "latency", "flak"))
+        if (lowerQuery.contains("blocker") || lowerQuery.contains("bottleneck") || lowerQuery.contains("issue") || lowerQuery.contains("stuck") || lowerQuery.contains("bug")) {
+            expandedTokens.addAll(listOf("blocker", "bottleneck", "issue", "bug", "problem", "challenge"))
         }
-        if (lowerQuery.contains("idea") || lowerQuery.contains("startup") || lowerQuery.contains("concept") || lowerQuery.contains("build")) {
-            expandedTokens.addAll(listOf("ideas", "hardware", "wearable", "concept"))
+        if (lowerQuery.contains("idea") || lowerQuery.contains("startup") || lowerQuery.contains("concept") || lowerQuery.contains("project") || lowerQuery.contains("build")) {
+            expandedTokens.addAll(listOf("ideas", "concept", "project", "build", "creativity", "innovation"))
         }
-        if (lowerQuery.contains("cost") || lowerQuery.contains("money") || lowerQuery.contains("budget") || lowerQuery.contains("cloud")) {
-            expandedTokens.addAll(listOf("finance", "cloud", "cost", "aws", "budget"))
+        if (lowerQuery.contains("cost") || lowerQuery.contains("money") || lowerQuery.contains("budget") || lowerQuery.contains("finance")) {
+            expandedTokens.addAll(listOf("finance", "cost", "money", "budget", "expenses", "investment"))
         }
 
         val allIds = (blendedRankings.map { it.first } + keywordNoteIds).distinct()
@@ -267,8 +280,8 @@ class NoteRepositoryImpl(
             .take(15)
     }
 
-    override suspend fun synthesizeSecondBrain(query: String): SynthesisResponse = withContext(Dispatchers.IO) {
-        val searchResults = searchNotesHybrid(query)
+    override suspend fun synthesizeSecondBrain(query: String, precomputedSearchResults: List<SearchResult>?): SynthesisResponse = withContext(Dispatchers.IO) {
+        val searchResults = precomputedSearchResults ?: searchNotesHybrid(query)
         val contextNotes = if (searchResults.isNotEmpty()) {
             searchResults.map { it.note }.take(5)
         } else {

@@ -28,6 +28,9 @@ interface NoteLinkDao {
     @Query("DELETE FROM note_links WHERE sourceNoteId = :noteId OR targetNoteId = :noteId")
     suspend fun deleteLinksForNote(noteId: Long)
 
+    @Query("DELETE FROM note_links WHERE sourceNoteId NOT IN (SELECT id FROM notes) OR targetNoteId NOT IN (SELECT id FROM notes)")
+    suspend fun deleteOrphanedLinks()
+
     @Query("DELETE FROM note_links")
     suspend fun deleteAllLinks()
 

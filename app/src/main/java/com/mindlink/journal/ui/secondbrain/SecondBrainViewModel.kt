@@ -183,8 +183,8 @@ class SecondBrainViewModel(
                 // 1. Run Hybrid Search (FTS + Vector cosine similarity)
                 val searchResults = repository.searchNotesHybrid(targetQuery)
 
-                // 2. Run Conversational Synthesis
-                val synthesis = repository.synthesizeSecondBrain(targetQuery)
+                // 2. Run Conversational Synthesis using pre-computed search results (zero duplicate search!)
+                val synthesis = repository.synthesizeSecondBrain(targetQuery, precomputedSearchResults = searchResults)
 
                 _uiState.update {
                     it.copy(

@@ -38,7 +38,7 @@ fun MindLinkNavHost(
         // Notes List (Home)
         composable(Screen.NotesList.route) {
             val notesViewModel: NotesViewModel = viewModel(
-                factory = NotesViewModel.Factory(repository)
+                factory = NotesViewModel.Factory(repository, serviceLocator.preferences)
             )
             NotesListScreen(
                 viewModel = notesViewModel,

@@ -6,10 +6,12 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.work.*
 import com.mindlink.journal.data.ai.CompositeBrainstormingEngine
 import com.mindlink.journal.data.ai.ModelRegistry
 import com.mindlink.journal.data.ai.SlmModelSpec
 import com.mindlink.journal.data.repository.NoteRepository
+import com.mindlink.journal.data.worker.ModelDownloadWorker
 import com.mindlink.journal.di.ServiceLocator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -39,7 +41,14 @@ data class SettingsUiState(
     val testPrompt: String = "Give 2 thoughtful questions for someone reflecting on an argument with their partner.",
     val testOutput: String? = null,
     val isTesting: Boolean = false,
-    val testLatencyMs: Long = 0L
+    val testLatencyMs: Long = 0L,
+    val fontScale: Float = 1.0f,
+    val isCheckingAppUpdate: Boolean = false,
+    val appUpdateInfo: com.mindlink.journal.data.ota.AppReleaseInfo? = null,
+    val appUpdateMessage: String? = null,
+    val isDownloadingAppUpdate: Boolean = false,
+    val appUpdateProgress: Float = 0f,
+    val downloadedApkFile: File? = null
 )
 
 class SettingsViewModel(
@@ -53,9 +62,10 @@ class SettingsViewModel(
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
-        val savedKey = preferences.getString(ServiceLocator.PREF_GEMINI_API_KEY, "") ?: ""
+        val savedKey = (appContext?.let { ServiceLocator.getInstance(it).getApiKey() } ?: preferences.getString(ServiceLocator.PREF_GEMINI_API_KEY, "")) ?: ""
         val savedMode = preferences.getString(ServiceLocator.PREF_ENGINE_MODE, "AUTO") ?: "AUTO"
-        _uiState.update { it.copy(apiKey = savedKey, engineMode = savedMode) }
+        val savedFontScale = preferences.getFloat(ServiceLocator.PREF_GLOBAL_FONT_SCALE, 1.0f)
+        _uiState.update { it.copy(apiKey = savedKey, engineMode = savedMode, fontScale = savedFontScale) }
         refreshEngineStatus()
 
         viewModelScope.launch {
@@ -67,6 +77,48 @@ class SettingsViewModel(
         viewModelScope.launch {
             repository.getEmbeddingsCount().collect { count ->
                 _uiState.update { it.copy(totalEmbeddings = count) }
+            }
+        }
+
+        if (appContext != null) {
+            val workManager = WorkManager.getInstance(appContext)
+            viewModelScope.launch {
+                workManager.getWorkInfosForUniqueWorkFlow(ModelDownloadWorker.UNIQUE_WORK_NAME).collect { workInfos ->
+                    val workInfo = workInfos.firstOrNull() ?: return@collect
+                    when (workInfo.state) {
+                        WorkInfo.State.RUNNING -> {
+                            val progress = workInfo.progress.getFloat(ModelDownloadWorker.KEY_PROGRESS, 0f)
+                            val status = workInfo.progress.getString(ModelDownloadWorker.KEY_STATUS) ?: "Downloading SLM model in background..."
+                            _uiState.update {
+                                it.copy(
+                                    isDownloadingModel = true,
+                                    downloadProgress = progress,
+                                    downloadStatus = status
+                                )
+                            }
+                        }
+                        WorkInfo.State.SUCCEEDED -> {
+                            _uiState.update {
+                                it.copy(
+                                    isDownloadingModel = false,
+                                    downloadProgress = 1.0f,
+                                    downloadStatus = "Model installed successfully!"
+                                )
+                            }
+                            refreshEngineStatus()
+                        }
+                        WorkInfo.State.FAILED -> {
+                            val status = workInfo.outputData.getString(ModelDownloadWorker.KEY_STATUS) ?: "Model download failed."
+                            _uiState.update {
+                                it.copy(
+                                    isDownloadingModel = false,
+                                    downloadStatus = status
+                                )
+                            }
+                        }
+                        else -> {}
+                    }
+                }
             }
         }
     }
@@ -94,8 +146,21 @@ class SettingsViewModel(
 
     fun updateApiKey(key: String) {
         _uiState.update { it.copy(apiKey = key) }
-        preferences.edit().putString(ServiceLocator.PREF_GEMINI_API_KEY, key.trim()).apply()
+        if (appContext != null) {
+            ServiceLocator.getInstance(appContext).saveApiKey(key)
+        } else {
+            preferences.edit().putString(ServiceLocator.PREF_GEMINI_API_KEY, key.trim()).apply()
+        }
         refreshEngineStatus()
+    }
+
+    fun updateFontScale(scale: Float) {
+        _uiState.update { it.copy(fontScale = scale) }
+        if (appContext != null) {
+            ServiceLocator.getInstance(appContext).updateGlobalFontScale(scale)
+        } else {
+            preferences.edit().putFloat(ServiceLocator.PREF_GLOBAL_FONT_SCALE, scale).apply()
+        }
     }
 
     fun updateTestPrompt(prompt: String) {
@@ -143,108 +208,119 @@ class SettingsViewModel(
 
     fun downloadModel(spec: SlmModelSpec? = null) {
         if (_uiState.value.isDownloadingModel) return
-        val targetDir = appContext?.filesDir?.let { File(it, "models") } ?: return
-        if (!targetDir.exists()) targetDir.mkdirs()
-        val targetFile = File(targetDir, "qwen2.5_0.5b.task")
-
+        val context = appContext ?: return
         val modelToDownload = spec ?: ModelRegistry.DEFAULT_MODELS.first()
-        val modelUrl = modelToDownload.downloadUrl
 
-        viewModelScope.launch(Dispatchers.IO) {
-            _uiState.update {
-                it.copy(
-                    isDownloadingModel = true,
-                    downloadProgress = 0f,
-                    downloadStatus = "Connecting to model repository (${modelToDownload.name})..."
+        val workRequest = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
+            .setInputData(
+                workDataOf(
+                    ModelDownloadWorker.KEY_MODEL_ID to modelToDownload.id,
+                    ModelDownloadWorker.KEY_MODEL_NAME to modelToDownload.name,
+                    ModelDownloadWorker.KEY_DOWNLOAD_URL to modelToDownload.downloadUrl
                 )
-            }
+            )
+            .build()
 
-            try {
-                val url = URL(modelUrl)
-                val connection = (url.openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 20000
-                    readTimeout = 60000
-                    setRequestProperty("User-Agent", "Mozilla/5.0")
-                }
-                connection.connect()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            ModelDownloadWorker.UNIQUE_WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            workRequest
+        )
 
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw IllegalStateException("Server returned HTTP ${connection.responseCode}")
-                }
-
-                val totalBytes = connection.contentLengthLong
-                val inputStream = connection.inputStream
-                val tempFile = File(targetDir, "qwen2.5_0.5b.tmp")
-                val outputStream = FileOutputStream(tempFile)
-
-                val buffer = ByteArray(64 * 1024)
-                var bytesRead: Int
-                var totalRead = 0L
-                var lastUpdate = System.currentTimeMillis()
-
-                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                    outputStream.write(buffer, 0, bytesRead)
-                    totalRead += bytesRead
-                    val now = System.currentTimeMillis()
-                    if (now - lastUpdate > 300) {
-                        val progress = if (totalBytes > 0) totalRead.toFloat() / totalBytes else 0f
-                        val readMb = totalRead / (1024 * 1024)
-                        val totalMb = totalBytes / (1024 * 1024)
-                        _uiState.update {
-                            it.copy(
-                                downloadProgress = progress,
-                                downloadStatus = "Downloading ${modelToDownload.name}: $readMb / $totalMb MB (${(progress * 100).toInt()}%)"
-                            )
-                        }
-                        lastUpdate = now
-                    }
-                }
-
-                outputStream.flush()
-                outputStream.close()
-                inputStream.close()
-
-                if (tempFile.renameTo(targetFile)) {
-                    Log.i("SettingsViewModel", "Model downloaded successfully to ${targetFile.name}")
-                }
-
-                compositeEngine?.mediaPipeEngine?.reloadModel()
-
-                withContext(Dispatchers.Main) {
-                    _uiState.update {
-                        it.copy(
-                            isDownloadingModel = false,
-                            downloadProgress = 1f,
-                            downloadStatus = "Installed & Active: ${modelToDownload.name}",
-                            isModelInstalled = true,
-                            availableUpdateModel = null
-                        )
-                    }
-                    refreshEngineStatus()
-                }
-
-            } catch (e: Exception) {
-                Log.e("SettingsViewModel", "Failed to download SLM model: ${e.message}", e)
-                withContext(Dispatchers.Main) {
-                    _uiState.update {
-                        it.copy(
-                            isDownloadingModel = false,
-                            downloadStatus = "Download error: ${e.message}"
-                        )
-                    }
-                }
-            }
+        _uiState.update {
+            it.copy(
+                isDownloadingModel = true,
+                downloadProgress = 0f,
+                downloadStatus = "Background download started for ${modelToDownload.name}..."
+            )
         }
     }
 
     fun deleteModel() {
         val targetDir = appContext?.filesDir?.let { File(it, "models") } ?: return
-        val targetFile = File(targetDir, "qwen2.5_0.5b.task")
-        if (targetFile.exists()) {
-            targetFile.delete()
+        targetDir.listFiles()?.filter { it.extension == "task" || it.extension == "tmp" || it.extension == "bin" }?.forEach {
+            it.delete()
         }
         compositeEngine?.mediaPipeEngine?.reloadModel()
         refreshEngineStatus()
+    }
+
+    fun checkForAppUpdate() {
+        val context = appContext ?: return
+        val otaManager = com.mindlink.journal.data.ota.OtaUpdateManager(context)
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCheckingAppUpdate = true, appUpdateMessage = null) }
+            val result = otaManager.checkForUpdates()
+            result.onSuccess { info ->
+                if (info != null && info.isNewer) {
+                    _uiState.update {
+                        it.copy(
+                            isCheckingAppUpdate = false,
+                            appUpdateInfo = info,
+                            appUpdateMessage = "New version ${info.tagName} is available!"
+                        )
+                    }
+                } else if (info != null) {
+                    _uiState.update {
+                        it.copy(
+                            isCheckingAppUpdate = false,
+                            appUpdateInfo = null,
+                            appUpdateMessage = "You're up to date (v${com.mindlink.journal.BuildConfig.VERSION_NAME})."
+                        )
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isCheckingAppUpdate = false,
+                            appUpdateMessage = "No APK releases found on GitHub."
+                        )
+                    }
+                }
+            }.onFailure { err ->
+                _uiState.update {
+                    it.copy(
+                        isCheckingAppUpdate = false,
+                        appUpdateMessage = "Update check failed: ${err.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun downloadAndInstallAppUpdate() {
+        val info = _uiState.value.appUpdateInfo ?: return
+        val context = appContext ?: return
+        val otaManager = com.mindlink.journal.data.ota.OtaUpdateManager(context)
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDownloadingAppUpdate = true, appUpdateProgress = 0f) }
+            val result = otaManager.downloadApk(info) { progress ->
+                _uiState.update { it.copy(appUpdateProgress = progress) }
+            }
+            result.onSuccess { apkFile ->
+                _uiState.update {
+                    it.copy(
+                        isDownloadingAppUpdate = false,
+                        downloadedApkFile = apkFile,
+                        appUpdateMessage = "Update downloaded. Ready to install!"
+                    )
+                }
+                otaManager.triggerInstall(apkFile)
+            }.onFailure { err ->
+                _uiState.update {
+                    it.copy(
+                        isDownloadingAppUpdate = false,
+                        appUpdateMessage = "Download failed: ${err.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun installDownloadedApk() {
+        val file = _uiState.value.downloadedApkFile ?: return
+        val context = appContext ?: return
+        com.mindlink.journal.data.ota.OtaUpdateManager(context).triggerInstall(file)
     }
 
     fun reindexAll() {

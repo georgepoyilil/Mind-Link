@@ -3,4 +3,6 @@
     <files-path name="note_images" path="note_images/" />
     <files-path name="audio_notes" path="audio_notes/" />
     <cache-path name="camera_photos" path="camera_photos/" />
+    <cache-path name="updates" path="updates/" />
+    <external-cache-path name="external_updates" path="updates/" />
 </paths>

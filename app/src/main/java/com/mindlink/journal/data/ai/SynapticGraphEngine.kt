@@ -106,4 +106,101 @@ class SynapticGraphEngine {
 
         return generatedLinks
     }
+
+    /**
+     * Incrementally computes synaptic edges between a single target note and all other active notes.
+     * Runtime: O(N) instead of O(N^2).
+     */
+    fun computeIncrementalLinks(targetNote: NoteEntity, allOtherNotes: List<NoteEntity>): List<NoteLinkEntity> {
+        if (targetNote.isDeleted || targetNote.isArchived) return emptyList()
+
+        val generatedLinks = mutableListOf<NoteLinkEntity>()
+        val titleToIdMap = allOtherNotes.associate { it.title.trim().lowercase(Locale.ROOT) to it.id }
+        val targetTags = targetNote.tags.map { it.trim().lowercase(Locale.ROOT) }.filter { it.isNotBlank() }.toSet()
+
+        val connectedIds = mutableSetOf<Long>()
+
+        // 1. Outgoing wikilinks from targetNote
+        val matcher = wikilinkPattern.matcher(targetNote.content)
+        while (matcher.find()) {
+            val targetTitle = matcher.group(1)?.trim()?.lowercase(Locale.ROOT) ?: continue
+            val otherId = titleToIdMap[targetTitle]
+                ?: allOtherNotes.firstOrNull { it.title.lowercase(Locale.ROOT).contains(targetTitle) }?.id
+
+            if (otherId != null && otherId != targetNote.id && connectedIds.add(otherId)) {
+                generatedLinks.add(
+                    NoteLinkEntity(
+                        sourceNoteId = targetNote.id,
+                        targetNoteId = otherId,
+                        linkType = "WIKILINK",
+                        weight = 1.0f,
+                        label = "[[${matcher.group(1)}]]"
+                    )
+                )
+            }
+        }
+
+        // 2. Incoming wikilinks from other notes to targetNote
+        val targetLowerTitle = targetNote.title.trim().lowercase(Locale.ROOT)
+        for (other in allOtherNotes) {
+            if (connectedIds.contains(other.id)) continue
+            val otherMatcher = wikilinkPattern.matcher(other.content)
+            while (otherMatcher.find()) {
+                val wikilinkText = otherMatcher.group(1)?.trim()?.lowercase(Locale.ROOT) ?: continue
+                if (wikilinkText == targetLowerTitle || targetLowerTitle.contains(wikilinkText)) {
+                    if (connectedIds.add(other.id)) {
+                        generatedLinks.add(
+                            NoteLinkEntity(
+                                sourceNoteId = other.id,
+                                targetNoteId = targetNote.id,
+                                linkType = "WIKILINK",
+                                weight = 1.0f,
+                                label = "[[${targetNote.title}]]"
+                            )
+                        )
+                    }
+                    break
+                }
+            }
+        }
+
+        // 3. Shared tags and emotional flow
+        for (other in allOtherNotes) {
+            if (connectedIds.contains(other.id)) continue
+            val otherTags = other.tags.map { it.trim().lowercase(Locale.ROOT) }.filter { it.isNotBlank() }.toSet()
+            val sharedTags = targetTags.intersect(otherTags)
+
+            if (sharedTags.isNotEmpty()) {
+                val weight = (0.4f + (sharedTags.size * 0.2f)).coerceAtMost(0.95f)
+                val label = sharedTags.take(2).joinToString(" & ") { "#$it" }
+                if (connectedIds.add(other.id)) {
+                    generatedLinks.add(
+                        NoteLinkEntity(
+                            sourceNoteId = targetNote.id,
+                            targetNoteId = other.id,
+                            linkType = "TAG_CLUSTER",
+                            weight = weight,
+                            label = label
+                        )
+                    )
+                }
+            } else if (targetNote.mood != null && targetNote.mood.equals(other.mood, ignoreCase = true) && targetTags.isNotEmpty() && otherTags.isNotEmpty()) {
+                val weight = 0.35f
+                val label = "Mood: ${targetNote.mood}"
+                if (connectedIds.add(other.id)) {
+                    generatedLinks.add(
+                        NoteLinkEntity(
+                            sourceNoteId = targetNote.id,
+                            targetNoteId = other.id,
+                            linkType = "EMOTION_FLOW",
+                            weight = weight,
+                            label = label
+                        )
+                    )
+                }
+            }
+        }
+
+        return generatedLinks
+    }
 }

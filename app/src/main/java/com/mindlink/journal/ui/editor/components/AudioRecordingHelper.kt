@@ -53,9 +53,17 @@ class AudioRecordingHelper(private val context: Context) {
     fun stopRecording(): Pair<File?, Long> {
         val durationMs = if (startTimeMs > 0) System.currentTimeMillis() - startTimeMs else 0L
         try {
-            mediaRecorder?.apply {
-                stop()
-                release()
+            mediaRecorder?.let { recorder ->
+                try {
+                    recorder.stop()
+                } catch (e: Exception) {
+                    Log.w(TAG, "MediaRecorder stop failed: ${e.message}")
+                }
+                try {
+                    recorder.release()
+                } catch (e: Exception) {
+                    Log.w(TAG, "MediaRecorder release failed: ${e.message}")
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to stop media recorder safely: ${e.message}")
@@ -70,9 +78,17 @@ class AudioRecordingHelper(private val context: Context) {
 
     fun cancelRecording() {
         try {
-            mediaRecorder?.apply {
-                stop()
-                release()
+            mediaRecorder?.let { recorder ->
+                try {
+                    recorder.stop()
+                } catch (e: Exception) {
+                    // Ignore
+                }
+                try {
+                    recorder.release()
+                } catch (e: Exception) {
+                    // Ignore
+                }
             }
         } catch (e: Exception) {
             // Ignore

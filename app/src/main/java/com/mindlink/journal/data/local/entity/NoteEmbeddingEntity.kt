@@ -1,12 +1,27 @@
 package com.mindlink.journal.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
  * Stores on-device 384-dimensional dense vector embeddings for semantic similarity & associative memory.
  */
-@Entity(tableName = "note_embeddings")
+@Entity(
+    tableName = "note_embeddings",
+    foreignKeys = [
+        ForeignKey(
+            entity = NoteEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["noteId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["noteId"])
+    ]
+)
 data class NoteEmbeddingEntity(
     @PrimaryKey
     val noteId: Long,

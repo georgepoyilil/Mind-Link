@@ -24,13 +24,22 @@ data class Note(
     val isArchived: Boolean = false,
     val isDeleted: Boolean = false,
     val deletedAt: Long? = null,
-    val fontFamily: String = "Sans"
+    val fontFamily: String = "Sans",
+    val fontSizeScale: Float? = null
 ) {
     val formattedDate: String
         get() = dateCache.get()?.format(Date(createdAt)) ?: ""
 
     val moodEmoji: String
-        get() = ""
+        get() = when (mood?.lowercase()?.trim()) {
+            "reflective" -> "🪞"
+            "analytical" -> "🔬"
+            "creative" -> "💡"
+            "energized" -> "⚡"
+            "stressed" -> "🌧️"
+            "calm" -> "🍃"
+            else -> if (!mood.isNullOrBlank()) "✨" else ""
+        }
 
     val daysUntilExpiry: Int
         get() {
@@ -72,7 +81,8 @@ data class Note(
             isArchived = isArchived,
             isDeleted = isDeleted,
             deletedAt = deletedAt,
-            fontFamily = fontFamily
+            fontFamily = fontFamily,
+            fontSizeScale = fontSizeScale
         )
     }
 
@@ -101,7 +111,8 @@ data class Note(
                 isArchived = entity.isArchived,
                 isDeleted = entity.isDeleted,
                 deletedAt = entity.deletedAt,
-                fontFamily = entity.fontFamily
+                fontFamily = entity.fontFamily,
+                fontSizeScale = entity.fontSizeScale
             )
         }
     }

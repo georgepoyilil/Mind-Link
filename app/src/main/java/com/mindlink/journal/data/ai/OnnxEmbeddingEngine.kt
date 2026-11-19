@@ -38,10 +38,12 @@ class OnnxEmbeddingEngine(
 
     private fun tryInit() {
         try {
-            // Check if asset exists
-            val hasAsset = context.assets.list("")?.contains(modelFileName) == true
-            if (!hasAsset) {
-                Log.i(TAG, "ONNX model asset '$modelFileName' not found in assets. Using deterministic embedding engine.")
+            // Check if asset and verified vocabulary exist
+            val assetList = context.assets.list("")?.toList() ?: emptyList()
+            val hasAsset = assetList.contains(modelFileName)
+            val hasVocab = assetList.contains("vocab.txt")
+            if (!hasAsset || !hasVocab) {
+                Log.i(TAG, "ONNX model asset or verified vocab.txt not found. Using deterministic FallbackEmbeddingEngine.")
                 return
             }
 

@@ -193,6 +193,15 @@ class NoteDetailViewModel(
         }
     }
 
+    fun updateFontSizeScale(scale: Float?) {
+        val current = _uiState.value.note ?: return
+        val updated = current.copy(fontSizeScale = scale, updatedAt = System.currentTimeMillis())
+        _uiState.update { it.copy(note = updated) }
+        viewModelScope.launch {
+            repository.saveNote(updated)
+        }
+    }
+
     fun deletePermanently(onDeleted: () -> Unit) {
         viewModelScope.launch {
             repository.deleteNotePermanently(noteId)

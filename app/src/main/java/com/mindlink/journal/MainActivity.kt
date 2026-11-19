@@ -4,6 +4,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.mindlink.journal.di.ServiceLocator
 import com.mindlink.journal.ui.navigation.MindLinkNavHost
 import com.mindlink.journal.ui.theme.MindLinkTheme
 
@@ -12,8 +15,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val serviceLocator = ServiceLocator.getInstance(applicationContext)
+
         setContent {
-            MindLinkTheme {
+            val globalFontScale by serviceLocator.globalFontScale.collectAsState()
+            MindLinkTheme(fontScale = globalFontScale) {
                 MindLinkNavHost()
             }
         }

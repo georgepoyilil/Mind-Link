@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mindlink.journal.data.repository.NoteRepository
 import com.mindlink.journal.domain.model.ThoughtGraph
 import com.mindlink.journal.domain.model.ThoughtGraphNode
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -83,7 +85,7 @@ class ThoughtGraphViewModel(
         }
     }
 
-    private fun initializeGraphLayout(nodes: List<ThoughtGraphNode>) {
+    private suspend fun initializeGraphLayout(nodes: List<ThoughtGraphNode>) = withContext(Dispatchers.Default) {
         val count = nodes.size
         val radius = 320f
         val layout = nodes.mapIndexed { index, node ->
@@ -97,7 +99,7 @@ class ThoughtGraphViewModel(
             )
         }
 
-        // Run relaxation iterations to settle force-directed layout
+        // Run relaxation iterations to settle force-directed layout off the UI thread
         val settled = runForceRelaxation(layout, _rawGraph.value.edges, iterations = 80)
         _layoutNodes.value = settled
     }

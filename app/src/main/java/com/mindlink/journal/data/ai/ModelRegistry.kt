@@ -44,7 +44,7 @@ object ModelRegistry {
             version = "2026.10.2",
             parameterCount = "360M",
             sizeMb = 385,
-            downloadUrl = "https://huggingface.co/litert-community/Qwen2.5-0.5B-Instruct/resolve/main/Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
+            downloadUrl = "https://huggingface.co/litert-community/SmolLM2-360M-Instruct/resolve/main/SmolLM2-360M-Instruct_multi-prefill-seq_q8_ekv1280.task",
             recommendedRamGb = 3.0f,
             description = "HuggingFace's ultra-compact model. Fastest latency on budget hardware, optimized for concise summarization.",
             isRecommendedForDevice = false
