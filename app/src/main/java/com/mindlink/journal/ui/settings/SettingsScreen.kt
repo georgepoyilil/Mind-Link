@@ -972,6 +972,28 @@ fun SettingsScreen(
                     }
 
                     if (!uiState.isCheckingAppUpdate && (updateInfo == null || !updateInfo.isNewer)) {
+                        if (updateInfo != null && !updateInfo.isNewer) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MindGlassSurface,
+                                border = BorderStroke(1.dp, MindEmerald.copy(alpha = 0.35f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MindEmerald, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Latest Release: ${updateInfo.tagName} (Installed & up to date)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MindTextPrimary
+                                    )
+                                }
+                            }
+                        }
                         Spacer(modifier = Modifier.height(12.dp))
                         OutlinedButton(
                             onClick = { viewModel.checkForAppUpdate() },

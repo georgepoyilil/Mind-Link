@@ -275,8 +275,8 @@ class SettingsViewModel(
                     _uiState.update {
                         it.copy(
                             isCheckingAppUpdate = false,
-                            appUpdateInfo = null,
-                            appUpdateMessage = "You're up to date (v${com.mindlink.journal.BuildConfig.VERSION_NAME})."
+                            appUpdateInfo = info,
+                            appUpdateMessage = "You're up to date! (v${com.mindlink.journal.BuildConfig.VERSION_NAME} is the latest release)"
                         )
                     }
                 } else {
