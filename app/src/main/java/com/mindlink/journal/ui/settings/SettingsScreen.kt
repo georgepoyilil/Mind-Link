@@ -77,7 +77,186 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 0. App Typography & Font Size Card
+            // 0. Visual Atmosphere & Themes Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Palette,
+                            contentDescription = "Themes",
+                            tint = PastelLavender,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Visual Atmosphere & Themes",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MindTextPrimary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "Tailor your aesthetic ritual with custom glassy, AMOLED, Pixel, and light modes:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MindTextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    MindTheme.entries.forEach { theme ->
+                        val isSelected = uiState.appTheme.equals(theme.id, ignoreCase = true)
+                        val themeColors = remember(theme) { getThemeColors(theme) }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) MindSurfaceVariantDark else Color.Transparent,
+                            border = BorderStroke(
+                                width = if (isSelected) 1.5.dp else 0.8.dp,
+                                color = if (isSelected) themeColors.accentPrimary else MindBorderDark.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { viewModel.setAppTheme(theme.id) }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Swatch preview
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = themeColors.background,
+                                    border = BorderStroke(1.dp, themeColors.border),
+                                    modifier = Modifier.size(width = 38.dp, height = 38.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = themeColors.accentPrimary,
+                                            modifier = Modifier.size(12.dp)
+                                        ) {}
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = theme.title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) themeColors.accentPrimary else MindTextPrimary
+                                        )
+                                        if (!theme.isDark) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            val isAppDark = LocalMindLinkColors.current.isDark
+                                            val badgeBg = if (isAppDark) PastelAmber.copy(alpha = 0.2f) else Color(0x26B45309)
+                                            val badgeText = if (isAppDark) PastelAmber else Color(0xFFB45309)
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = badgeBg,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            ) {
+                                                Text(
+                                                    text = "LIGHT",
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = badgeText
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = theme.subtitle,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MindTextSecondary
+                                    )
+                                }
+
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = { viewModel.setAppTheme(theme.id) },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = themeColors.accentPrimary,
+                                        unselectedColor = MindTextTertiary
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 0.2. Mood & Reaction Emojis Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = PastelMint.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, PastelMint.copy(alpha = 0.35f)),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Mood,
+                                contentDescription = null,
+                                tint = PastelMint,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "🎭 Mood & Reaction Emojis",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MindTextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Display emotional emoji accents on note cards, mood badges, and thought graph nodes.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MindTextSecondary
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Switch(
+                        checked = uiState.showEmojis,
+                        onCheckedChange = { viewModel.setShowEmojis(it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MindBackgroundDark,
+                            checkedTrackColor = PastelMint,
+                            uncheckedThumbColor = MindTextSecondary,
+                            uncheckedTrackColor = MindSurfaceVariantDark
+                        )
+                    )
+                }
+            }
+
+            // 0.3. App Typography & Font Size Card
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
@@ -158,6 +337,54 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    // Line Height Spacing Row
+                    Text(
+                        text = "Journal Body Line Spacing:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MindTextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val lineSpacingOptions = listOf(
+                        Pair(1.25f, "Compact"),
+                        Pair(1.45f, "Normal"),
+                        Pair(1.75f, "Relaxed"),
+                        Pair(2.0f, "Spacious")
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        lineSpacingOptions.forEach { (mult, label) ->
+                            val isSelected = Math.abs(uiState.lineSpacingMultiplier - mult) < 0.05f
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) MindSurfaceVariantDark else Color.Transparent,
+                                border = BorderStroke(
+                                    width = if (isSelected) 1.2.dp else 0.8.dp,
+                                    color = if (isSelected) PastelMint else MindBorderDark.copy(alpha = 0.5f)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { viewModel.updateLineSpacingMultiplier(mult) }
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) PastelMint else MindTextSecondary,
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     // Live Preview Area
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -172,9 +399,11 @@ fun SettingsScreen(
                                 color = MindTextTertiary
                             )
                             Spacer(modifier = Modifier.height(4.dp))
+                            val previewFontSize = MaterialTheme.typography.bodyMedium.fontSize
+                            val previewLineHeight = (previewFontSize.value * uiState.lineSpacingMultiplier).sp
                             Text(
-                                text = "MindLink captures thoughts into permanent clarity with on-device intelligence.",
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = "MindLink captures thoughts into permanent clarity with on-device intelligence. Line height and typography scale proportionally.",
+                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = previewLineHeight),
                                 color = MindTextPrimary
                             )
                         }

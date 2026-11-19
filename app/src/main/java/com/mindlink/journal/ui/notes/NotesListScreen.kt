@@ -13,6 +13,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +33,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -37,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import com.mindlink.journal.di.ServiceLocator
 import com.mindlink.journal.domain.model.Note
 import com.mindlink.journal.ui.components.MindLinkOnboardingDialog
 import com.mindlink.journal.ui.notes.components.NoteCard
@@ -53,9 +58,20 @@ fun NotesListScreen(
     onThoughtGraphClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val serviceLocator = remember { ServiceLocator.getInstance(context) }
+    val savedViewModeStr by serviceLocator.noteViewMode.collectAsState()
+    val initialViewMode = remember(savedViewModeStr) {
+        when (savedViewModeStr) {
+            "grid" -> NoteViewMode.GRID
+            "cards" -> NoteViewMode.CARDS
+            "compact" -> NoteViewMode.COMPACT_LIST
+            else -> NoteViewMode.GRID
+        }
+    }
     val uiState by viewModel.uiState.collectAsState()
     var isSearchActive by remember { mutableStateOf(false) }
-    var viewMode by remember { mutableStateOf(NoteViewMode.CARDS) }
+    var viewMode by remember { mutableStateOf(initialViewMode) }
     var showJournalingMethodsSheet by remember { mutableStateOf(false) }
 
     val searchFocusRequester = remember { FocusRequester() }
@@ -197,11 +213,19 @@ fun NotesListScreen(
                     actions = {
                         // 1. Google Keep Style Layout Switching Vector Icon
                         IconButton(onClick = {
-                            viewMode = when (viewMode) {
+                            val nextMode = when (viewMode) {
+                                NoteViewMode.GRID -> NoteViewMode.CARDS
                                 NoteViewMode.CARDS -> NoteViewMode.COMPACT_LIST
-                                NoteViewMode.COMPACT_LIST -> NoteViewMode.FULL_WIDTH
-                                NoteViewMode.FULL_WIDTH -> NoteViewMode.CARDS
+                                NoteViewMode.COMPACT_LIST -> NoteViewMode.GRID
                             }
+                            viewMode = nextMode
+                            serviceLocator.updateNoteViewMode(
+                                when (nextMode) {
+                                    NoteViewMode.GRID -> "grid"
+                                    NoteViewMode.CARDS -> "cards"
+                                    NoteViewMode.COMPACT_LIST -> "compact"
+                                }
+                            )
                         }) {
                             Icon(
                                 imageVector = viewMode.icon,
@@ -624,15 +648,17 @@ fun NotesListScreen(
                     }
                 }
             } else {
-                LazyColumn(
+                val isGrid = viewMode == NoteViewMode.GRID
+                LazyVerticalStaggeredGrid(
+                    columns = if (isGrid) StaggeredGridCells.Fixed(2) else StaggeredGridCells.Fixed(1),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (viewMode == NoteViewMode.COMPACT_LIST) 6.dp else 10.dp)
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 100.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalItemSpacing = 8.dp
                 ) {
                     items(
                         items = uiState.filteredNotes,
-                        key = { it.id },
-                        contentType = { "note_item" }
+                        key = { it.id }
                     ) { note ->
                         Column(modifier = Modifier.fillMaxWidth()) {
                             NoteCard(
@@ -647,53 +673,48 @@ fun NotesListScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 6.dp),
+                                        .padding(horizontal = 4.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Schedule, contentDescription = null, tint = PastelRose, modifier = Modifier.size(12.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = "Expires in ${note.daysUntilExpiry} days",
-                                            fontSize = 11.sp,
-                                            color = PastelRose,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(
+                                        text = "${note.daysUntilExpiry}d left",
+                                        fontSize = 10.sp,
+                                        color = PastelRose
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Surface(
-                                            shape = RoundedCornerShape(8.dp),
+                                            shape = RoundedCornerShape(6.dp),
                                             color = PastelMint.copy(alpha = 0.16f),
                                             border = BorderStroke(0.6.dp, PastelMint.copy(alpha = 0.4f)),
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
+                                                .clip(RoundedCornerShape(6.dp))
                                                 .clickable { viewModel.restoreFromTrash(note.id) }
                                         ) {
                                             Row(
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Icon(Icons.Default.Restore, contentDescription = null, tint = PastelMint, modifier = Modifier.size(12.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Restore", fontSize = 11.sp, color = PastelMint, fontWeight = FontWeight.Bold)
+                                                Icon(Icons.Default.Restore, contentDescription = null, tint = PastelMint, modifier = Modifier.size(11.dp))
+                                                Spacer(modifier = Modifier.width(2.dp))
+                                                Text("Restore", fontSize = 10.sp, color = PastelMint, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                         Surface(
-                                            shape = RoundedCornerShape(8.dp),
+                                            shape = RoundedCornerShape(6.dp),
                                             color = PastelRose.copy(alpha = 0.16f),
                                             border = BorderStroke(0.6.dp, PastelRose.copy(alpha = 0.4f)),
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
+                                                .clip(RoundedCornerShape(6.dp))
                                                 .clickable { viewModel.deletePermanently(note.id) }
                                         ) {
                                             Row(
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Icon(Icons.Default.DeleteForever, contentDescription = null, tint = PastelRose, modifier = Modifier.size(12.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Delete", fontSize = 11.sp, color = PastelRose, fontWeight = FontWeight.Bold)
+                                                Icon(Icons.Default.DeleteForever, contentDescription = null, tint = PastelRose, modifier = Modifier.size(11.dp))
+                                                Spacer(modifier = Modifier.width(2.dp))
+                                                Text("Delete", fontSize = 10.sp, color = PastelRose, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                     }
@@ -703,25 +724,25 @@ fun NotesListScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 6.dp),
+                                        .padding(horizontal = 4.dp),
                                     horizontalArrangement = Arrangement.End,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(6.dp),
                                         color = PastelAmber.copy(alpha = 0.16f),
                                         border = BorderStroke(0.6.dp, PastelAmber.copy(alpha = 0.4f)),
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
+                                            .clip(RoundedCornerShape(6.dp))
                                             .clickable { viewModel.unarchiveNote(note.id) }
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(Icons.Default.Unarchive, contentDescription = null, tint = PastelAmber, modifier = Modifier.size(12.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Unarchive", fontSize = 11.sp, color = PastelAmber, fontWeight = FontWeight.Bold)
+                                            Icon(Icons.Default.Unarchive, contentDescription = null, tint = PastelAmber, modifier = Modifier.size(11.dp))
+                                            Spacer(modifier = Modifier.width(2.dp))
+                                            Text("Unarchive", fontSize = 10.sp, color = PastelAmber, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }

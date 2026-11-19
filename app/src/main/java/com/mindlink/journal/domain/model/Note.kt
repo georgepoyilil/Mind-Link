@@ -30,6 +30,9 @@ data class Note(
     val formattedDate: String
         get() = dateCache.get()?.format(Date(createdAt)) ?: ""
 
+    val compactDate: String
+        get() = compactDateCache.get()?.format(Date(createdAt)) ?: ""
+
     val moodEmoji: String
         get() = when (mood?.lowercase()?.trim()) {
             "reflective" -> "🪞"
@@ -89,6 +92,10 @@ data class Note(
     companion object {
         private val dateCache = ThreadLocal.withInitial {
             SimpleDateFormat("MMM d, yyyy · h:mm a", Locale.getDefault())
+        }
+
+        private val compactDateCache = ThreadLocal.withInitial {
+            SimpleDateFormat("MMM d", Locale.getDefault())
         }
 
         fun fromEntity(entity: NoteEntity): Note {

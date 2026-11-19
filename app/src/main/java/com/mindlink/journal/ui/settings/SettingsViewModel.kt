@@ -49,7 +49,10 @@ data class SettingsUiState(
     val isDownloadingAppUpdate: Boolean = false,
     val appUpdateProgress: Float = 0f,
     val downloadedApkFile: File? = null,
-    val isTechMode: Boolean = false
+    val isTechMode: Boolean = false,
+    val appTheme: String = "amoled_black",
+    val showEmojis: Boolean = true,
+    val lineSpacingMultiplier: Float = 1.45f
 )
 
 class SettingsViewModel(
@@ -67,7 +70,20 @@ class SettingsViewModel(
         val savedMode = preferences.getString(ServiceLocator.PREF_ENGINE_MODE, "AUTO") ?: "AUTO"
         val savedFontScale = preferences.getFloat(ServiceLocator.PREF_GLOBAL_FONT_SCALE, 1.0f)
         val savedTechMode = (appContext?.let { ServiceLocator.getInstance(it).techMode.value } ?: preferences.getBoolean(ServiceLocator.PREF_TECH_MODE, false))
-        _uiState.update { it.copy(apiKey = savedKey, engineMode = savedMode, fontScale = savedFontScale, isTechMode = savedTechMode) }
+        val savedTheme = (appContext?.let { ServiceLocator.getInstance(it).appTheme.value } ?: preferences.getString(ServiceLocator.PREF_APP_THEME, "amoled_black")) ?: "amoled_black"
+        val savedShowEmojis = (appContext?.let { ServiceLocator.getInstance(it).showEmojis.value } ?: preferences.getBoolean(ServiceLocator.PREF_SHOW_EMOJIS, true))
+        val savedLineSpacing = (appContext?.let { ServiceLocator.getInstance(it).lineSpacingMultiplier.value } ?: preferences.getFloat(ServiceLocator.PREF_LINE_SPACING_MULTIPLIER, 1.45f))
+        _uiState.update {
+            it.copy(
+                apiKey = savedKey,
+                engineMode = savedMode,
+                fontScale = savedFontScale,
+                isTechMode = savedTechMode,
+                appTheme = savedTheme,
+                showEmojis = savedShowEmojis,
+                lineSpacingMultiplier = savedLineSpacing
+            )
+        }
         refreshEngineStatus()
 
         viewModelScope.launch {
@@ -171,6 +187,33 @@ class SettingsViewModel(
             ServiceLocator.getInstance(appContext).setTechMode(enabled)
         } else {
             preferences.edit().putBoolean(ServiceLocator.PREF_TECH_MODE, enabled).apply()
+        }
+    }
+
+    fun setAppTheme(theme: String) {
+        _uiState.update { it.copy(appTheme = theme) }
+        if (appContext != null) {
+            ServiceLocator.getInstance(appContext).updateAppTheme(theme)
+        } else {
+            preferences.edit().putString(ServiceLocator.PREF_APP_THEME, theme).apply()
+        }
+    }
+
+    fun setShowEmojis(enabled: Boolean) {
+        _uiState.update { it.copy(showEmojis = enabled) }
+        if (appContext != null) {
+            ServiceLocator.getInstance(appContext).updateShowEmojis(enabled)
+        } else {
+            preferences.edit().putBoolean(ServiceLocator.PREF_SHOW_EMOJIS, enabled).apply()
+        }
+    }
+
+    fun updateLineSpacingMultiplier(multiplier: Float) {
+        _uiState.update { it.copy(lineSpacingMultiplier = multiplier) }
+        if (appContext != null) {
+            ServiceLocator.getInstance(appContext).updateLineSpacingMultiplier(multiplier)
+        } else {
+            preferences.edit().putFloat(ServiceLocator.PREF_LINE_SPACING_MULTIPLIER, multiplier).apply()
         }
     }
 

@@ -45,6 +45,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.mindlink.journal.data.ai.LocalHeuristicBrainstormingEngine
+import com.mindlink.journal.di.ServiceLocator
 import com.mindlink.journal.ui.editor.components.AudioRecordingHelper
 import com.mindlink.journal.ui.editor.components.SpeechRecognitionHelper
 import com.mindlink.journal.ui.editor.components.SpeechState
@@ -65,6 +66,9 @@ fun NoteEditorScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()
+    val serviceLocator = remember { ServiceLocator.getInstance(context) }
+    val defaultLineSpacing = LocalLineSpacingMultiplier.current
+    var activeLineSpacing by remember { mutableStateOf(defaultLineSpacing) }
 
     // Helpers
     val speechHelper = remember { SpeechRecognitionHelper(context) }
@@ -561,6 +565,43 @@ fun NoteEditorScreen(
                         .background(MindGlassBorderSubtle)
                 )
 
+                // Line Height Spacing Pills
+                val lineSpacingOptions = listOf(
+                    Pair(1.25f, "1.2x"),
+                    Pair(1.45f, "1.5x"),
+                    Pair(1.75f, "1.8x"),
+                    Pair(2.0f, "2.0x")
+                )
+                lineSpacingOptions.forEach { (mult, label) ->
+                    val isSelected = Math.abs(activeLineSpacing - mult) < 0.05f
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) MindIndigo.copy(alpha = 0.35f) else MindGlassButtonContainer,
+                        border = BorderStroke(0.8.dp, if (isSelected) PastelSky else MindGlassButtonBorder),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                activeLineSpacing = mult
+                                serviceLocator.updateLineSpacingMultiplier(mult)
+                            }
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) PastelSky else MindTextSecondary,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .height(20.dp)
+                        .width(1.dp)
+                        .background(MindGlassBorderSubtle)
+                )
+
                 // Gallery Attach
                 IconButton(onClick = { imagePickerLauncher.launch("image/*") }, modifier = Modifier.size(34.dp)) {
                     Icon(Icons.Default.PhotoLibrary, contentDescription = "Gallery", tint = PastelLavender, modifier = Modifier.size(18.dp))
@@ -657,23 +698,14 @@ fun NoteEditorScreen(
                 }
             }
 
-            val appFontScale = LocalAppFontScale.current
-            val activeFontScale = uiState.fontSizeScale ?: appFontScale
-            val currentDensity = LocalDensity.current
-            val relativeScale = activeFontScale / appFontScale
-            val effectiveDensity = remember(currentDensity, relativeScale) {
-                Density(currentDensity.density, fontScale = currentDensity.fontScale * relativeScale)
-            }
-
-            CompositionLocalProvider(LocalDensity provides effectiveDensity) {
-                // Note Content Editor Area
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
+            // Note Content Editor Area
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 // OCR Hero Card (Prominent and directly accessible when in OCR mode or opened for scanning)
                 if (initialMode == "ocr" || uiState.imageUri == null) {
                     Surface(
@@ -1048,18 +1080,26 @@ fun NoteEditorScreen(
                 }
 
                 // Title Field
+                val editorNoteScale = uiState.fontSizeScale ?: 1.0f
+                val titleFontSize = (MaterialTheme.typography.headlineSmall.fontSize.value * editorNoteScale).sp
+                val titleLineHeight = (titleFontSize.value * 1.35f).sp
                 TextField(
                     value = uiState.title,
                     onValueChange = { viewModel.updateTitle(it) },
                     placeholder = {
                         Text(
                             text = "Title of your thought...",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MindTextTertiary,
-                            fontFamily = currentFontFamily
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontSize = titleFontSize,
+                                lineHeight = titleLineHeight,
+                                fontFamily = currentFontFamily
+                            ),
+                            color = MindTextTertiary
                         )
                     },
                     textStyle = MaterialTheme.typography.headlineSmall.copy(
+                        fontSize = titleFontSize,
+                        lineHeight = titleLineHeight,
                         fontWeight = FontWeight.Bold,
                         fontFamily = currentFontFamily
                     ),
@@ -1265,6 +1305,8 @@ fun NoteEditorScreen(
                 HorizontalDivider(color = MindBorderDark.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 2.dp))
 
                 // Markdown Body Field (Selection-Aware!)
+                val bodyFontSize = (MaterialTheme.typography.bodyLarge.fontSize.value * editorNoteScale).sp
+                val bodyLineHeight = (bodyFontSize.value * activeLineSpacing).sp
                 TextField(
                     value = contentValue,
                     onValueChange = { newValue ->
@@ -1274,12 +1316,19 @@ fun NoteEditorScreen(
                     placeholder = {
                         Text(
                             text = "Write your thoughts freely. Dictate with the mic, snap photos, or scan documents with OCR...",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MindTextTertiary,
-                            fontFamily = currentFontFamily
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = bodyFontSize,
+                                lineHeight = bodyLineHeight,
+                                fontFamily = currentFontFamily
+                            ),
+                            color = MindTextTertiary
                         )
                     },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = currentFontFamily),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = bodyFontSize,
+                        lineHeight = bodyLineHeight,
+                        fontFamily = currentFontFamily
+                    ),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
@@ -1297,5 +1346,4 @@ fun NoteEditorScreen(
             }
         }
     }
-}
 }

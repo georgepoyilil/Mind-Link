@@ -74,6 +74,46 @@ class ServiceLocator private constructor(context: Context) {
         _techMode.value = enabled
     }
 
+    private val _appTheme by lazy {
+        MutableStateFlow(preferences.getString(PREF_APP_THEME, "amoled_black") ?: "amoled_black")
+    }
+    val appTheme: StateFlow<String> by lazy { _appTheme.asStateFlow() }
+
+    fun updateAppTheme(theme: String) {
+        preferences.edit().putString(PREF_APP_THEME, theme).apply()
+        _appTheme.value = theme
+    }
+
+    private val _showEmojis by lazy {
+        MutableStateFlow(preferences.getBoolean(PREF_SHOW_EMOJIS, true))
+    }
+    val showEmojis: StateFlow<Boolean> by lazy { _showEmojis.asStateFlow() }
+
+    fun updateShowEmojis(enabled: Boolean) {
+        preferences.edit().putBoolean(PREF_SHOW_EMOJIS, enabled).apply()
+        _showEmojis.value = enabled
+    }
+
+    private val _lineSpacingMultiplier by lazy {
+        MutableStateFlow(preferences.getFloat(PREF_LINE_SPACING_MULTIPLIER, 1.45f))
+    }
+    val lineSpacingMultiplier: StateFlow<Float> by lazy { _lineSpacingMultiplier.asStateFlow() }
+
+    fun updateLineSpacingMultiplier(multiplier: Float) {
+        preferences.edit().putFloat(PREF_LINE_SPACING_MULTIPLIER, multiplier).apply()
+        _lineSpacingMultiplier.value = multiplier
+    }
+
+    private val _noteViewMode by lazy {
+        MutableStateFlow(preferences.getString(PREF_NOTE_VIEW_MODE, "grid") ?: "grid")
+    }
+    val noteViewMode: StateFlow<String> by lazy { _noteViewMode.asStateFlow() }
+
+    fun updateNoteViewMode(mode: String) {
+        preferences.edit().putString(PREF_NOTE_VIEW_MODE, mode).apply()
+        _noteViewMode.value = mode
+    }
+
     fun hasSeenOnboarding(): Boolean {
         return preferences.getBoolean(PREF_HAS_SEEN_ONBOARDING, false)
     }
@@ -132,6 +172,10 @@ class ServiceLocator private constructor(context: Context) {
         const val PREF_GLOBAL_FONT_SCALE = "pref_global_font_scale"
         const val PREF_HAS_SEEN_ONBOARDING = "pref_has_seen_onboarding"
         const val PREF_TECH_MODE = "pref_tech_mode"
+        const val PREF_APP_THEME = "pref_app_theme"
+        const val PREF_SHOW_EMOJIS = "pref_show_emojis"
+        const val PREF_LINE_SPACING_MULTIPLIER = "pref_line_spacing_multiplier"
+        const val PREF_NOTE_VIEW_MODE = "pref_note_view_mode"
 
         @Volatile
         private var INSTANCE: ServiceLocator? = null

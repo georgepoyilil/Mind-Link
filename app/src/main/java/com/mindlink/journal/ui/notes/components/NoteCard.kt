@@ -25,27 +25,27 @@ import com.mindlink.journal.domain.model.Note
 import com.mindlink.journal.ui.theme.*
 
 enum class NoteViewMode(val label: String, val icon: ImageVector) {
+    GRID("Grid", Icons.Default.ViewAgenda),
     CARDS("Cards", Icons.Default.GridView),
-    COMPACT_LIST("List", Icons.Default.ViewAgenda),
-    FULL_WIDTH("Stream", Icons.Default.ViewStream)
+    COMPACT_LIST("List", Icons.Default.Dashboard)
 }
 
 @Composable
 fun NoteCard(
     note: Note,
     onClick: () -> Unit,
-    viewMode: NoteViewMode = NoteViewMode.CARDS,
+    viewMode: NoteViewMode = NoteViewMode.GRID,
     modifier: Modifier = Modifier
 ) {
     when (viewMode) {
         NoteViewMode.COMPACT_LIST -> NoteCompactItem(note = note, onClick = onClick, modifier = modifier)
-        NoteViewMode.FULL_WIDTH -> NoteFullWidthCard(note = note, onClick = onClick, modifier = modifier)
-        NoteViewMode.CARDS -> NoteStandardCard(note = note, onClick = onClick, modifier = modifier)
+        NoteViewMode.CARDS -> NoteFullWidthCard(note = note, onClick = onClick, modifier = modifier)
+        NoteViewMode.GRID -> NoteStandardCard(note = note, onClick = onClick, modifier = modifier)
     }
 }
 
 /**
- * Standard Card View: Balanced preview with tags and mood chip
+ * Standard Card View: Balanced preview with tags and mood chip, optimized for 2-column staggered Google Keep grid
  */
 @Composable
 fun NoteStandardCard(
@@ -62,146 +62,150 @@ fun NoteStandardCard(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MindGlassSurface),
-        border = BorderStroke(1.dp, MindPrismGlassCardBorder),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = BorderStroke(1.2.dp, MindPrismGlassCardBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
-            // Header Row: Mood Chip & Date
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (note.mood != null) {
-                    MoodBadge(mood = note.mood, emoji = note.moodEmoji)
-                } else {
-                    Box(modifier = Modifier.width(1.dp))
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (note.audioUri != null) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MindGlassButtonContainer,
-                            border = BorderStroke(0.5.dp, MindGlassButtonBorder),
-                            modifier = Modifier.padding(end = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Mic,
-                                contentDescription = "Voice Note",
-                                tint = PastelLavender,
-                                modifier = Modifier
-                                    .padding(horizontal = 5.dp, vertical = 2.dp)
-                                    .size(11.dp)
-                            )
-                        }
-                    }
-
-                    if (note.imageUri != null) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MindGlassButtonContainer,
-                            border = BorderStroke(0.5.dp, MindGlassButtonBorder),
-                            modifier = Modifier.padding(end = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PhotoCamera,
-                                contentDescription = "Image Attached",
-                                tint = PastelSky,
-                                modifier = Modifier
-                                    .padding(horizontal = 5.dp, vertical = 2.dp)
-                                    .size(11.dp)
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = note.formattedDate,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MindTextTertiary
-                    )
-                }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Optional attached image header (Google Keep style)
+            if (note.imageUri != null) {
+                AsyncImage(
+                    model = note.imageUri,
+                    contentDescription = "Attached Image",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(110.dp)
+                        .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
+                )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Title
-            Text(
-                text = note.title.ifBlank { "Untitled Thought" },
-                style = MaterialTheme.typography.titleMedium.copy(fontFamily = cardFont),
-                fontWeight = FontWeight.Bold,
-                color = MindTextPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // AI TL;DR or Preview
-            Text(
-                text = note.previewText,
-                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = cardFont),
-                color = if (note.summary != null) MindTextSecondary else MindTextTertiary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Footer: Action items count + Tags
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(11.dp)
             ) {
+                // Header Row: Mood Chip & Date
                 Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    note.tags.take(3).forEach { tag ->
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MindGlassSurfaceVariant,
-                            border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
-                        ) {
-                            Text(
-                                text = "#$tag",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MindTextSecondary,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                fontSize = 10.5.sp
-                            )
+                    if (note.mood != null) {
+                        MoodBadge(mood = note.mood, emoji = note.moodEmoji)
+                    } else {
+                        Box(modifier = Modifier.width(1.dp))
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (note.audioUri != null) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MindGlassButtonContainer,
+                                border = BorderStroke(0.5.dp, MindGlassButtonBorder),
+                                modifier = Modifier.padding(end = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Mic,
+                                    contentDescription = "Voice Note",
+                                    tint = PastelLavender,
+                                    modifier = Modifier
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        .size(10.dp)
+                                )
+                            }
                         }
+
+                        Text(
+                            text = note.compactDate,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MindTextTertiary,
+                            fontSize = 10.5.sp,
+                            maxLines = 1
+                        )
                     }
                 }
 
-                if (note.actionItems.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Title
+                Text(
+                    text = note.title.ifBlank { "Untitled Thought" },
+                    style = MaterialTheme.typography.titleSmall.copy(fontFamily = cardFont),
+                    fontWeight = FontWeight.Bold,
+                    color = MindTextPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // AI TL;DR or Body Preview (Staggered natural text wrap)
+                Text(
+                    text = note.previewText,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = cardFont),
+                    color = if (note.summary != null) MindTextSecondary else MindTextTertiary,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (note.tags.isNotEmpty() || note.actionItems.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Footer: Action items count + Tags
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .background(
-                                color = PastelMint.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.TaskAlt,
-                            contentDescription = null,
-                            tint = PastelMint,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "${note.actionItems.size} tasks",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = PastelMint,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            note.tags.take(2).forEach { tag ->
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MindGlassSurfaceVariant,
+                                    border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
+                                ) {
+                                    Text(
+                                        text = "#$tag",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MindTextSecondary,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                        fontSize = 10.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+
+                        if (note.actionItems.isNotEmpty()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .background(
+                                        color = PastelMint.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.TaskAlt,
+                                    contentDescription = null,
+                                    tint = PastelMint,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = "${note.actionItems.size}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = PastelMint,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -488,19 +492,21 @@ fun NoteFullWidthCard(
 
 @Composable
 fun MoodBadge(mood: String, emoji: String = "") {
-    val textColor = getMoodColor(mood)
-    val bgColor = textColor.copy(alpha = 0.16f)
+    val showEmojis = LocalShowEmojis.current
+    val isDark = LocalMindLinkColors.current.isDark
+    val textColor = getMoodColor(mood, isDark)
+    val bgColor = textColor.copy(alpha = if (isDark) 0.16f else 0.12f)
 
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = bgColor,
-        border = BorderStroke(0.6.dp, textColor.copy(alpha = 0.45f))
+        border = BorderStroke(0.6.dp, textColor.copy(alpha = if (isDark) 0.45f else 0.35f))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (emoji.isNotBlank()) {
+            if (showEmojis && emoji.isNotBlank()) {
                 Text(text = emoji, fontSize = 11.sp)
                 Spacer(modifier = Modifier.width(4.dp))
             } else {
@@ -521,14 +527,30 @@ fun MoodBadge(mood: String, emoji: String = "") {
     }
 }
 
-fun getMoodColor(mood: String?): Color = when (mood?.lowercase()?.trim()) {
-    "reflective" -> PastelLavender
-    "analytical" -> PastelSky
-    "creative" -> PastelViolet
-    "energized" -> PastelAmber
-    "stressed" -> PastelRose
-    "calm" -> PastelMint
-    "vulnerable" -> PastelPeach
-    "grateful" -> PastelRose
-    else -> PastelMint
+fun getMoodColor(mood: String?, isDark: Boolean = true): Color {
+    return if (isDark) {
+        when (mood?.lowercase()?.trim()) {
+            "reflective" -> PastelLavender
+            "analytical" -> PastelSky
+            "creative" -> PastelViolet
+            "energized" -> PastelAmber
+            "stressed" -> PastelRose
+            "calm" -> PastelMint
+            "vulnerable" -> PastelPeach
+            "grateful" -> PastelRose
+            else -> PastelMint
+        }
+    } else {
+        when (mood?.lowercase()?.trim()) {
+            "reflective" -> Color(0xFF4F46E5)
+            "analytical" -> Color(0xFF0284C7)
+            "creative" -> Color(0xFF7C3AED)
+            "energized" -> Color(0xFFD97706)
+            "stressed" -> Color(0xFFE11D48)
+            "calm" -> Color(0xFF059669)
+            "vulnerable" -> Color(0xFFEA580C)
+            "grateful" -> Color(0xFFDB2777)
+            else -> Color(0xFF059669)
+        }
+    }
 }

@@ -22,88 +22,96 @@ val CalibriFontFamily = FontFamily(
 )
 
 /**
- * High-density, compact Calibri Typography tuned for mobile journaling:
- * Tightened line heights, crisp letter spacing, and compact vertical metrics.
+ * Returns a Typography instance with proportionally scaled font sizes and line heights.
+ * Line heights scale by ~1.38x-1.45x so multi-line text never collides or clips when scaling up.
  */
-val Typography = Typography(
-    headlineLarge = TextStyle(
-        fontFamily = CalibriFontFamily,
-        fontWeight = FontWeight.Bold,
-        fontSize = 26.sp,
-        lineHeight = 30.sp,
-        letterSpacing = (-0.4).sp
-    ),
-    headlineMedium = TextStyle(
-        fontFamily = CalibriFontFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 21.sp,
-        lineHeight = 25.sp,
-        letterSpacing = (-0.2).sp
-    ),
-    headlineSmall = TextStyle(
-        fontFamily = CalibriFontFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 18.sp,
-        lineHeight = 22.sp
-    ),
-    titleLarge = TextStyle(
-        fontFamily = CalibriFontFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp,
-        lineHeight = 20.sp,
-        letterSpacing = (-0.1).sp
-    ),
-    titleMedium = TextStyle(
-        fontFamily = CalibriFontFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 14.5.sp,
-        lineHeight = 18.sp
-    ),
-    titleSmall = TextStyle(
-        fontFamily = CalibriFontFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 13.sp,
-        lineHeight = 16.sp
-    ),
-    bodyLarge = TextStyle(
-        fontFamily = CalibriFontFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 14.5.sp,
-        lineHeight = 19.sp,
-        letterSpacing = 0.1.sp
-    ),
-    bodyMedium = TextStyle(
-        fontFamily = CalibriFontFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 13.sp,
-        lineHeight = 17.sp,
-        letterSpacing = 0.1.sp
-    ),
-    bodySmall = TextStyle(
-        fontFamily = CalibriFontFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 12.sp,
-        lineHeight = 15.sp
-    ),
-    labelLarge = TextStyle(
-        fontFamily = CalibriFontFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 12.sp,
-        lineHeight = 15.sp
-    ),
-    labelMedium = TextStyle(
-        fontFamily = CalibriFontFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 14.sp
-    ),
-    labelSmall = TextStyle(
-        fontFamily = CalibriFontFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 10.sp,
-        lineHeight = 13.sp
+fun getScaledTypography(fontScale: Float = 1.0f): Typography {
+    val scale = fontScale.coerceIn(0.85f, 1.35f)
+    return Typography(
+        headlineLarge = TextStyle(
+            fontFamily = CalibriFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = (26 * scale).sp,
+            lineHeight = (34 * scale).sp,
+            letterSpacing = (-0.4).sp
+        ),
+        headlineMedium = TextStyle(
+            fontFamily = CalibriFontFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = (21 * scale).sp,
+            lineHeight = (28 * scale).sp,
+            letterSpacing = (-0.2).sp
+        ),
+        headlineSmall = TextStyle(
+            fontFamily = CalibriFontFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = (18 * scale).sp,
+            lineHeight = (24 * scale).sp
+        ),
+        titleLarge = TextStyle(
+            fontFamily = CalibriFontFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = (16 * scale).sp,
+            lineHeight = (22 * scale).sp,
+            letterSpacing = (-0.1).sp
+        ),
+        titleMedium = TextStyle(
+            fontFamily = CalibriFontFamily,
+            fontWeight = FontWeight.Medium,
+            fontSize = (14.5f * scale).sp,
+            lineHeight = (20 * scale).sp
+        ),
+        titleSmall = TextStyle(
+            fontFamily = CalibriFontFamily,
+            fontWeight = FontWeight.Medium,
+            fontSize = (13 * scale).sp,
+            lineHeight = (18 * scale).sp
+        ),
+        bodyLarge = TextStyle(
+            fontFamily = CalibriFontFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = (15 * scale).sp,
+            lineHeight = (22 * scale).sp,
+            letterSpacing = 0.1.sp
+        ),
+        bodyMedium = TextStyle(
+            fontFamily = CalibriFontFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = (13.5f * scale).sp,
+            lineHeight = (19 * scale).sp,
+            letterSpacing = 0.1.sp
+        ),
+        bodySmall = TextStyle(
+            fontFamily = CalibriFontFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = (12 * scale).sp,
+            lineHeight = (16.5f * scale).sp
+        ),
+        labelLarge = TextStyle(
+            fontFamily = CalibriFontFamily,
+            fontWeight = FontWeight.Medium,
+            fontSize = (12 * scale).sp,
+            lineHeight = (16.5f * scale).sp
+        ),
+        labelMedium = TextStyle(
+            fontFamily = CalibriFontFamily,
+            fontWeight = FontWeight.Medium,
+            fontSize = (11 * scale).sp,
+            lineHeight = (15 * scale).sp
+        ),
+        labelSmall = TextStyle(
+            fontFamily = CalibriFontFamily,
+            fontWeight = FontWeight.Medium,
+            fontSize = (10 * scale).sp,
+            lineHeight = (14 * scale).sp
+        )
     )
-)
+}
+
+/**
+ * Default Typography at 1.0x baseline.
+ */
+val Typography = getScaledTypography(1.0f)
 
 enum class NoteFontOption(val key: String, val label: String, val fontFamily: FontFamily) {
     CALIBRI("Sans", "Calibri", CalibriFontFamily),
@@ -122,4 +130,3 @@ enum class NoteFontOption(val key: String, val label: String, val fontFamily: Fo
 fun resolveNoteFontFamily(key: String?): FontFamily {
     return NoteFontOption.fromKey(key).fontFamily
 }
-

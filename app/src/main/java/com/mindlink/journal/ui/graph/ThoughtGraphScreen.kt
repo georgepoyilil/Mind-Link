@@ -107,6 +107,9 @@ fun ThoughtGraphScreen(
         },
         containerColor = MindBackgroundAmoled
     ) { paddingValues ->
+        val isThemeDark = LocalMindLinkColors.current.isDark
+        val nodeCoreColor = MindSurfaceAmoled
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -205,13 +208,13 @@ fun ThoughtGraphScreen(
 
                     // Solid obsidian core
                     drawCircle(
-                        color = MindSurfaceAmoled,
+                        color = nodeCoreColor,
                         radius = nr,
                         center = Offset(nx, ny)
                     )
 
                     // Neon rim
-                    val rimColor = if (isSelected) Color.White else baseColor
+                    val rimColor = if (isSelected) (if (isThemeDark) Color.White else Color.Black) else baseColor
                     drawCircle(
                         color = rimColor,
                         radius = nr,
@@ -224,7 +227,7 @@ fun ThoughtGraphScreen(
                     // Draw clean, readable title inside the node circle (without distracting emojis)
                     drawIntoCanvas { canvas ->
                         nativePaint.typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
-                        nativePaint.color = android.graphics.Color.WHITE
+                        nativePaint.color = if (isThemeDark) android.graphics.Color.WHITE else android.graphics.Color.parseColor("#0F172A")
                         val fontSize = (nr * 0.32f).coerceIn(11f, 20f)
                         nativePaint.textSize = fontSize
 

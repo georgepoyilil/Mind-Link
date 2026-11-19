@@ -209,20 +209,11 @@ fun NoteDetailScreen(
                 CircularProgressIndicator(color = MindIndigo)
             }
         } else {
-            val appFontScale = LocalAppFontScale.current
-            val activeFontScale = note.fontSizeScale ?: appFontScale
-            val currentDensity = LocalDensity.current
-            val relativeScale = activeFontScale / appFontScale
-            val effectiveDensity = remember(currentDensity, relativeScale) {
-                Density(currentDensity.density, fontScale = currentDensity.fontScale * relativeScale)
-            }
-
-            CompositionLocalProvider(LocalDensity provides effectiveDensity) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -292,9 +283,16 @@ fun NoteDetailScreen(
                     }
 
                     // Title
+                    val noteScale = note.fontSizeScale ?: 1.0f
+                    val titleFontSize = (MaterialTheme.typography.headlineMedium.fontSize.value * noteScale).sp
+                    val titleLineHeight = (titleFontSize.value * 1.35f).sp
                     Text(
                         text = note.title,
-                        style = MaterialTheme.typography.headlineMedium.copy(fontFamily = noteFont),
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontSize = titleFontSize,
+                            lineHeight = titleLineHeight,
+                            fontFamily = noteFont
+                        ),
                         fontWeight = FontWeight.Bold,
                         color = MindTextPrimary
                     )
@@ -531,11 +529,17 @@ fun NoteDetailScreen(
                                 )
                             }
                             Spacer(modifier = Modifier.height(10.dp))
+                            val lineSpacing = LocalLineSpacingMultiplier.current
+                            val bodyFontSize = (MaterialTheme.typography.bodyLarge.fontSize.value * noteScale).sp
+                            val bodyLineHeight = (bodyFontSize.value * lineSpacing).sp
                             Text(
                                 text = note.content,
-                                style = MaterialTheme.typography.bodyLarge.copy(fontFamily = noteFont),
-                                color = MindTextPrimary,
-                                lineHeight = 24.sp
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontSize = bodyFontSize,
+                                    lineHeight = bodyLineHeight,
+                                    fontFamily = noteFont
+                                ),
+                                color = MindTextPrimary
                             )
                         }
                     }
@@ -981,5 +985,4 @@ fun NoteDetailScreen(
             }
         }
     }
-}
 }
