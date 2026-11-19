@@ -80,12 +80,28 @@ class NoteRepositoryImpl(
     }
 
     override suspend fun deleteNotePermanently(id: Long) = withContext(Dispatchers.IO) {
+        val note = noteDao.getNoteByIdSync(id)
+        note?.imageUri?.let { uriStr ->
+            try { java.io.File(android.net.Uri.parse(uriStr).path ?: "").delete() } catch (_: Exception) {}
+        }
+        note?.audioUri?.let { uriStr ->
+            try { java.io.File(android.net.Uri.parse(uriStr).path ?: "").delete() } catch (_: Exception) {}
+        }
         noteDao.deleteNoteById(id)
         embeddingDao.deleteByNoteId(id)
         noteLinkDao.deleteLinksForNote(id)
     }
 
     override suspend fun emptyTrash() = withContext(Dispatchers.IO) {
+        val trashNotes = noteDao.getTrashNotes().firstOrNull() ?: emptyList()
+        trashNotes.forEach { note ->
+            note.imageUri?.let { uriStr ->
+                try { java.io.File(android.net.Uri.parse(uriStr).path ?: "").delete() } catch (_: Exception) {}
+            }
+            note.audioUri?.let { uriStr ->
+                try { java.io.File(android.net.Uri.parse(uriStr).path ?: "").delete() } catch (_: Exception) {}
+            }
+        }
         noteDao.emptyTrash()
         embeddingDao.deleteOrphanedEmbeddings()
         noteLinkDao.deleteOrphanedLinks()
@@ -93,6 +109,15 @@ class NoteRepositoryImpl(
 
     override suspend fun purgeExpiredTrash() = withContext(Dispatchers.IO) {
         val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000L)
+        val trashNotes = noteDao.getTrashNotes().firstOrNull() ?: emptyList()
+        trashNotes.filter { it.deletedAt != null && it.deletedAt!! < thirtyDaysAgo }.forEach { note ->
+            note.imageUri?.let { uriStr ->
+                try { java.io.File(android.net.Uri.parse(uriStr).path ?: "").delete() } catch (_: Exception) {}
+            }
+            note.audioUri?.let { uriStr ->
+                try { java.io.File(android.net.Uri.parse(uriStr).path ?: "").delete() } catch (_: Exception) {}
+            }
+        }
         noteDao.purgeExpiredTrash(thirtyDaysAgo)
         embeddingDao.deleteOrphanedEmbeddings()
         noteLinkDao.deleteOrphanedLinks()
@@ -395,9 +420,13 @@ class NoteRepositoryImpl(
 
     private fun triggerAsyncAiProcessing(noteId: Long) {
         val workData = workDataOf(NoteProcessingWorker.KEY_NOTE_ID to noteId)
+        val constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)
+            .build()
 
         val workRequest = OneTimeWorkRequestBuilder<NoteProcessingWorker>()
             .setInputData(workData)
+            .setConstraints(constraints)
             .addTag(NoteProcessingWorker.WORK_TAG)
             .setBackoffCriteria(
                 BackoffPolicy.EXPONENTIAL,

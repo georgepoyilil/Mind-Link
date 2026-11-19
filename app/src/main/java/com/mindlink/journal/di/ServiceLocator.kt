@@ -64,6 +64,16 @@ class ServiceLocator private constructor(context: Context) {
         _globalFontScale.value = scale
     }
 
+    private val _techMode by lazy {
+        MutableStateFlow(preferences.getBoolean(PREF_TECH_MODE, false))
+    }
+    val techMode: StateFlow<Boolean> by lazy { _techMode.asStateFlow() }
+
+    fun setTechMode(enabled: Boolean) {
+        preferences.edit().putBoolean(PREF_TECH_MODE, enabled).apply()
+        _techMode.value = enabled
+    }
+
     fun hasSeenOnboarding(): Boolean {
         return preferences.getBoolean(PREF_HAS_SEEN_ONBOARDING, false)
     }
@@ -121,6 +131,7 @@ class ServiceLocator private constructor(context: Context) {
         const val PREF_ENGINE_MODE = "pref_engine_mode" // "AUTO", "SLM", "GEMINI", "LOCAL"
         const val PREF_GLOBAL_FONT_SCALE = "pref_global_font_scale"
         const val PREF_HAS_SEEN_ONBOARDING = "pref_has_seen_onboarding"
+        const val PREF_TECH_MODE = "pref_tech_mode"
 
         @Volatile
         private var INSTANCE: ServiceLocator? = null

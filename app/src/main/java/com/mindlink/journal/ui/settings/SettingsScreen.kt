@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -181,6 +182,62 @@ fun SettingsScreen(
                 }
             }
 
+            // 0.5. Neural Inspector (Tech Mode) Toggle Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = PastelSky.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.35f)),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Science,
+                                contentDescription = null,
+                                tint = PastelSky,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "🔬 Neural Inspector (Tech Mode)",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MindTextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Reveal 384-d vector embeddings, cosine match scores, hybrid RRF ranks, and engine latency.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MindTextSecondary
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Switch(
+                        checked = uiState.isTechMode,
+                        onCheckedChange = { viewModel.setTechMode(it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MindBackgroundDark,
+                            checkedTrackColor = PastelSky,
+                            uncheckedThumbColor = MindTextSecondary,
+                            uncheckedTrackColor = MindSurfaceVariantDark
+                        )
+                    )
+                }
+            }
+
             // 1. Engine Mode Switcher Card
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -218,7 +275,7 @@ fun SettingsScreen(
                         Triple("AUTO", "Auto Smart", "Cloud if key -> On-Device SLM -> Local NLP"),
                         Triple("SLM", "On-Device SLM", "Force local Qwen 2.5 neural model (100% offline)"),
                         Triple("GEMINI", "Cloud Gemini", "Force Gemini 2.0 Flash (Requires API key)"),
-                        Triple("LOCAL", "Local NLP", "Instant rule-based heuristic with Life Spheres")
+                        Triple("LOCAL", "Local NLP", "Instant rule-based heuristic with Life Chapters (Heart, Work, Wellness, Personal)")
                     )
 
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

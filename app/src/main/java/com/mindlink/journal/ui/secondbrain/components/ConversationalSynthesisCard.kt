@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mindlink.journal.LocalTechMode
 import com.mindlink.journal.domain.model.SynthesisResponse
 import com.mindlink.journal.ui.theme.*
 
@@ -26,6 +27,8 @@ fun ConversationalSynthesisCard(
     onNoteClick: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isTechMode = LocalTechMode.current
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
@@ -41,6 +44,26 @@ fun ConversationalSynthesisCard(
                 .background(MindAiGlassGradient)
                 .padding(20.dp)
         ) {
+            // Tech Mode Telemetry Bar
+            if (isTechMode) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MindGlassButtonContainer,
+                    border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "🔬 [Engine: On-Device / Heuristics] · [Context: ${synthesis.citedNotes.size} Notes · Synthesized]",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = PastelSky,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
             // Distinct AI Synthesis Header
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -53,14 +76,19 @@ fun ConversationalSynthesisCard(
                     modifier = Modifier.size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Psychology, contentDescription = null, tint = PastelSky, modifier = Modifier.size(20.dp))
+                        Icon(
+                            imageVector = if (isTechMode) Icons.Default.Psychology else Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = if (isTechMode) PastelSky else PastelLavender,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "AI Brain Synthesis",
+                            text = if (isTechMode) "AI Brain Synthesis" else "✨ Your Mind's Story",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MindTextPrimary
@@ -71,7 +99,7 @@ fun ConversationalSynthesisCard(
                             color = MindGlassButtonContainer
                         ) {
                             Text(
-                                text = "ON-DEVICE AI",
+                                text = if (isTechMode) "ON-DEVICE AI" else "MINDFUL REFLECTION",
                                 color = PastelLavender,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
@@ -80,7 +108,11 @@ fun ConversationalSynthesisCard(
                         }
                     }
                     Text(
-                        text = "Cross-referenced synthesis from your journal memory bank",
+                        text = if (isTechMode) {
+                            "Cross-referenced synthesis from your journal memory bank"
+                        } else {
+                            "Reflections based on what you've written"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MindTextSecondary
                     )

@@ -28,7 +28,7 @@ data class SettingsUiState(
     val totalEmbeddings: Int = 0,
     val isReindexing: Boolean = false,
     val reindexMessage: String? = null,
-    val activeEngineName: String = "Local Life-Sphere NLP Engine (Zero Weights)",
+    val activeEngineName: String = "Local Life-Chapters NLP Engine (Zero Weights)",
     val slmModelInfo: String = "Not installed",
     val isModelInstalled: Boolean = false,
     val isDownloadingModel: Boolean = false,
@@ -48,7 +48,8 @@ data class SettingsUiState(
     val appUpdateMessage: String? = null,
     val isDownloadingAppUpdate: Boolean = false,
     val appUpdateProgress: Float = 0f,
-    val downloadedApkFile: File? = null
+    val downloadedApkFile: File? = null,
+    val isTechMode: Boolean = false
 )
 
 class SettingsViewModel(
@@ -65,7 +66,8 @@ class SettingsViewModel(
         val savedKey = (appContext?.let { ServiceLocator.getInstance(it).getApiKey() } ?: preferences.getString(ServiceLocator.PREF_GEMINI_API_KEY, "")) ?: ""
         val savedMode = preferences.getString(ServiceLocator.PREF_ENGINE_MODE, "AUTO") ?: "AUTO"
         val savedFontScale = preferences.getFloat(ServiceLocator.PREF_GLOBAL_FONT_SCALE, 1.0f)
-        _uiState.update { it.copy(apiKey = savedKey, engineMode = savedMode, fontScale = savedFontScale) }
+        val savedTechMode = (appContext?.let { ServiceLocator.getInstance(it).techMode.value } ?: preferences.getBoolean(ServiceLocator.PREF_TECH_MODE, false))
+        _uiState.update { it.copy(apiKey = savedKey, engineMode = savedMode, fontScale = savedFontScale, isTechMode = savedTechMode) }
         refreshEngineStatus()
 
         viewModelScope.launch {
@@ -124,7 +126,7 @@ class SettingsViewModel(
     }
 
     fun refreshEngineStatus() {
-        val engineName = compositeEngine?.getActiveEngineName() ?: "Local Life-Sphere NLP Engine (Zero Weights)"
+        val engineName = compositeEngine?.getActiveEngineName() ?: "Local Life-Chapters NLP Engine (Zero Weights)"
         val slmInfo = compositeEngine?.mediaPipeEngine?.getModelInfo() ?: "Not installed"
         val isInstalled = compositeEngine?.mediaPipeEngine?.isModelAvailable() ?: false
         val savedMode = preferences.getString(ServiceLocator.PREF_ENGINE_MODE, "AUTO") ?: "AUTO"
@@ -160,6 +162,15 @@ class SettingsViewModel(
             ServiceLocator.getInstance(appContext).updateGlobalFontScale(scale)
         } else {
             preferences.edit().putFloat(ServiceLocator.PREF_GLOBAL_FONT_SCALE, scale).apply()
+        }
+    }
+
+    fun setTechMode(enabled: Boolean) {
+        _uiState.update { it.copy(isTechMode = enabled) }
+        if (appContext != null) {
+            ServiceLocator.getInstance(appContext).setTechMode(enabled)
+        } else {
+            preferences.edit().putBoolean(ServiceLocator.PREF_TECH_MODE, enabled).apply()
         }
     }
 

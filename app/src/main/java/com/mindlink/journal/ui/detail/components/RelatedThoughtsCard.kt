@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mindlink.journal.LocalTechMode
 import com.mindlink.journal.domain.model.RelatedThought
 import com.mindlink.journal.ui.theme.*
 
@@ -28,6 +29,8 @@ fun RelatedThoughtsCard(
     onThoughtClick: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isTechMode = LocalTechMode.current
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -53,21 +56,26 @@ fun RelatedThoughtsCard(
                     modifier = Modifier.size(36.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Hub, contentDescription = null, tint = PastelSky, modifier = Modifier.size(18.dp))
+                        Icon(
+                            imageVector = if (isTechMode) Icons.Default.Hub else Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = if (isTechMode) PastelSky else PastelMint,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "Related Thoughts & Synapses",
+                        text = if (isTechMode) "Related Thoughts & Synapses" else "🌿 Reminds you of something...",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MindTextPrimary
                     )
                     Text(
-                        text = "Linked via 384-d on-device vector cosine similarity",
+                        text = if (isTechMode) "384-d ONNX / Fallback vector space" else "Connected memories from your journal",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MindTextTertiary
+                        color = if (isTechMode) PastelSky.copy(alpha = 0.8f) else MindTextTertiary
                     )
                 }
             }
@@ -81,12 +89,12 @@ fun RelatedThoughtsCard(
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
-                        color = MindIndigo,
+                        color = if (isTechMode) PastelSky else MindIndigo,
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Traversing vector embeddings...",
+                        text = if (isTechMode) "Traversing 384-d vector embeddings..." else "Connecting the dots...",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MindTextSecondary
                     )
@@ -99,7 +107,11 @@ fun RelatedThoughtsCard(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "No associative connections found yet. Add more notes to grow your neural network.",
+                        text = if (isTechMode) {
+                            "No cosine vector neighbors found above threshold (>= 0.35). Add more thoughts to compute embeddings."
+                        } else {
+                            "No connected memories yet. As you write more, links will blossom here."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MindTextSecondary,
                         modifier = Modifier.padding(14.dp)
@@ -108,7 +120,10 @@ fun RelatedThoughtsCard(
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     relatedThoughts.forEach { thought ->
-                        val percent = (thought.similarityScore * 100).toInt().coerceIn(0, 100)
+                        val score = thought.similarityScore
+                        val percent = (score * 100).toInt().coerceIn(0, 100)
+                        val distance = (1.0f - score).coerceAtLeast(0f)
+
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = MindGlassSurfaceVariant,
@@ -132,7 +147,7 @@ fun RelatedThoughtsCard(
                                     Box(
                                         modifier = Modifier
                                             .size(7.dp)
-                                            .background(PastelLavender, CircleShape)
+                                            .background(if (isTechMode) PastelSky else PastelLavender, CircleShape)
                                     )
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column {
@@ -151,6 +166,16 @@ fun RelatedThoughtsCard(
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
+                                        if (isTechMode) {
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = String.format("[384-d Cosine: %.3f | Distance: %.3f]", score, distance),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = PastelSky,
+                                                fontSize = 9.sp,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                            )
+                                        }
                                     }
                                 }
 
@@ -159,13 +184,19 @@ fun RelatedThoughtsCard(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
-                                        color = MindGlassButtonContainer,
-                                        border = BorderStroke(0.5.dp, MindGlassButtonBorder)
+                                        color = if (isTechMode) PastelSky.copy(alpha = 0.12f) else MindGlassButtonContainer,
+                                        border = BorderStroke(0.5.dp, if (isTechMode) PastelSky.copy(alpha = 0.35f) else MindGlassButtonBorder)
                                     ) {
                                         Text(
-                                            text = "$percent% match",
+                                            text = if (isTechMode) {
+                                                "$percent% match"
+                                            } else if (score >= 0.70f) {
+                                                "Strong connection"
+                                            } else {
+                                                "Related"
+                                            },
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = PastelLavender,
+                                            color = if (isTechMode) PastelSky else PastelLavender,
                                             fontWeight = FontWeight.Bold,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                             fontSize = 10.sp

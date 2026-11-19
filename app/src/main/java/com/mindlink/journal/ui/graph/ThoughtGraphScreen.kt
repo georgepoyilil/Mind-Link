@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mindlink.journal.LocalTechMode
 import com.mindlink.journal.domain.model.ThoughtGraphNode
 import com.mindlink.journal.ui.theme.*
 import kotlin.math.sqrt
@@ -39,6 +40,7 @@ fun ThoughtGraphScreen(
     onNavigateBack: () -> Unit,
     onNoteClick: (Long) -> Unit
 ) {
+    val isTechMode = LocalTechMode.current
     val uiState by viewModel.uiState.collectAsState()
 
     var scale by remember { mutableFloatStateOf(1.0f) }
@@ -56,15 +58,19 @@ fun ThoughtGraphScreen(
                 title = {
                     Column {
                         Text(
-                            text = "Synaptic Network",
+                            text = if (isTechMode) "Synaptic Network (Inspector)" else "🌌 Thought Constellation",
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             color = MindTextPrimary
                         )
                         Text(
-                            text = "${uiState.graph.totalThoughts} thoughts · ${uiState.graph.totalSynapses} synapses",
+                            text = if (isTechMode) {
+                                "${uiState.graph.totalThoughts} nodes · ${uiState.graph.totalSynapses} edges · 384-d Cosine"
+                            } else {
+                                "${uiState.graph.totalThoughts} connected memories"
+                            },
                             style = MaterialTheme.typography.labelSmall,
-                            color = MindTextSecondary
+                            color = if (isTechMode) PastelSky else MindTextSecondary
                         )
                     }
                 },
@@ -91,8 +97,8 @@ fun ThoughtGraphScreen(
                     IconButton(onClick = { viewModel.rebuildGraph() }) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "Recalculate Graph",
-                            tint = MindIndigo
+                            contentDescription = "Reorganize Thoughts",
+                            tint = if (isTechMode) PastelSky else MindIndigo
                         )
                     }
                 },
@@ -354,12 +360,17 @@ fun ThoughtGraphScreen(
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(Icons.Default.Hub, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(11.dp))
+                                            Icon(
+                                                imageVector = if (isTechMode) Icons.Default.Hub else Icons.Default.AutoAwesome,
+                                                contentDescription = null,
+                                                tint = if (isTechMode) PastelSky else PastelLavender,
+                                                modifier = Modifier.size(11.dp)
+                                            )
                                             Spacer(modifier = Modifier.width(3.dp))
                                             Text(
-                                                text = "${node.degree} synapses",
+                                                text = if (isTechMode) "k = ${node.degree} synapses" else "${node.degree} connections",
                                                 fontSize = 10.sp,
-                                                color = PastelLavender,
+                                                color = if (isTechMode) PastelSky else PastelLavender,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }

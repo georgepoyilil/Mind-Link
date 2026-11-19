@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mindlink.journal.LocalTechMode
 import com.mindlink.journal.domain.model.SearchResult
 import com.mindlink.journal.ui.theme.*
 
@@ -30,6 +31,7 @@ fun HybridSearchSection(
 ) {
     if (results.isEmpty()) return
 
+    val isTechMode = LocalTechMode.current
     var isExpanded by remember { mutableStateOf(false) }
     val initialPreviewCount = 3
     val displayedResults = if (isExpanded) results else results.take(initialPreviewCount)
@@ -151,7 +153,7 @@ fun HybridSearchSection(
                                         border = BorderStroke(0.5.dp, MindGlassButtonBorder)
                                     ) {
                                         Text(
-                                            text = "Semantic",
+                                            text = if (isTechMode) "Semantic" else "Related feeling",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = PastelLavender,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -166,11 +168,27 @@ fun HybridSearchSection(
                                         border = BorderStroke(0.5.dp, MindGlassButtonBorder)
                                     ) {
                                         Text(
-                                            text = "FTS",
+                                            text = if (isTechMode) "FTS" else "Direct mention",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = PastelSky,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                             fontSize = 9.sp
+                                        )
+                                    }
+                                }
+                                if (isTechMode) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = PastelMint.copy(alpha = 0.12f),
+                                        border = BorderStroke(0.5.dp, PastelMint.copy(alpha = 0.35f))
+                                    ) {
+                                        Text(
+                                            text = String.format("RRF: %.3f", result.hybridScore),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = PastelMint,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            fontSize = 9.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                                         )
                                     }
                                 }

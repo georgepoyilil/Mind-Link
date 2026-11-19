@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mindlink.journal.LocalTechMode
 import com.mindlink.journal.ui.theme.*
 
 @Composable
@@ -28,6 +29,7 @@ fun ReflectionPromptsCard(
 ) {
     if (prompts.isEmpty()) return
 
+    val isTechMode = LocalTechMode.current
     var activeAnsweringIndex by remember { mutableStateOf<Int?>(null) }
     var answerInputText by remember { mutableStateOf("") }
 
@@ -62,7 +64,7 @@ fun ReflectionPromptsCard(
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Evolving Socratic Prompts",
+                            text = if (isTechMode) "Evolving Socratic Prompts" else "💭 Questions for Yourself",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MindTextPrimary
@@ -74,7 +76,7 @@ fun ReflectionPromptsCard(
                             border = BorderStroke(0.5.dp, PastelAmber.copy(alpha = 0.3f))
                         ) {
                             Text(
-                                text = "LIVE CONTEXT",
+                                text = if (isTechMode) "LIVE CONTEXT" else "REFLECT",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = PastelAmber,
@@ -83,7 +85,11 @@ fun ReflectionPromptsCard(
                         }
                     }
                     Text(
-                        text = "Answer any prompt to evolve deeper questions and update your graph",
+                        text = if (isTechMode) {
+                            "Answer any prompt to evolve deeper questions and update your graph"
+                        } else {
+                            "Thoughtful prompts to help you reflect on this entry"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MindTextTertiary
                     )
