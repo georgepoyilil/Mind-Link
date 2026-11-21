@@ -28,6 +28,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
@@ -201,9 +202,14 @@ fun NotesListScreen(
         )
     }
 
+    val isHeaderDark = LocalMindLinkColors.current.isDark
+    val topBarBg = if (MindIsGlassy) {
+        if (isHeaderDark) Color(0xF8070B14) else Color(0xF8E8EEF7)
+    } else MindBackgroundAmoled
+
     Scaffold(
         topBar = {
-            Column(modifier = Modifier.background(if (MindIsGlassy) Color.Transparent else MindBackgroundAmoled)) {
+            Column(modifier = Modifier.background(topBarBg)) {
                 TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -264,7 +270,6 @@ fun NotesListScreen(
                         }
 
                         // 2. Dark / Bright Mode Switch (Right next to card layout switcher)
-                        val isHeaderDark = LocalMindLinkColors.current.isDark
                         val currentAppThemeId by serviceLocator.appTheme.collectAsState()
                         IconButton(onClick = {
                             val targetTheme = if (isHeaderDark) {
@@ -488,6 +493,142 @@ fun NotesListScreen(
                         }
                     }
                 }
+
+                // 4. Horizontal Mood/Pattern Filter Chips (All (39), Reflective, etc.) or Tab Status Banner
+                when (uiState.selectedTab) {
+                    NotesTab.JOURNAL -> {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = uiState.selectedMood == null,
+                                onClick = { viewModel.selectMoodFilter(null) },
+                                label = { Text("All (${uiState.notes.size})") },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = PastelLavender,
+                                    selectedLabelColor = Color.Black,
+                                    containerColor = MindGlassSurface,
+                                    labelColor = MindTextSecondary
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    borderColor = if (uiState.selectedMood == null) PastelLavender else MindGlassBorderSubtle,
+                                    selectedBorderColor = PastelLavender,
+                                    enabled = true,
+                                    selected = uiState.selectedMood == null
+                                ),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+
+                            filterChips.forEach { filter ->
+                                val isSelected = uiState.selectedMood.equals(filter, ignoreCase = true)
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { viewModel.selectMoodFilter(filter) },
+                                    label = { Text(filter) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = PastelLavender,
+                                        selectedLabelColor = Color.Black,
+                                        containerColor = MindGlassSurface,
+                                        labelColor = MindTextSecondary
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        borderColor = if (isSelected) PastelLavender else MindGlassBorderSubtle,
+                                        selectedBorderColor = PastelLavender,
+                                        enabled = true,
+                                        selected = isSelected
+                                    ),
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                            }
+                        }
+                    }
+                    NotesTab.ARCHIVE -> {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = PastelAmber.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, PastelAmber.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Archive, contentDescription = null, tint = PastelAmber, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Archived Thoughts are stored safely outside your active stream",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = PastelAmber,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                    NotesTab.TRASH -> {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = PastelRose.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Schedule, contentDescription = null, tint = PastelRose, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Notes in Trash auto-purge after 30 days",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = PastelRose,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                if (uiState.trashNotes.isNotEmpty()) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = PastelRose.copy(alpha = 0.25f),
+                                        border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.5f)),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { viewModel.emptyTrash() }
+                                    ) {
+                                        Text(
+                                            text = "Empty Trash",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = PastelRose,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Delicate hairline divider at bottom of sticky bar
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(0.6.dp)
+                        .background(if (isHeaderDark) Color(0x22FFFFFF) else Color(0x120F172A))
+                )
             }
         },
         floatingActionButton = {
@@ -548,140 +689,12 @@ fun NotesListScreen(
         },
         containerColor = if (MindIsGlassy) Color.Transparent else MindBackgroundAmoled
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            when (uiState.selectedTab) {
-                NotesTab.JOURNAL -> {
-                    // Filter Chips (Moods + Patterns - Clean Typography)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilterChip(
-                            selected = uiState.selectedMood == null,
-                            onClick = { viewModel.selectMoodFilter(null) },
-                            label = { Text("All (${uiState.notes.size})") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = PastelLavender,
-                                selectedLabelColor = Color.Black,
-                                containerColor = MindGlassSurface,
-                                labelColor = MindTextSecondary
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                borderColor = if (uiState.selectedMood == null) PastelLavender else MindGlassBorderSubtle,
-                                selectedBorderColor = PastelLavender,
-                                enabled = true,
-                                selected = uiState.selectedMood == null
-                            ),
-                            shape = RoundedCornerShape(16.dp)
-                        )
-
-                        filterChips.forEach { filter ->
-                            val isSelected = uiState.selectedMood.equals(filter, ignoreCase = true)
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { viewModel.selectMoodFilter(filter) },
-                                label = { Text(filter) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = PastelLavender,
-                                    selectedLabelColor = Color.Black,
-                                    containerColor = MindGlassSurface,
-                                    labelColor = MindTextSecondary
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(
-                                    borderColor = if (isSelected) PastelLavender else MindGlassBorderSubtle,
-                                    selectedBorderColor = PastelLavender,
-                                    enabled = true,
-                                    selected = isSelected
-                                ),
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                        }
-                    }
-                }
-                NotesTab.ARCHIVE -> {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = PastelAmber.copy(alpha = 0.12f),
-                        border = BorderStroke(1.dp, PastelAmber.copy(alpha = 0.35f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Archive, contentDescription = null, tint = PastelAmber, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Archived Thoughts are stored safely outside your active stream",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = PastelAmber,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-                NotesTab.TRASH -> {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = PastelRose.copy(alpha = 0.12f),
-                        border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.35f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.Schedule, contentDescription = null, tint = PastelRose, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Notes in Trash auto-purge after 30 days",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = PastelRose,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                            if (uiState.trashNotes.isNotEmpty()) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = PastelRose.copy(alpha = 0.25f),
-                                    border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.5f)),
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { viewModel.emptyTrash() }
-                                ) {
-                                    Text(
-                                        text = "Empty Trash",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = PastelRose,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Notes Stream with Active ViewMode
+            // 1. Notes Stream with Active ViewMode
             if (uiState.filteredNotes.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -869,6 +882,25 @@ fun NotesListScreen(
                     }
                 }
             }
+
+            // 2. Ambient Drop Shadow below the All(39) horizontal bar so scrolling looks naturally going under
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(14.dp)
+                    .align(Alignment.TopCenter)
+                    .zIndex(10f)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                if (isHeaderDark) Color(0x80000000) else Color(0x350F172A),
+                                if (isHeaderDark) Color(0x40000000) else Color(0x180F172A),
+                                if (isHeaderDark) Color(0x15000000) else Color(0x060F172A),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
         }
     }
 }

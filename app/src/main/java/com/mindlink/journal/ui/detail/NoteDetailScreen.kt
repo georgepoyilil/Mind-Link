@@ -540,11 +540,13 @@ fun NoteDetailScreen(
                         }
                     }
 
-                    // Tags
+                    // Tags (FlowRow with no-wrap pills)
                     if (note.tags.isNotEmpty()) {
-                        Row(
+                        @OptIn(ExperimentalLayoutApi::class)
+                        FlowRow(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             note.tags.forEach { tag ->
                                 Surface(
@@ -556,7 +558,9 @@ fun NoteDetailScreen(
                                         text = "#$tag",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MindTextSecondary,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             }

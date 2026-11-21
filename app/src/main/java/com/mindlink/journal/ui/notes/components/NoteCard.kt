@@ -187,6 +187,7 @@ fun NoteStandardCard(
                                         modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
                                         fontSize = 10.sp,
                                         maxLines = 1,
+                                        softWrap = false,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
@@ -524,6 +525,7 @@ fun NoteFullWidthCard(
                                         color = if (isDone) MindTextTertiary else MindTextPrimary,
                                         textDecoration = if (isDone) TextDecoration.LineThrough else null,
                                         maxLines = 1,
+                                        softWrap = false,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
@@ -532,26 +534,31 @@ fun NoteFullWidthCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Tags
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    note.tags.take(4).forEach { tag ->
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MindGlassSurfaceVariant,
-                            border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
-                        ) {
-                            Text(
-                                text = "#$tag",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MindTextSecondary,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                fontSize = 11.sp
-                            )
+                // Tags (FlowRow with no-wrap pills)
+                if (note.tags.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        note.tags.take(5).forEach { tag ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MindGlassSurfaceVariant,
+                                border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
+                            ) {
+                                Text(
+                                    text = "#$tag",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MindTextSecondary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
                         }
                     }
                 }
