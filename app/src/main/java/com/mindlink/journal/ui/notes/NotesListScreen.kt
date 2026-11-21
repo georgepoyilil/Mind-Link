@@ -219,25 +219,16 @@ fun NotesListScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
-                                    .background(
-                                        brush = Brush.linearGradient(
-                                            listOf(PastelLavender.copy(alpha = 0.35f), PastelSky.copy(alpha = 0.20f))
-                                        ),
-                                        shape = RoundedCornerShape(9.dp)
-                                    )
-                                    .border(
-                                        width = 1.dp,
-                                        color = PastelLavender.copy(alpha = 0.50f),
-                                        shape = RoundedCornerShape(9.dp)
-                                    ),
+                                    .size(34.dp)
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .background(Color(0xFF0F172A))
+                                    .border(1.dp, PastelLavender.copy(alpha = 0.35f), RoundedCornerShape(9.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Psychology,
-                                    contentDescription = null,
-                                    tint = PastelLavender,
-                                    modifier = Modifier.size(20.dp)
+                                androidx.compose.foundation.Image(
+                                    painter = androidx.compose.ui.res.painterResource(com.mindlink.journal.R.drawable.ic_launcher_foreground),
+                                    contentDescription = "MindLink App Icon",
+                                    modifier = Modifier.size(30.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(10.dp))

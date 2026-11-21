@@ -55,7 +55,10 @@ data class SettingsUiState(
     val lineSpacingMultiplier: Float = 1.45f,
     val googleUser: com.mindlink.journal.data.sync.GoogleUserProfile? = null,
     val syncState: com.mindlink.journal.data.sync.SyncState = com.mindlink.journal.data.sync.SyncState.Idle,
-    val lastBackupTimestamp: Long = 0L
+    val lastBackupTimestamp: Long = 0L,
+    val lastBackupSizeFormatted: String = "",
+    val backupSlots: List<com.mindlink.journal.data.sync.BackupSlotInfo> = emptyList(),
+    val backupFrequency: String = "Daily"
 )
 
 class SettingsViewModel(
@@ -155,7 +158,17 @@ class SettingsViewModel(
             }
             viewModelScope.launch {
                 syncManager.lastBackupTime.collect { time ->
-                    _uiState.update { it.copy(lastBackupTimestamp = time) }
+                    _uiState.update { it.copy(lastBackupTimestamp = time, lastBackupSizeFormatted = syncManager.formattedLastBackupSize) }
+                }
+            }
+            viewModelScope.launch {
+                syncManager.backupSlots.collect { slots ->
+                    _uiState.update { it.copy(backupSlots = slots) }
+                }
+            }
+            viewModelScope.launch {
+                syncManager.backupFrequency.collect { freq ->
+                    _uiState.update { it.copy(backupFrequency = freq) }
                 }
             }
         }
@@ -429,9 +442,14 @@ class SettingsViewModel(
         return ServiceLocator.getInstance(context).googleSyncManager.getSignInIntent()
     }
 
-    fun handleGoogleSignInResult(data: android.content.Intent?) {
-        val context = appContext ?: return
-        ServiceLocator.getInstance(context).googleSyncManager.handleSignInResult(data)
+    fun getAccountChooserIntent(): android.content.Intent? {
+        val context = appContext ?: return null
+        return ServiceLocator.getInstance(context).googleSyncManager.getAccountChooserIntent()
+    }
+
+    fun handleGoogleSignInResult(data: android.content.Intent?): Result<com.mindlink.journal.data.sync.GoogleUserProfile> {
+        val context = appContext ?: return Result.failure(Exception("Context not initialized"))
+        return ServiceLocator.getInstance(context).googleSyncManager.handleSignInResult(data)
     }
 
     fun signOutGoogle() {
@@ -442,7 +460,7 @@ class SettingsViewModel(
     fun backupToGoogleDrive() {
         val context = appContext ?: return
         viewModelScope.launch {
-            ServiceLocator.getInstance(context).googleSyncManager.backupNotesToGoogleDrive()
+            ServiceLocator.getInstance(context).googleSyncManager.createBackup()
         }
     }
 
@@ -450,6 +468,42 @@ class SettingsViewModel(
         val context = appContext ?: return
         viewModelScope.launch {
             ServiceLocator.getInstance(context).googleSyncManager.restoreNotesFromGoogleDrive()
+        }
+    }
+
+    fun restoreFromSlot(slot: Int) {
+        val context = appContext ?: return
+        viewModelScope.launch {
+            ServiceLocator.getInstance(context).googleSyncManager.restoreFromSlot(slot)
+        }
+    }
+
+    fun setBackupFrequency(freq: String) {
+        val context = appContext ?: return
+        ServiceLocator.getInstance(context).googleSyncManager.setBackupFrequency(freq)
+    }
+
+    fun exportSlotToUri(slot: Int, uri: android.net.Uri) {
+        val context = appContext ?: return
+        viewModelScope.launch {
+            try {
+                val outputStream = context.contentResolver.openOutputStream(uri)
+                if (outputStream != null) {
+                    ServiceLocator.getInstance(context).googleSyncManager.exportSlotToStream(slot, outputStream)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun importBackupFromUri(uri: android.net.Uri) {
+        val context = appContext ?: return
+        viewModelScope.launch {
+            try {
+                val inputStream = context.contentResolver.openInputStream(uri)
+                if (inputStream != null) {
+                    ServiceLocator.getInstance(context).googleSyncManager.importFromInputStream(inputStream)
+                }
+            } catch (_: Exception) {}
         }
     }
 
