@@ -79,8 +79,8 @@ fun NoteStandardCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Optional attached image header (Google Keep style)
-            if (note.imageUri != null) {
+            // Optional attached image header (Google Keep style) - hidden if locked
+            if (note.imageUri != null && !note.isLocked) {
                 AsyncImage(
                     model = note.imageUri,
                     contentDescription = "Attached Image",
@@ -97,20 +97,45 @@ fun NoteStandardCard(
                     .fillMaxWidth()
                     .padding(11.dp)
             ) {
-                // Header Row: Mood Chip & Date
+                // Header Row: Mood Chip / Lock Badge & Date
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (note.mood != null) {
+                    if (note.isLocked) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MindIndigo.copy(alpha = 0.16f),
+                            border = BorderStroke(0.6.dp, MindIndigo.copy(alpha = 0.4f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Locked",
+                                    tint = MindIndigo,
+                                    modifier = Modifier.size(10.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = "Locked",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MindIndigo
+                                )
+                            }
+                        }
+                    } else if (note.mood != null) {
                         MoodBadge(mood = note.mood, emoji = note.moodEmoji)
                     } else {
                         Box(modifier = Modifier.width(1.dp))
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (note.audioUri != null) {
+                        if (note.audioUri != null && !note.isLocked) {
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
                                 color = MindGlassButtonContainer,
@@ -150,74 +175,99 @@ fun NoteStandardCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // AI TL;DR or Body Preview (Staggered natural text wrap)
-                Text(
-                    text = note.previewText,
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = cardFont),
-                    color = if (note.summary != null) MindTextSecondary else MindTextTertiary,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                if (note.tags.isNotEmpty() || note.actionItems.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Footer: Action items count + Tags
+                if (note.isLocked) {
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MindGlassSurfaceVariant, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.Fingerprint,
+                            contentDescription = null,
+                            tint = MindTextTertiary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Tap to unlock",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MindTextTertiary,
+                            fontSize = 10.sp
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // AI TL;DR or Body Preview (Staggered natural text wrap)
+                    Text(
+                        text = note.previewText,
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = cardFont),
+                        color = if (note.summary != null) MindTextSecondary else MindTextTertiary,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    if (note.tags.isNotEmpty() || note.actionItems.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Footer: Action items count + Tags
                         Row(
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            note.tags.take(2).forEach { tag ->
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = MindGlassSurfaceVariant,
-                                    border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
-                                ) {
-                                    Text(
-                                        text = "#$tag",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MindTextSecondary,
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                        fontSize = 10.sp,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                note.tags.take(2).forEach { tag ->
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = MindGlassSurfaceVariant,
+                                        border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
+                                    ) {
+                                        Text(
+                                            text = "#$tag",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MindTextSecondary,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                            fontSize = 10.sp,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                        if (note.actionItems.isNotEmpty()) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .background(
-                                        color = PastelMint.copy(alpha = 0.15f),
-                                        shape = RoundedCornerShape(8.dp)
+                            if (note.actionItems.isNotEmpty()) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .background(
+                                            color = PastelMint.copy(alpha = 0.15f),
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.TaskAlt,
+                                        contentDescription = null,
+                                        tint = PastelMint,
+                                        modifier = Modifier.size(11.dp)
                                     )
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.TaskAlt,
-                                    contentDescription = null,
-                                    tint = PastelMint,
-                                    modifier = Modifier.size(11.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = "${note.actionItems.size}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = PastelMint,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 10.sp
-                                )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "${note.actionItems.size}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = PastelMint,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 10.sp
+                                    )
+                                }
                             }
                         }
                     }
@@ -267,11 +317,20 @@ fun NoteCompactItem(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(getMoodColor(note.mood), CircleShape)
-                )
+                if (note.isLocked) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "Locked",
+                        tint = MindIndigo,
+                        modifier = Modifier.size(13.dp)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(getMoodColor(note.mood), CircleShape)
+                    )
+                }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
@@ -284,34 +343,36 @@ fun NoteCompactItem(
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = note.formattedDate,
+                            text = if (note.isLocked) "${note.formattedDate} · 🔒 Protected" else note.formattedDate,
                             style = MaterialTheme.typography.labelSmall,
                             color = MindTextTertiary
                         )
-                        if (note.tags.isNotEmpty()) {
-                            Text(
-                                text = " · #${note.tags.first()}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MindIndigo,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                        if (note.actionItems.isNotEmpty()) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = " · ", style = MaterialTheme.typography.labelSmall, color = MindTextTertiary)
-                                Icon(
-                                    imageVector = Icons.Default.TaskAlt,
-                                    contentDescription = null,
-                                    tint = PastelMint,
-                                    modifier = Modifier.size(11.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
+                        if (!note.isLocked) {
+                            if (note.tags.isNotEmpty()) {
                                 Text(
-                                    text = "${note.actionItems.size}",
+                                    text = " · #${note.tags.first()}",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = PastelMint,
-                                    fontWeight = FontWeight.SemiBold
+                                    color = MindIndigo,
+                                    fontWeight = FontWeight.Medium
                                 )
+                            }
+                            if (note.actionItems.isNotEmpty()) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = " · ", style = MaterialTheme.typography.labelSmall, color = MindTextTertiary)
+                                    Icon(
+                                        imageVector = Icons.Default.TaskAlt,
+                                        contentDescription = null,
+                                        tint = PastelMint,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "${note.actionItems.size}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = PastelMint,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
                         }
                     }
@@ -359,8 +420,8 @@ fun NoteFullWidthCard(
         elevation = CardDefaults.cardElevation(defaultElevation = if (isGlassy) 0.dp else 3.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Optional Header Image
-            if (note.imageUri != null) {
+            // Optional Header Image (hidden if locked)
+            if (note.imageUri != null && !note.isLocked) {
                 AsyncImage(
                     model = note.imageUri,
                     contentDescription = note.imageCaption ?: note.title,
@@ -372,18 +433,43 @@ fun NoteFullWidthCard(
             }
 
             Column(modifier = Modifier.padding(14.dp)) {
-                // Header: Mood badge & Date
+                // Header: Mood badge / Lock & Date
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (note.mood != null) {
+                    if (note.isLocked) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MindIndigo.copy(alpha = 0.16f),
+                            border = BorderStroke(0.6.dp, MindIndigo.copy(alpha = 0.4f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Locked",
+                                    tint = MindIndigo,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Protected Thought",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MindIndigo
+                                )
+                            }
+                        }
+                    } else if (note.mood != null) {
                         MoodBadge(mood = note.mood, emoji = note.moodEmoji)
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (note.audioUri != null) {
+                        if (note.audioUri != null && !note.isLocked) {
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
                                 color = MindGlassButtonContainer,
@@ -429,79 +515,107 @@ fun NoteFullWidthCard(
                     color = MindTextPrimary
                 )
 
-                // Image Caption if present
-                if (!note.imageCaption.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Image,
-                            contentDescription = null,
-                            tint = PastelSky,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = note.imageCaption,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = PastelSky,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Full Preview or Summary
-                Text(
-                    text = note.previewText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MindTextSecondary,
-                    lineHeight = 22.sp
-                )
-
-                // Action items teaser
-                if (note.actionItems.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                if (note.isLocked) {
+                    Spacer(modifier = Modifier.height(10.dp))
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = PastelMint.copy(alpha = 0.12f),
-                        border = BorderStroke(0.5.dp, PastelMint.copy(alpha = 0.35f)),
+                        color = MindIndigo.copy(alpha = 0.10f),
+                        border = BorderStroke(0.6.dp, MindIndigo.copy(alpha = 0.3f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.TaskAlt,
-                                    contentDescription = null,
-                                    tint = PastelMint,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Spacer(modifier = Modifier.width(5.dp))
-                                Text(
-                                    text = "Action Items (${note.actionItems.size})",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = PastelMint,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            note.actionItems.take(2).forEach { rawAction ->
-                                val isDone = rawAction.startsWith("[x] ", ignoreCase = true) || rawAction.startsWith("x ", ignoreCase = true)
-                                val actionText = rawAction
-                                    .removePrefix("[ ] ")
-                                    .removePrefix("[x] ")
-                                    .removePrefix("[X] ")
-                                    .removePrefix("• ")
-                                    .trim()
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(13.dp)
-                                            .clip(RoundedCornerShape(3.5.dp))
-                                            .background(if (isDone) PastelMint.copy(alpha = 0.25f) else Color.Transparent)
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Fingerprint,
+                                contentDescription = null,
+                                tint = MindIndigo,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Biometric protected thought. Tap to unlock.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MindIndigo,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                } else {
+                    // Image Caption if present
+                    if (!note.imageCaption.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                tint = PastelSky,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = note.imageCaption,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = PastelSky,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Full Preview or Summary
+                    Text(
+                        text = note.previewText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MindTextSecondary,
+                        lineHeight = 22.sp
+                    )
+
+                    // Action items teaser
+                    if (note.actionItems.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = PastelMint.copy(alpha = 0.12f),
+                            border = BorderStroke(0.5.dp, PastelMint.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.TaskAlt,
+                                        contentDescription = null,
+                                        tint = PastelMint,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = "Action Items (${note.actionItems.size})",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = PastelMint,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                note.actionItems.take(2).forEach { rawAction ->
+                                    val isDone = rawAction.startsWith("[x] ", ignoreCase = true) || rawAction.startsWith("x ", ignoreCase = true)
+                                    val actionText = rawAction
+                                        .removePrefix("[ ] ")
+                                        .removePrefix("[x] ")
+                                        .removePrefix("[X] ")
+                                        .removePrefix("• ")
+                                        .trim()
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(vertical = 2.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(13.dp)
+                                                .clip(RoundedCornerShape(3.5.dp))
+                                                .background(if (isDone) PastelMint.copy(alpha = 0.25f) else Color.Transparent)
                                             .border(
                                                 width = 1.2.dp,
                                                 color = if (isDone) PastelMint else MindTextTertiary,
@@ -562,6 +676,7 @@ fun NoteFullWidthCard(
                         }
                     }
                 }
+            }
             }
         }
     }

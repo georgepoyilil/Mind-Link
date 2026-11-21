@@ -27,7 +27,7 @@ import com.mindlink.journal.data.local.entity.NoteVersionEntity
         NoteLinkEntity::class,
         NoteVersionEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -101,6 +101,14 @@ abstract class MindLinkDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE notes ADD COLUMN isLocked INTEGER NOT NULL DEFAULT 0")
+                } catch (_: Exception) {}
+            }
+        }
+
         fun getInstance(context: Context): MindLinkDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -108,7 +116,7 @@ abstract class MindLinkDatabase : RoomDatabase() {
                     MindLinkDatabase::class.java,
                     "mindlink_database"
                 )
-                    .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_5_7, MIGRATION_7_8)
+                    .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_5_7, MIGRATION_7_8, MIGRATION_8_9)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

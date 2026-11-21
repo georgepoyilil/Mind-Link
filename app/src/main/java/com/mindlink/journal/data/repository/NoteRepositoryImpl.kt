@@ -520,4 +520,8 @@ class NoteRepositoryImpl(
         noteDao.updateNote(restoredEntity)
         Note.fromEntity(restoredEntity)
     }
+
+    override suspend fun updateLockStatus(id: Long, isLocked: Boolean): Unit = withContext(Dispatchers.IO) {
+        noteDao.updateLockStatus(id, isLocked)
+    }
 }

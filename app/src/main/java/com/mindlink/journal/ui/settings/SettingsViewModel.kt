@@ -52,7 +52,10 @@ data class SettingsUiState(
     val isTechMode: Boolean = false,
     val appTheme: String = "amoled_black",
     val showEmojis: Boolean = true,
-    val lineSpacingMultiplier: Float = 1.45f
+    val lineSpacingMultiplier: Float = 1.45f,
+    val googleUser: com.mindlink.journal.data.sync.GoogleUserProfile? = null,
+    val syncState: com.mindlink.journal.data.sync.SyncState = com.mindlink.journal.data.sync.SyncState.Idle,
+    val lastBackupTimestamp: Long = 0L
 )
 
 class SettingsViewModel(
@@ -136,6 +139,23 @@ class SettingsViewModel(
                         }
                         else -> {}
                     }
+                }
+            }
+
+            val syncManager = ServiceLocator.getInstance(appContext).googleSyncManager
+            viewModelScope.launch {
+                syncManager.currentUser.collect { user ->
+                    _uiState.update { it.copy(googleUser = user) }
+                }
+            }
+            viewModelScope.launch {
+                syncManager.syncState.collect { state ->
+                    _uiState.update { it.copy(syncState = state) }
+                }
+            }
+            viewModelScope.launch {
+                syncManager.lastBackupTime.collect { time ->
+                    _uiState.update { it.copy(lastBackupTimestamp = time) }
                 }
             }
         }
@@ -402,6 +422,40 @@ class SettingsViewModel(
                 )
             }
         }
+    }
+
+    fun getGoogleSignInIntent(): android.content.Intent? {
+        val context = appContext ?: return null
+        return ServiceLocator.getInstance(context).googleSyncManager.getSignInIntent()
+    }
+
+    fun handleGoogleSignInResult(data: android.content.Intent?) {
+        val context = appContext ?: return
+        ServiceLocator.getInstance(context).googleSyncManager.handleSignInResult(data)
+    }
+
+    fun signOutGoogle() {
+        val context = appContext ?: return
+        ServiceLocator.getInstance(context).googleSyncManager.signOut {}
+    }
+
+    fun backupToGoogleDrive() {
+        val context = appContext ?: return
+        viewModelScope.launch {
+            ServiceLocator.getInstance(context).googleSyncManager.backupNotesToGoogleDrive()
+        }
+    }
+
+    fun restoreFromGoogleDrive() {
+        val context = appContext ?: return
+        viewModelScope.launch {
+            ServiceLocator.getInstance(context).googleSyncManager.restoreNotesFromGoogleDrive()
+        }
+    }
+
+    fun clearSyncState() {
+        val context = appContext ?: return
+        ServiceLocator.getInstance(context).googleSyncManager.clearSyncState()
     }
 
     class Factory(

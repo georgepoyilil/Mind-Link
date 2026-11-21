@@ -2,7 +2,7 @@ package com.mindlink.journal
 
 import android.app.Activity
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
@@ -21,7 +21,7 @@ import com.mindlink.journal.ui.theme.MindTheme
 
 val LocalTechMode = compositionLocalOf { false }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

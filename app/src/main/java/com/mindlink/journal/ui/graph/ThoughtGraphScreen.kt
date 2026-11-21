@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -56,22 +57,32 @@ fun ThoughtGraphScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = if (isTechMode) "Synaptic Network (Inspector)" else "🌌 Thought Constellation",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = MindTextPrimary
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(com.mindlink.journal.R.drawable.ic_thought_constellation),
+                            contentDescription = "Thought Constellation",
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
                         )
-                        Text(
-                            text = if (isTechMode) {
-                                "${uiState.graph.totalThoughts} nodes · ${uiState.graph.totalSynapses} edges · 384-d Cosine"
-                            } else {
-                                "${uiState.graph.totalThoughts} connected memories"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isTechMode) PastelSky else MindTextSecondary
-                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = if (isTechMode) "Synaptic Network (Inspector)" else "Thought Constellation",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = MindTextPrimary
+                            )
+                            Text(
+                                text = if (isTechMode) {
+                                    "${uiState.graph.totalThoughts} nodes · ${uiState.graph.totalSynapses} edges · 384-d Cosine"
+                                } else {
+                                    "${uiState.graph.totalThoughts} connected memories"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isTechMode) PastelSky else MindTextSecondary
+                            )
+                        }
                     }
                 },
                 navigationIcon = {

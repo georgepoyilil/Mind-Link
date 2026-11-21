@@ -280,6 +280,17 @@ class NoteDetailViewModel(
         _uiState.update { it.copy(transcribeError = null) }
     }
 
+    fun toggleLockStatus(onChanged: (Boolean) -> Unit = {}) {
+        val current = _uiState.value.note ?: return
+        val newLockState = !current.isLocked
+        val updated = current.copy(isLocked = newLockState, updatedAt = System.currentTimeMillis())
+        _uiState.update { it.copy(note = updated) }
+        viewModelScope.launch {
+            repository.updateLockStatus(noteId, newLockState)
+            onChanged(newLockState)
+        }
+    }
+
     class Factory(
         private val repository: NoteRepository,
         private val noteId: Long

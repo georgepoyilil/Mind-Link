@@ -10,4 +10,5 @@
     <color name="mind_primary">#6366F1</color>
     <color name="mind_secondary">#8B5CF6</color>
     <color name="mind_dark_bg">#0F172A</color>
+    <color name="mind_icon_bg">#070C14</color>
 </resources>

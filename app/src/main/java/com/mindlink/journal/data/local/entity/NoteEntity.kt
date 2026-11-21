@@ -34,5 +34,7 @@ data class NoteEntity(
     @ColumnInfo(defaultValue = "'Sans'")
     val fontFamily: String = "Sans",
     @ColumnInfo(defaultValue = "NULL")
-    val fontSizeScale: Float? = null
+    val fontSizeScale: Float? = null,
+    @ColumnInfo(defaultValue = "0")
+    val isLocked: Boolean = false
 )

@@ -45,6 +45,12 @@ fun SettingsScreen(
     var showUserGuideDialog by remember { mutableStateOf(false) }
     var showOnboardingDialog by remember { mutableStateOf(false) }
 
+    val googleSignInLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        viewModel.handleGoogleSignInResult(result.data)
+    }
+
     if (showUserGuideDialog) {
         MindLinkUserGuideDialog(onDismiss = { showUserGuideDialog = false })
     }
@@ -971,6 +977,234 @@ fun SettingsScreen(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+            }
+
+            // Google Cloud SSO & Drive Backup Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = if (isSettingsGlassy) Color.Transparent else MindSurfaceDark),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .liquidGlass(
+                        shape = RoundedCornerShape(16.dp),
+                        cornerRadius = 16.dp,
+                        isGlassy = isSettingsGlassy,
+                        isDark = isSettingsDark,
+                        cardBackground = MindGlassCardBackground,
+                        cardBorder = MindGlassCardBorder
+                    )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudSync,
+                            contentDescription = "Cloud Backup",
+                            tint = PastelSky,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Google Cloud & Drive Backup",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MindTextPrimary
+                            )
+                            Text(
+                                text = if (uiState.googleUser != null) "Connected: ${uiState.googleUser?.email}" else "Sign in to backup to private Google Drive",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (uiState.googleUser != null) PastelMint else MindTextSecondary
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (uiState.googleUser == null) {
+                        Text(
+                            text = "Back up all your thoughts, tags, audio durations, and AI summaries securely to your personal Google Drive (AppData).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MindTextSecondary,
+                            lineHeight = 18.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = {
+                                val intent = viewModel.getGoogleSignInIntent()
+                                if (intent != null) {
+                                    googleSignInLauncher.launch(intent)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.White,
+                                contentColor = Color(0xFF1F1F1F)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AccountCircle,
+                                contentDescription = null,
+                                tint = Color(0xFF4285F4),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Sign in with Google",
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1F1F1F)
+                            )
+                        }
+                    } else {
+                        val user = uiState.googleUser!!
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MindGlassSurface,
+                            border = BorderStroke(1.dp, MindGlassBorderSubtle),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = PastelSky.copy(alpha = 0.2f),
+                                    border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.4f)),
+                                    modifier = Modifier.size(40.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = user.displayName.take(1).uppercase(),
+                                            fontWeight = FontWeight.Bold,
+                                            color = PastelSky,
+                                            fontSize = 18.sp
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = user.displayName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MindTextPrimary
+                                    )
+                                    Text(
+                                        text = user.email,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MindTextSecondary
+                                    )
+                                }
+                                TextButton(onClick = { viewModel.signOutGoogle() }) {
+                                    Text("Sign Out", color = PastelRose, fontSize = 12.sp)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        val formattedBackupTime = remember(uiState.lastBackupTimestamp) {
+                            if (uiState.lastBackupTimestamp <= 0) "Never backed up"
+                            else java.text.SimpleDateFormat("MMM d, yyyy · h:mm a", java.util.Locale.getDefault()).format(java.util.Date(uiState.lastBackupTimestamp))
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Last Drive Backup:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MindTextTertiary
+                            )
+                            Text(
+                                text = formattedBackupTime,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (uiState.lastBackupTimestamp > 0) PastelMint else MindTextTertiary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Backup and Restore Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Button(
+                                onClick = { viewModel.backupToGoogleDrive() },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = PastelSky,
+                                    contentColor = MindBackgroundDark
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                enabled = uiState.syncState !is com.mindlink.journal.data.sync.SyncState.Syncing
+                            ) {
+                                Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Backup Now", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = { viewModel.restoreFromGoogleDrive() },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelLavender),
+                                border = BorderStroke(1.dp, PastelLavender.copy(alpha = 0.5f)),
+                                shape = RoundedCornerShape(10.dp),
+                                enabled = uiState.syncState !is com.mindlink.journal.data.sync.SyncState.Syncing
+                            ) {
+                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Restore", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            }
+                        }
+
+                        // Sync State Banner
+                        when (val sync = uiState.syncState) {
+                            is com.mindlink.journal.data.sync.SyncState.Syncing -> {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = PastelSky, strokeWidth = 2.dp)
+                                    Text(text = sync.message, style = MaterialTheme.typography.bodySmall, color = PastelSky)
+                                }
+                            }
+                            is com.mindlink.journal.data.sync.SyncState.Success -> {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MindEmerald, modifier = Modifier.size(16.dp))
+                                    Text(text = sync.message, style = MaterialTheme.typography.bodySmall, color = MindEmerald)
+                                }
+                            }
+                            is com.mindlink.journal.data.sync.SyncState.Error -> {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = PastelRose, modifier = Modifier.size(16.dp))
+                                    Text(text = sync.error, style = MaterialTheme.typography.bodySmall, color = PastelRose)
+                                }
+                            }
+                            com.mindlink.journal.data.sync.SyncState.Idle -> {}
+                        }
+                    }
                 }
             }
 

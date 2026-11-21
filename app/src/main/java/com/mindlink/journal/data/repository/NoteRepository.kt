@@ -35,6 +35,9 @@ interface NoteRepository {
     suspend fun rebuildSynapticGraph()
     fun getSynapseCount(): Flow<Int>
 
+    // Note Lock Protection (Biometrics)
+    suspend fun updateLockStatus(id: Long, isLocked: Boolean)
+
     // Audio Transcription
     suspend fun transcribeAudioFile(file: java.io.File): Result<String>
 

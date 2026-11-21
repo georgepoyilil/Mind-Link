@@ -57,6 +57,12 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 
+# Biometrics
+androidx-biometric = { group = "androidx.biometric", name = "biometric", version = "1.2.0-alpha05" }
+
+# Google Sign-In & Auth
+play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version = "21.0.0" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

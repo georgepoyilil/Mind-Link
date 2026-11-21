@@ -12,8 +12,8 @@ android {
         applicationId = "com.mindlink.journal"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 4
+        versionName = "1.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -22,6 +22,10 @@ android {
 
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
+        }
+
+        ndk {
+            abiFilters += listOf("arm64-v8a")
         }
     }
 
@@ -128,6 +132,12 @@ dependencies {
 
     // Security & EncryptedSharedPreferences for API Keys
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // Biometric Authentication (Fingerprint & Device PIN)
+    implementation(libs.androidx.biometric)
+
+    // Google Sign-In & Auth
+    implementation(libs.play.services.auth)
 
     // Testing
     testImplementation(libs.junit)

@@ -25,7 +25,9 @@ data class NotesUiState(
     val selectedMood: String? = null,
     val searchQuery: String = "",
     val isLoading: Boolean = true,
-    val showOnboarding: Boolean = false
+    val showOnboarding: Boolean = false,
+    val availableUpdate: com.mindlink.journal.data.ota.AppReleaseInfo? = null,
+    val isOtaDismissed: Boolean = false
 )
 
 class NotesViewModel(
@@ -166,6 +168,24 @@ class NotesViewModel(
 
     fun showOnboarding() {
         _uiState.update { it.copy(showOnboarding = true) }
+    }
+
+    fun checkForOtaUpdates(context: android.content.Context) {
+        viewModelScope.launch {
+            try {
+                val otaManager = com.mindlink.journal.data.ota.OtaUpdateManager(context)
+                val result = otaManager.checkForUpdates()
+                result.onSuccess { info ->
+                    if (info != null && info.isNewer) {
+                        _uiState.update { it.copy(availableUpdate = info) }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun dismissOtaUpdate() {
+        _uiState.update { it.copy(isOtaDismissed = true) }
     }
 
     private fun applyFilter(notes: List<Note>, mood: String?, query: String): List<Note> {

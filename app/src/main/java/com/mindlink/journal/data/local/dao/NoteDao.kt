@@ -91,4 +91,10 @@ interface NoteDao {
 
     @Query("SELECT COUNT(*) FROM notes WHERE isDeleted = 1")
     fun getTrashCount(): Flow<Int>
+
+    @Query("UPDATE notes SET isLocked = :isLocked, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateLockStatus(id: Long, isLocked: Boolean, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("SELECT * FROM notes ORDER BY createdAt DESC")
+    suspend fun getAllNotesListSync(): List<NoteEntity>
 }

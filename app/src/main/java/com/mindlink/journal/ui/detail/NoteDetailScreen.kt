@@ -150,6 +150,38 @@ fun NoteDetailScreen(
                                 Icon(Icons.Default.History, contentDescription = "Version History & Diff", tint = PastelLavender)
                             }
 
+                            // Biometric Fingerprint Lock / Unlock
+                            IconButton(
+                                onClick = {
+                                    val activity = context as? androidx.fragment.app.FragmentActivity
+                                    if (note.isLocked) {
+                                        if (activity != null && com.mindlink.journal.ui.security.BiometricHelper.canAuthenticate(context)) {
+                                            com.mindlink.journal.ui.security.BiometricHelper.authenticate(
+                                                activity = activity,
+                                                title = "Unlock Thought",
+                                                subtitle = "Verify fingerprint to remove lock",
+                                                onSuccess = {
+                                                    viewModel.toggleLockStatus()
+                                                    Toast.makeText(context, "Lock removed", Toast.LENGTH_SHORT).show()
+                                                }
+                                            )
+                                        } else {
+                                            viewModel.toggleLockStatus()
+                                            Toast.makeText(context, "Lock removed", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        viewModel.toggleLockStatus()
+                                        Toast.makeText(context, "Thought locked with fingerprint", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = if (note.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                    contentDescription = if (note.isLocked) "Locked (Protected)" else "Lock Note",
+                                    tint = if (note.isLocked) PastelRose else PastelLavender
+                                )
+                            }
+
                             // Font Size Override Menu
                             var showFontSizeMenu by remember { mutableStateOf(false) }
                             Box {
@@ -278,6 +310,42 @@ fun NoteDetailScreen(
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
+                            }
+                        }
+                    }
+
+                    if (note.isLocked) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MindIndigo.copy(alpha = 0.14f),
+                            border = BorderStroke(1.dp, MindIndigo.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Fingerprint,
+                                    contentDescription = null,
+                                    tint = MindIndigo,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Fingerprint Protected",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MindIndigo
+                                    )
+                                    Text(
+                                        text = "This thought is secured. In note lists, only the heading is visible.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MindTextSecondary,
+                                        fontSize = 11.5.sp
+                                    )
+                                }
                             }
                         }
                     }

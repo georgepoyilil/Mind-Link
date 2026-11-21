@@ -89,6 +89,10 @@ fun NotesListScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.checkForOtaUpdates(context)
+    }
+
     val filterChips = listOf(
         "Reflective",
         "Analytical",
@@ -302,11 +306,12 @@ fun NotesListScreen(
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Hub,
-                                    contentDescription = "Synaptic Intelligence Graph",
-                                    tint = if (isHeaderDark) Color(0xFFA5B4FC) else Color(0xFF4F46E5),
-                                    modifier = Modifier.size(19.dp)
+                                androidx.compose.foundation.Image(
+                                    painter = androidx.compose.ui.res.painterResource(com.mindlink.journal.R.drawable.ic_thought_constellation),
+                                    contentDescription = "Thought Constellation",
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
                                 )
                             }
                         }
@@ -622,6 +627,93 @@ fun NotesListScreen(
                     }
                 }
 
+                // 5. In-App OTA Update Notification Banner
+                AnimatedVisibility(
+                    visible = uiState.availableUpdate != null && !uiState.isOtaDismissed,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    val update = uiState.availableUpdate
+                    if (update != null) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MindGlassSurface,
+                            border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.SystemUpdate,
+                                        contentDescription = "New Release",
+                                        tint = PastelSky,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "MindLink ${update.tagName} Available",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MindTextPrimary,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(
+                                        onClick = { viewModel.dismissOtaUpdate() },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Dismiss",
+                                            tint = MindTextTertiary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = update.changelog.ifBlank { "New version available with speed and security optimizations." },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MindTextSecondary,
+                                    maxLines = 2,
+                                    fontSize = 11.5.sp
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    TextButton(
+                                        onClick = { viewModel.dismissOtaUpdate() },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("Later", fontSize = 11.sp, color = MindTextTertiary)
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Button(
+                                        onClick = { onSettingsClick() },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = PastelSky,
+                                            contentColor = MindBackgroundDark
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(13.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Update", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Delicate hairline divider at bottom of sticky bar
                 Box(
                     modifier = Modifier
@@ -795,7 +887,23 @@ fun NotesListScreen(
                             NoteCard(
                                 note = note,
                                 viewMode = viewMode,
-                                onClick = { onNoteClick(note.id) }
+                                onClick = {
+                                    if (note.isLocked) {
+                                        val activity = context as? androidx.fragment.app.FragmentActivity
+                                        if (activity != null && com.mindlink.journal.ui.security.BiometricHelper.canAuthenticate(context)) {
+                                            com.mindlink.journal.ui.security.BiometricHelper.authenticate(
+                                                activity = activity,
+                                                title = "Unlock \"${note.title.ifBlank { "Protected Thought" }}\"",
+                                                subtitle = "Scan fingerprint to access this thought",
+                                                onSuccess = { onNoteClick(note.id) }
+                                            )
+                                        } else {
+                                            onNoteClick(note.id)
+                                        }
+                                    } else {
+                                        onNoteClick(note.id)
+                                    }
+                                }
                             )
 
                             // Quick actions under cards for Trash or Archive

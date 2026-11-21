@@ -25,7 +25,8 @@ data class Note(
     val isDeleted: Boolean = false,
     val deletedAt: Long? = null,
     val fontFamily: String = "Sans",
-    val fontSizeScale: Float? = null
+    val fontSizeScale: Float? = null,
+    val isLocked: Boolean = false
 ) {
     val formattedDate: String
         get() = dateCache.get()?.format(Date(createdAt)) ?: ""
@@ -91,7 +92,8 @@ data class Note(
             isDeleted = isDeleted,
             deletedAt = deletedAt,
             fontFamily = fontFamily,
-            fontSizeScale = fontSizeScale
+            fontSizeScale = fontSizeScale,
+            isLocked = isLocked
         )
     }
 
@@ -125,7 +127,8 @@ data class Note(
                 isDeleted = entity.isDeleted,
                 deletedAt = entity.deletedAt,
                 fontFamily = entity.fontFamily,
-                fontSizeScale = entity.fontSizeScale
+                fontSizeScale = entity.fontSizeScale,
+                isLocked = entity.isLocked
             )
         }
     }

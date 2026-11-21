@@ -165,6 +165,14 @@ class ServiceLocator private constructor(context: Context) {
         )
     }
 
+    val appUpdateManager: com.mindlink.journal.data.update.AppUpdateManager by lazy {
+        com.mindlink.journal.data.update.AppUpdateManager(applicationContext)
+    }
+
+    val googleSyncManager: com.mindlink.journal.data.sync.GoogleSyncManager by lazy {
+        com.mindlink.journal.data.sync.GoogleSyncManager(applicationContext, database.noteDao())
+    }
+
     companion object {
         const val PREF_GEMINI_API_KEY = "pref_gemini_api_key"
         const val PREF_ON_DEVICE_ONLY = "pref_on_device_only"
