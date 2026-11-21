@@ -43,6 +43,7 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     var isKeyVisible by remember { mutableStateOf(false) }
     var isThemeCardExpanded by rememberSaveable { mutableStateOf(false) }
+    var isBackupCardExpanded by rememberSaveable { mutableStateOf(false) }
     var showUserGuideDialog by remember { mutableStateOf(false) }
     var showOnboardingDialog by remember { mutableStateOf(false) }
 
@@ -67,7 +68,7 @@ fun SettingsScreen(
     }
 
     val saveToDriveLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+        contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         if (uri != null) {
             viewModel.exportSlotToUri(1, uri)
@@ -1011,7 +1012,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Google Cloud SSO & Drive Backup Card
+            // Google Cloud SSO & Drive Backup Card (Simpler & Minimizable)
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = if (isSettingsGlassy) Color.Transparent else MindSurfaceDark),
@@ -1027,423 +1028,504 @@ fun SettingsScreen(
                     )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    // 1. Minimizable Card Header Row
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { isBackupCardExpanded = !isBackupCardExpanded },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CloudSync,
-                            contentDescription = "Cloud Backup",
-                            tint = PastelSky,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Google Cloud & Drive Backup",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MindTextPrimary
-                            )
-                            Text(
-                                text = if (uiState.googleUser != null) "Connected: ${uiState.googleUser?.email}" else "Sign in to backup to Google Drive",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (uiState.googleUser != null) PastelMint else MindTextSecondary
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    if (uiState.googleUser == null) {
-                        Text(
-                            text = "Back up all your thoughts, tags, audio durations, and AI summaries securely to Google Drive. Keeps 3 redundant rolling snapshots for instant recovery.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MindTextSecondary,
-                            lineHeight = 18.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Button(
-                            onClick = {
-                                val intent = viewModel.getAccountChooserIntent()
-                                if (intent != null) {
-                                    accountChooserLauncher.launch(intent)
-                                } else {
-                                    val gIntent = viewModel.getGoogleSignInIntent()
-                                    if (gIntent != null) googleSignInLauncher.launch(gIntent)
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.White,
-                                contentColor = Color(0xFF1F1F1F)
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = null,
-                                tint = Color(0xFF4285F4),
-                                modifier = Modifier.size(22.dp)
+                                imageVector = Icons.Default.CloudSync,
+                                contentDescription = "Cloud Backup",
+                                tint = PastelSky,
+                                modifier = Modifier.size(24.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Sign in with Google",
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1F1F1F)
-                            )
-                        }
-                    } else {
-                        val user = uiState.googleUser!!
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MindGlassSurface,
-                            border = BorderStroke(1.dp, MindGlassBorderSubtle),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = PastelSky.copy(alpha = 0.2f),
-                                    border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.4f)),
-                                    modifier = Modifier.size(42.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = user.displayName.take(1).uppercase(),
-                                            fontWeight = FontWeight.Bold,
-                                            color = PastelSky,
-                                            fontSize = 18.sp
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = user.displayName,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MindTextPrimary
-                                    )
-                                    Text(
-                                        text = user.email,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MindTextSecondary
-                                    )
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(top = 2.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(6.dp)
-                                                .clip(CircleShape)
-                                                .background(MindEmerald)
-                                        )
-                                        Spacer(modifier = Modifier.width(5.dp))
-                                        Text(
-                                            text = "Connected Google Account",
-                                            fontSize = 11.sp,
-                                            color = PastelMint,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    TextButton(
-                                        onClick = {
-                                            val chooser = viewModel.getAccountChooserIntent()
-                                            if (chooser != null) accountChooserLauncher.launch(chooser)
-                                        },
-                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text("Switch", color = PastelSky, fontSize = 12.sp)
-                                    }
-                                    TextButton(
-                                        onClick = { viewModel.signOutGoogle() },
-                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text("Sign Out", color = PastelRose, fontSize = 12.sp)
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        val formattedBackupTime = remember(uiState.lastBackupTimestamp) {
-                            if (uiState.lastBackupTimestamp <= 0) "Never backed up"
-                            else java.text.SimpleDateFormat("MMM d, yyyy · h:mm a", java.util.Locale.getDefault()).format(java.util.Date(uiState.lastBackupTimestamp))
-                        }
-
-                        // Backed up status badge and size
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (uiState.lastBackupTimestamp > 0) MindEmerald.copy(alpha = 0.08f) else MindBorderDark.copy(alpha = 0.3f),
-                            border = BorderStroke(1.dp, if (uiState.lastBackupTimestamp > 0) MindEmerald.copy(alpha = 0.25f) else MindBorderDark),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = if (uiState.lastBackupTimestamp > 0) MindEmerald.copy(alpha = 0.2f) else PastelAmber.copy(alpha = 0.2f),
-                                        modifier = Modifier.padding(end = 8.dp)
-                                    ) {
-                                        Text(
-                                            text = if (uiState.lastBackupTimestamp > 0) "✓ Backed Up" else "Pending Backup",
-                                            color = if (uiState.lastBackupTimestamp > 0) MindEmerald else PastelAmber,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = formattedBackupTime,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MindTextSecondary,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                if (uiState.lastBackupSizeFormatted.isNotBlank()) {
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = PastelSky.copy(alpha = 0.15f),
-                                        border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.3f))
-                                    ) {
-                                        Text(
-                                            text = uiState.lastBackupSizeFormatted,
-                                            color = PastelSky,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Backup Frequency Selector
-                        Text(
-                            text = "Backup Frequency",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MindTextPrimary
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        val frequencyOptions = listOf("Daily", "Weekly", "On Launch", "Manual")
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            frequencyOptions.forEach { freq ->
-                                val isSelected = uiState.backupFrequency == freq
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isSelected) PastelSky.copy(alpha = 0.22f) else MindGlassSurface,
-                                    border = BorderStroke(
-                                        1.dp,
-                                        if (isSelected) PastelSky else MindBorderDark.copy(alpha = 0.5f)
-                                    ),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable { viewModel.setBackupFrequency(freq) }
-                                ) {
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier.padding(vertical = 7.dp)
-                                    ) {
-                                        Text(
-                                            text = freq,
-                                            color = if (isSelected) PastelSky else MindTextSecondary,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Primary Action Buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Button(
-                                onClick = { viewModel.backupToGoogleDrive() },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = PastelSky,
-                                    contentColor = MindBackgroundDark
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                enabled = uiState.syncState !is com.mindlink.journal.data.sync.SyncState.Syncing
-                            ) {
-                                Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Backup Now", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
-
-                            OutlinedButton(
-                                onClick = { viewModel.restoreFromGoogleDrive() },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelLavender),
-                                border = BorderStroke(1.dp, PastelLavender.copy(alpha = 0.5f)),
-                                shape = RoundedCornerShape(10.dp),
-                                enabled = uiState.syncState !is com.mindlink.journal.data.sync.SyncState.Syncing && uiState.backupSlots.isNotEmpty()
-                            ) {
-                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Restore Latest", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Secondary Action Buttons (Storage Access Framework)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    val dateStr = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
-                                    saveToDriveLauncher.launch("mindlink_backup_$dateStr.json")
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MindTextSecondary),
-                                border = BorderStroke(1.dp, MindBorderDark),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Text("Save to Drive (SAF)", fontSize = 11.sp, maxLines = 1)
-                            }
-
-                            OutlinedButton(
-                                onClick = {
-                                    restoreFromPickerLauncher.launch(arrayOf("application/json", "*/*"))
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MindTextSecondary),
-                                border = BorderStroke(1.dp, MindBorderDark),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Text("Restore from File", fontSize = 11.sp, maxLines = 1)
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Redundant Backups (3 Rolling Slots) Section
-                        HorizontalDivider(
-                            modifier = Modifier.fillMaxWidth(),
-                            thickness = 1.dp,
-                            color = MindBorderDark.copy(alpha = 0.5f)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
                             Column {
                                 Text(
-                                    text = "Redundant Backups (3 Slots)",
-                                    style = MaterialTheme.typography.titleSmall,
+                                    text = "Google Cloud & Drive Backup",
+                                    style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MindTextPrimary
                                 )
                                 Text(
-                                    text = "Keeps 3 rolling snapshots for error redundancy",
+                                    text = if (uiState.googleUser != null) "Connected: ${uiState.googleUser?.email}" else "Sign in to backup to Google Drive",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MindTextSecondary,
-                                    fontSize = 11.sp
+                                    color = if (uiState.googleUser != null) PastelMint else MindTextSecondary
                                 )
                             }
                         }
+                        IconButton(onClick = { isBackupCardExpanded = !isBackupCardExpanded }) {
+                            Icon(
+                                imageVector = if (isBackupCardExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (isBackupCardExpanded) "Minimize" else "Expand",
+                                tint = MindTextSecondary
+                            )
+                        }
+                    }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                        // 3 Slots Column
-                        for (slotNum in 1..3) {
-                            val slotInfo = uiState.backupSlots.firstOrNull { it.slot == slotNum }
-                            val slotLabel = when (slotNum) {
-                                1 -> "Slot 1 (Latest)"
-                                2 -> "Slot 2 (Previous)"
-                                else -> "Slot 3 (Oldest)"
+                    // 2. Default Visible Summary (Account & Backed Up Time)
+                    val formattedBackupTime = remember(uiState.lastBackupTimestamp) {
+                        if (uiState.lastBackupTimestamp <= 0) "Never backed up"
+                        else java.text.SimpleDateFormat("MMM d, yyyy · h:mm a", java.util.Locale.getDefault()).format(java.util.Date(uiState.lastBackupTimestamp))
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MindGlassSurface,
+                        border = BorderStroke(1.dp, MindBorderDark.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isBackupCardExpanded = !isBackupCardExpanded }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            // Account Section
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                if (uiState.googleUser != null) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = PastelSky.copy(alpha = 0.2f),
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = uiState.googleUser!!.displayName.take(1).uppercase(),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = PastelSky
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = uiState.googleUser!!.email,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MindTextPrimary,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.AccountCircle,
+                                        contentDescription = null,
+                                        tint = MindTextTertiary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Not Signed In",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MindTextSecondary
+                                    )
+                                }
                             }
 
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = MindGlassSurface,
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (slotInfo != null) MindBorderDark else MindBorderDark.copy(alpha = 0.3f)
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                            // Backed Up Time & Size Status
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (uiState.lastBackupTimestamp > 0) MindEmerald.copy(alpha = 0.18f) else PastelAmber.copy(alpha = 0.18f),
+                                    modifier = Modifier.padding(end = 6.dp)
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = slotLabel,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (slotInfo != null) PastelSky else MindTextTertiary
-                                            )
-                                            if (slotInfo != null) {
-                                                Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (uiState.lastBackupTimestamp > 0) "✓ Backed Up" else "Pending",
+                                        color = if (uiState.lastBackupTimestamp > 0) MindEmerald else PastelAmber,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 10.sp,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                    )
+                                }
+                                Text(
+                                    text = formattedBackupTime,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MindTextSecondary,
+                                    fontSize = 11.sp
+                                )
+                                if (uiState.lastBackupSizeFormatted.isNotBlank()) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "(${uiState.lastBackupSizeFormatted})",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = PastelSky,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Minimized Part (Reveals on Expanding)
+                    AnimatedVisibility(
+                        visible = isBackupCardExpanded,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column {
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            if (uiState.googleUser == null) {
+                                Text(
+                                    text = "Back up all your thoughts, tags, audio durations, and AI summaries securely to Google Drive. Keeps 3 redundant rolling snapshots for instant recovery.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MindTextSecondary,
+                                    lineHeight = 18.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Button(
+                                    onClick = {
+                                        val intent = viewModel.getAccountChooserIntent()
+                                        if (intent != null) {
+                                            accountChooserLauncher.launch(intent)
+                                        } else {
+                                            val gIntent = viewModel.getGoogleSignInIntent()
+                                            if (gIntent != null) googleSignInLauncher.launch(gIntent)
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color.White,
+                                        contentColor = Color(0xFF1F1F1F)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AccountCircle,
+                                        contentDescription = null,
+                                        tint = Color(0xFF4285F4),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = "Sign in with Google",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF1F1F1F)
+                                    )
+                                }
+                            } else {
+                                val user = uiState.googleUser!!
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MindGlassSurface,
+                                    border = BorderStroke(1.dp, MindGlassBorderSubtle),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = PastelSky.copy(alpha = 0.2f),
+                                            border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.4f)),
+                                            modifier = Modifier.size(42.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
                                                 Text(
-                                                    text = "(${slotInfo.formattedSize})",
-                                                    fontSize = 11.sp,
-                                                    color = PastelMint
+                                                    text = user.displayName.take(1).uppercase(),
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = PastelSky,
+                                                    fontSize = 18.sp
                                                 )
                                             }
                                         }
-                                        Text(
-                                            text = if (slotInfo != null) "${slotInfo.formattedDate} · ${slotInfo.notesCount} thoughts" else "Empty · Next backup will fill",
-                                            fontSize = 11.sp,
-                                            color = if (slotInfo != null) MindTextSecondary else MindTextTertiary
-                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = user.displayName,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MindTextPrimary
+                                            )
+                                            Text(
+                                                text = user.email,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MindTextSecondary
+                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(top = 2.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(6.dp)
+                                                        .clip(CircleShape)
+                                                        .background(MindEmerald)
+                                                )
+                                                Spacer(modifier = Modifier.width(5.dp))
+                                                Text(
+                                                    text = "Connected Google Account",
+                                                    fontSize = 11.sp,
+                                                    color = PastelMint,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        }
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            TextButton(
+                                                onClick = {
+                                                    val chooser = viewModel.getAccountChooserIntent()
+                                                    if (chooser != null) accountChooserLauncher.launch(chooser)
+                                                },
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text("Switch", color = PastelSky, fontSize = 12.sp)
+                                            }
+                                            TextButton(
+                                                onClick = { viewModel.signOutGoogle() },
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text("Sign Out", color = PastelRose, fontSize = 12.sp)
+                                            }
+                                        }
                                     }
+                                }
+                            }
 
-                                    if (slotInfo != null) {
-                                        FilledTonalButton(
-                                            onClick = { viewModel.restoreFromSlot(slotNum) },
-                                            colors = ButtonDefaults.filledTonalButtonColors(
-                                                containerColor = PastelLavender.copy(alpha = 0.15f),
-                                                contentColor = PastelLavender
-                                            ),
-                                            shape = RoundedCornerShape(8.dp),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                            modifier = Modifier.height(30.dp)
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Backup Frequency Selector
+                            Text(
+                                text = "Backup Frequency",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MindTextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            val frequencyOptions = listOf("Daily", "Weekly", "On Launch", "Manual")
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                frequencyOptions.forEach { freq ->
+                                    val isSelected = uiState.backupFrequency == freq
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isSelected) PastelSky.copy(alpha = 0.22f) else MindGlassSurface,
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (isSelected) PastelSky else MindBorderDark.copy(alpha = 0.5f)
+                                        ),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { viewModel.setBackupFrequency(freq) }
+                                    ) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.padding(vertical = 7.dp)
                                         ) {
-                                            Text("Restore", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                            Text(
+                                                text = freq,
+                                                color = if (isSelected) PastelSky else MindTextSecondary,
+                                                fontSize = 12.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Primary Action Buttons (Backup Now & Download to Device)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Button(
+                                    onClick = { viewModel.backupToGoogleDrive() },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = PastelSky,
+                                        contentColor = MindBackgroundDark
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    enabled = uiState.syncState !is com.mindlink.journal.data.sync.SyncState.Syncing
+                                ) {
+                                    Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Backup Now", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+
+                                Button(
+                                    onClick = { viewModel.downloadBackupToDevice() },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = PastelMint,
+                                        contentColor = MindBackgroundDark
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    enabled = uiState.syncState !is com.mindlink.journal.data.sync.SyncState.Syncing
+                                ) {
+                                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Download to Device", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Secondary Action Buttons (Restore Latest, Save to Drive SAF, Restore from File)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { viewModel.restoreFromGoogleDrive() },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelLavender),
+                                    border = BorderStroke(1.dp, PastelLavender.copy(alpha = 0.5f)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    enabled = uiState.syncState !is com.mindlink.journal.data.sync.SyncState.Syncing && uiState.backupSlots.isNotEmpty()
+                                ) {
+                                    Text("Restore Latest", fontSize = 11.sp, maxLines = 1)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        val dateStr = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+                                        saveToDriveLauncher.launch("mindlink_backup_$dateStr.zip")
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MindTextSecondary),
+                                    border = BorderStroke(1.dp, MindBorderDark),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Save to Drive", fontSize = 11.sp, maxLines = 1)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        restoreFromPickerLauncher.launch(arrayOf("application/zip", "application/json", "*/*"))
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MindTextSecondary),
+                                    border = BorderStroke(1.dp, MindBorderDark),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Restore File", fontSize = 11.sp, maxLines = 1)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Redundant Backups (3 Rolling Slots) Section
+                            HorizontalDivider(
+                                modifier = Modifier.fillMaxWidth(),
+                                thickness = 1.dp,
+                                color = MindBorderDark.copy(alpha = 0.5f)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Redundant Backups (3 Slots)",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MindTextPrimary
+                                    )
+                                    Text(
+                                        text = "Keeps 3 rolling snapshots for error redundancy",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MindTextSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // 3 Slots Column
+                            for (slotNum in 1..3) {
+                                val slotInfo = uiState.backupSlots.firstOrNull { it.slot == slotNum }
+                                val slotLabel = when (slotNum) {
+                                    1 -> "Slot 1 (Latest)"
+                                    2 -> "Slot 2 (Previous)"
+                                    else -> "Slot 3 (Oldest)"
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MindGlassSurface,
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (slotInfo != null) MindBorderDark else MindBorderDark.copy(alpha = 0.3f)
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = slotLabel,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (slotInfo != null) PastelSky else MindTextTertiary
+                                                )
+                                                if (slotInfo != null) {
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = "(${slotInfo.formattedSize})",
+                                                        fontSize = 11.sp,
+                                                        color = PastelMint
+                                                    )
+                                                }
+                                            }
+                                            Text(
+                                                text = if (slotInfo != null) "${slotInfo.formattedDate} · ${slotInfo.notesCount} thoughts" else "Empty · Next backup will fill",
+                                                fontSize = 11.sp,
+                                                color = if (slotInfo != null) MindTextSecondary else MindTextTertiary
+                                            )
+                                        }
+
+                                        if (slotInfo != null) {
+                                            FilledTonalButton(
+                                                onClick = { viewModel.restoreFromSlot(slotNum) },
+                                                colors = ButtonDefaults.filledTonalButtonColors(
+                                                    containerColor = PastelLavender.copy(alpha = 0.15f),
+                                                    contentColor = PastelLavender
+                                                ),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                                modifier = Modifier.height(30.dp)
+                                            ) {
+                                                Text("Restore", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                            }
                                         }
                                     }
                                 }
@@ -1451,7 +1533,7 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Sync State Banner (Always visible if not idle)
+                    // 4. Sync State Banner (Always visible if not idle)
                     when (val sync = uiState.syncState) {
                         is com.mindlink.journal.data.sync.SyncState.Syncing -> {
                             Spacer(modifier = Modifier.height(10.dp))

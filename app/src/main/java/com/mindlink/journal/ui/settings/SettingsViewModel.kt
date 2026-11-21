@@ -464,6 +464,20 @@ class SettingsViewModel(
         }
     }
 
+    fun downloadBackupToDevice() {
+        val context = appContext ?: return
+        viewModelScope.launch {
+            val result = ServiceLocator.getInstance(context).googleSyncManager.downloadBackupToDevice()
+            withContext(Dispatchers.Main) {
+                result.onSuccess { msg ->
+                    android.widget.Toast.makeText(context, "✓ $msg", android.widget.Toast.LENGTH_LONG).show()
+                }.onFailure { ex ->
+                    android.widget.Toast.makeText(context, "Download failed: ${ex.message}", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     fun restoreFromGoogleDrive() {
         val context = appContext ?: return
         viewModelScope.launch {

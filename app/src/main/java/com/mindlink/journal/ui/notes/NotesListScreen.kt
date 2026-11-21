@@ -307,7 +307,44 @@ fun NotesListScreen(
                             }
                         }
 
-                        // 4. Settings Icon
+                        // 4. Google Account Status Avatar (Shows signed-in state & backup status)
+                        val googleUser by serviceLocator.googleSyncManager.currentUser.collectAsState()
+                        if (googleUser != null) {
+                            val initial = (googleUser!!.displayName.firstOrNull() ?: googleUser!!.email.firstOrNull() ?: 'G').uppercaseChar()
+                            IconButton(
+                                onClick = onSettingsClick,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .background(
+                                            brush = Brush.linearGradient(
+                                                listOf(Color(0xFF4285F4), Color(0xFF34A853))
+                                            ),
+                                            shape = CircleShape
+                                        )
+                                        .border(1.dp, Color.White.copy(alpha = 0.7f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = initial.toString(),
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .size(7.dp)
+                                            .background(MindEmerald, CircleShape)
+                                            .border(1.dp, Color(0xFF0F172A), CircleShape)
+                                    )
+                                }
+                            }
+                        }
+
+                        // 5. Settings Icon
                         IconButton(onClick = onSettingsClick) {
                             Icon(
                                 imageVector = Icons.Default.Settings,

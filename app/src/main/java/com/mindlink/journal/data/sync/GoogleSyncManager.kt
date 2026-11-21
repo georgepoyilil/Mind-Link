@@ -37,6 +37,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
 data class GoogleUserProfile(
     val id: String,
@@ -81,7 +84,9 @@ data class BackupNoteDto(
     val isDeleted: Boolean,
     val isLocked: Boolean,
     val fontFamily: String,
-    val fontSizeScale: Float?
+    val fontSizeScale: Float?,
+    val imageFileName: String? = null,
+    val imageCaption: String? = null
 )
 
 data class MindLinkBackupPayload(
@@ -199,19 +204,26 @@ class GoogleSyncManager(
     fun refreshBackupSlots() {
         val slots = mutableListOf<BackupSlotInfo>()
         for (i in 1..3) {
-            val file = File(backupsDir, "backup_slot_$i.json")
-            if (file.exists() && file.length() > 0) {
+            val zipFile = File(backupsDir, "backup_slot_$i.zip")
+            val jsonFile = File(backupsDir, "backup_slot_$i.json")
+            val targetFile = if (zipFile.exists() && zipFile.length() > 0) zipFile else if (jsonFile.exists() && jsonFile.length() > 0) jsonFile else null
+
+            if (targetFile != null) {
                 try {
-                    val json = file.readText()
-                    val payload = gson.fromJson(json, MindLinkBackupPayload::class.java)
+                    val payload = if (targetFile.name.endsWith(".zip")) {
+                        readPayloadFromZip(targetFile)
+                    } else {
+                        gson.fromJson(targetFile.readText(), MindLinkBackupPayload::class.java)
+                    }
+
                     if (payload != null) {
                         slots.add(
                             BackupSlotInfo(
                                 slot = i,
-                                fileName = file.name,
+                                fileName = targetFile.name,
                                 timestamp = payload.backupTimestamp,
                                 notesCount = payload.notesCount,
-                                sizeBytes = file.length(),
+                                sizeBytes = targetFile.length(),
                                 appVersion = payload.appVersion
                             )
                         )
@@ -220,6 +232,24 @@ class GoogleSyncManager(
             }
         }
         _backupSlots.value = slots
+    }
+
+    private fun readPayloadFromZip(file: File): MindLinkBackupPayload? {
+        return try {
+            ZipInputStream(file.inputStream()).use { zis ->
+                var entry = zis.nextEntry
+                while (entry != null) {
+                    if (entry.name == "mindlink_notes.json" || entry.name.endsWith(".json")) {
+                        val json = zis.bufferedReader().readText()
+                        return gson.fromJson(json, MindLinkBackupPayload::class.java)
+                    }
+                    entry = zis.nextEntry
+                }
+            }
+            null
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun getSignInIntent(): Intent = googleSignInClient.signInIntent
@@ -324,13 +354,32 @@ class GoogleSyncManager(
      * slot 1 -> slot 2
      * new -> slot 1
      * Keeps exactly the last 3 redundant backups.
+     * Bundles all thoughts and attached photos into a compressed ZIP package.
      */
     suspend fun createBackup(isAuto: Boolean = false): Result<BackupSlotInfo> = withContext(Dispatchers.IO) {
-        _syncState.value = SyncState.Syncing("Reading thoughts database...")
+        _syncState.value = SyncState.Syncing("Reading thoughts database and photos...")
 
         try {
             val allNotes = noteDao.getAllNotesListSync()
+            val imagesDir = File(context.filesDir, "note_images").apply { if (!exists()) mkdirs() }
+            val imageFilesToPack = mutableListOf<File>()
+
             val dtos = allNotes.map { entity ->
+                var imageFileName: String? = null
+                if (!entity.imageUri.isNullOrBlank()) {
+                    try {
+                        val path = Uri.parse(entity.imageUri).path ?: ""
+                        val f = File(path)
+                        val candidate = if (f.exists()) f else File(imagesDir, f.name)
+                        if (candidate.exists()) {
+                            imageFileName = candidate.name
+                            if (!imageFilesToPack.contains(candidate)) {
+                                imageFilesToPack.add(candidate)
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+
                 BackupNoteDto(
                     id = entity.id,
                     title = entity.title,
@@ -346,7 +395,9 @@ class GoogleSyncManager(
                     isDeleted = entity.isDeleted,
                     isLocked = entity.isLocked,
                     fontFamily = entity.fontFamily,
-                    fontSizeScale = entity.fontSizeScale
+                    fontSizeScale = entity.fontSizeScale,
+                    imageFileName = imageFileName,
+                    imageCaption = entity.imageCaption
                 )
             }
 
@@ -359,9 +410,9 @@ class GoogleSyncManager(
             val jsonString = gson.toJson(payload)
 
             // Redundant rotation: shift slot 2 to 3, slot 1 to 2
-            val slot3 = File(backupsDir, "backup_slot_3.json")
-            val slot2 = File(backupsDir, "backup_slot_2.json")
-            val slot1 = File(backupsDir, "backup_slot_1.json")
+            val slot3 = File(backupsDir, "backup_slot_3.zip")
+            val slot2 = File(backupsDir, "backup_slot_2.zip")
+            val slot1 = File(backupsDir, "backup_slot_1.zip")
 
             if (slot2.exists()) {
                 slot2.copyTo(slot3, overwrite = true)
@@ -370,7 +421,22 @@ class GoogleSyncManager(
                 slot1.copyTo(slot2, overwrite = true)
             }
 
-            slot1.writeText(jsonString)
+            // Write compressed ZIP containing mindlink_notes.json and all attached images
+            ZipOutputStream(slot1.outputStream()).use { zos ->
+                val jsonEntry = ZipEntry("mindlink_notes.json")
+                zos.putNextEntry(jsonEntry)
+                zos.write(jsonString.toByteArray(Charsets.UTF_8))
+                zos.closeEntry()
+
+                imageFilesToPack.forEach { imgFile ->
+                    try {
+                        val imgEntry = ZipEntry("images/${imgFile.name}")
+                        zos.putNextEntry(imgEntry)
+                        imgFile.inputStream().use { input -> input.copyTo(zos) }
+                        zos.closeEntry()
+                    } catch (_: Exception) {}
+                }
+            }
 
             val now = System.currentTimeMillis()
             val size = slot1.length()
@@ -387,9 +453,10 @@ class GoogleSyncManager(
             tryCloudUpload(jsonString)
 
             val info = _backupSlots.value.firstOrNull { it.slot == 1 }
-                ?: BackupSlotInfo(1, "backup_slot_1.json", now, dtos.size, size, BuildConfig.VERSION_NAME)
+                ?: BackupSlotInfo(1, "backup_slot_1.zip", now, dtos.size, size, BuildConfig.VERSION_NAME)
 
-            val msg = "Backed up ${dtos.size} thoughts (${info.formattedSize}) successfully!"
+            val photoSuffix = if (imageFilesToPack.isNotEmpty()) " with ${imageFilesToPack.size} photos" else ""
+            val msg = "Backed up ${dtos.size} thoughts$photoSuffix (${info.formattedSize}) successfully!"
             _syncState.value = SyncState.Success(msg)
             Result.success(info)
         } catch (e: Exception) {
@@ -455,19 +522,25 @@ class GoogleSyncManager(
     }
 
     /**
-     * Restores thoughts from one of the 3 redundant backup slots (1 = Latest, 2 = Previous, 3 = Oldest).
+     * Restores thoughts and photos from one of the 3 redundant backup slots (1 = Latest, 2 = Previous, 3 = Oldest).
      */
     suspend fun restoreFromSlot(slot: Int): Result<Int> = withContext(Dispatchers.IO) {
-        val file = File(backupsDir, "backup_slot_$slot.json")
-        if (!file.exists()) {
+        val zipFile = File(backupsDir, "backup_slot_$slot.zip")
+        val jsonFile = File(backupsDir, "backup_slot_$slot.json")
+        val file = if (zipFile.exists()) zipFile else if (jsonFile.exists()) jsonFile else null
+
+        if (file == null || !file.exists()) {
             val err = "Backup slot $slot does not exist."
             _syncState.value = SyncState.Error(err)
             return@withContext Result.failure(Exception(err))
         }
 
         try {
-            val json = file.readText()
-            val result = restoreFromJsonString(json)
+            val result = if (file.name.endsWith(".zip")) {
+                restoreFromZipFile(file)
+            } else {
+                restoreFromJsonString(file.readText())
+            }
             result.onSuccess { count ->
                 _syncState.value = SyncState.Success("Restored $count thoughts from Backup #$slot!")
             }
@@ -479,8 +552,52 @@ class GoogleSyncManager(
         }
     }
 
+    suspend fun restoreFromZipFile(file: File): Result<Int> = withContext(Dispatchers.IO) {
+        file.inputStream().use { input ->
+            restoreFromZipStream(input)
+        }
+    }
+
+    suspend fun restoreFromZipStream(inputStream: InputStream): Result<Int> = withContext(Dispatchers.IO) {
+        _syncState.value = SyncState.Syncing("Unpacking backup archive and photos...")
+        try {
+            val imagesDir = File(context.filesDir, "note_images").apply { if (!exists()) mkdirs() }
+            var jsonContent: String? = null
+
+            ZipInputStream(inputStream).use { zis ->
+                var entry = zis.nextEntry
+                while (entry != null) {
+                    if (entry.name == "mindlink_notes.json" || entry.name.endsWith(".json")) {
+                        jsonContent = zis.bufferedReader().readText()
+                    } else if (entry.name.startsWith("images/")) {
+                        val fileName = entry.name.substringAfterLast("/")
+                        if (fileName.isNotBlank()) {
+                            val targetImg = File(imagesDir, fileName)
+                            targetImg.outputStream().use { out ->
+                                zis.copyTo(out)
+                            }
+                        }
+                    }
+                    entry = zis.nextEntry
+                }
+            }
+
+            if (jsonContent.isNullOrBlank()) {
+                val err = "No valid notes found inside backup archive."
+                _syncState.value = SyncState.Error(err)
+                return@withContext Result.failure(Exception(err))
+            }
+
+            restoreFromJsonString(jsonContent!!)
+        } catch (e: Exception) {
+            val err = e.message ?: "Failed to restore archive"
+            _syncState.value = SyncState.Error(err)
+            Result.failure(e)
+        }
+    }
+
     /**
-     * Parses JSON string and restores all thoughts into Room SQLite database.
+     * Parses JSON string and restores all thoughts into Room SQLite database with linked photos.
      */
     suspend fun restoreFromJsonString(jsonString: String): Result<Int> = withContext(Dispatchers.IO) {
         _syncState.value = SyncState.Syncing("Parsing backup data...")
@@ -493,9 +610,15 @@ class GoogleSyncManager(
             }
 
             _syncState.value = SyncState.Syncing("Restoring ${payload.notes.size} thoughts into database...")
+            val imagesDir = File(context.filesDir, "note_images").apply { if (!exists()) mkdirs() }
 
             var count = 0
             payload.notes.forEach { dto ->
+                val resolvedImageUri = if (!dto.imageFileName.isNullOrBlank()) {
+                    val localImg = File(imagesDir, dto.imageFileName)
+                    if (localImg.exists()) Uri.fromFile(localImg).toString() else null
+                } else null
+
                 val entity = NoteEntity(
                     id = dto.id,
                     title = dto.title,
@@ -508,6 +631,8 @@ class GoogleSyncManager(
                     actionItems = dto.actionItems,
                     reflectionPrompts = dto.reflectionPrompts,
                     isProcessed = true,
+                    imageUri = resolvedImageUri,
+                    imageCaption = dto.imageCaption,
                     isArchived = dto.isArchived,
                     isDeleted = dto.isDeleted,
                     isLocked = dto.isLocked,
@@ -518,7 +643,7 @@ class GoogleSyncManager(
                 count++
             }
 
-            val msg = "Successfully restored $count thoughts!"
+            val msg = "Successfully restored $count thoughts and attached photos!"
             _syncState.value = SyncState.Success(msg)
             Result.success(count)
         } catch (e: Exception) {
@@ -529,11 +654,13 @@ class GoogleSyncManager(
     }
 
     /**
-     * Reads a backup slot file and writes it to an output stream (e.g. for Storage Access Framework / Google Drive export).
+     * Reads a backup slot file and writes it to an output stream (e.g. for Google Drive export).
      */
     suspend fun exportSlotToStream(slot: Int, outputStream: OutputStream): Result<Unit> = withContext(Dispatchers.IO) {
-        val file = File(backupsDir, "backup_slot_$slot.json")
-        if (!file.exists()) {
+        val zipFile = File(backupsDir, "backup_slot_$slot.zip")
+        val jsonFile = File(backupsDir, "backup_slot_$slot.json")
+        val file = if (zipFile.exists()) zipFile else if (jsonFile.exists()) jsonFile else null
+        if (file == null || !file.exists()) {
             return@withContext Result.failure(Exception("Backup slot $slot does not exist"))
         }
         try {
@@ -549,12 +676,70 @@ class GoogleSyncManager(
     }
 
     /**
-     * Imports a backup from an input stream (e.g. from Google Drive file picker / OpenDocument).
+     * Downloads the latest backup package (.zip) directly to the device's public Downloads directory.
+     */
+    suspend fun downloadBackupToDevice(): Result<String> = withContext(Dispatchers.IO) {
+        _syncState.value = SyncState.Syncing("Preparing device backup archive...")
+        val slot1 = File(backupsDir, "backup_slot_1.zip")
+        if (!slot1.exists() || slot1.length() == 0L) {
+            val bRes = createBackup()
+            if (bRes.isFailure) {
+                val err = bRes.exceptionOrNull()?.message ?: "Could not create backup"
+                _syncState.value = SyncState.Error(err)
+                return@withContext Result.failure(Exception(err))
+            }
+        }
+
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val fileName = "mindlink_backup_$timestamp.zip"
+
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/zip")
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/MindLink")
+                }
+                val resolver = context.contentResolver
+                val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    ?: return@withContext Result.failure(Exception("Failed to create file in Downloads"))
+                resolver.openOutputStream(uri)?.use { out ->
+                    slot1.inputStream().use { input -> input.copyTo(out) }
+                }
+            } else {
+                val dir = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "MindLink")
+                if (!dir.exists()) dir.mkdirs()
+                val targetFile = File(dir, fileName)
+                slot1.copyTo(targetFile, overwrite = true)
+            }
+            val msg = "Saved to Downloads/MindLink/$fileName"
+            _syncState.value = SyncState.Success(msg)
+            Result.success(msg)
+        } catch (e: Exception) {
+            val err = "Download failed: ${e.message}"
+            _syncState.value = SyncState.Error(err)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Imports a backup from an input stream (supports both .zip with photos and legacy .json).
      */
     suspend fun importFromInputStream(inputStream: InputStream): Result<Int> = withContext(Dispatchers.IO) {
         try {
-            val text = inputStream.bufferedReader().use { it.readText() }
-            restoreFromJsonString(text)
+            val bis = java.io.BufferedInputStream(inputStream)
+            bis.mark(1024)
+            val header = ByteArray(4)
+            val read = bis.read(header)
+            bis.reset()
+
+            val isZip = read >= 4 && header[0] == 0x50.toByte() && header[1] == 0x4B.toByte()
+            if (isZip) {
+                restoreFromZipStream(bis)
+            } else {
+                val text = bis.bufferedReader().use { it.readText() }
+                restoreFromJsonString(text)
+            }
         } catch (e: Exception) {
             val err = e.message ?: "Import failed"
             _syncState.value = SyncState.Error(err)
