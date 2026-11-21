@@ -39,6 +39,8 @@ import com.mindlink.journal.ui.detail.components.ReflectionPromptsCard
 import com.mindlink.journal.ui.detail.components.RelatedThoughtsCard
 import com.mindlink.journal.ui.editor.components.TextRecognitionHelper
 import com.mindlink.journal.ui.notes.components.MoodBadge
+import com.mindlink.journal.ui.components.RichTextView
+import com.mindlink.journal.ui.history.NoteVersionHistoryDialog
 import com.mindlink.journal.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -63,6 +65,8 @@ fun NoteDetailScreen(
     // Audio Playback state
     var isPlayingAudio by remember { mutableStateOf(false) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    val noteVersions by viewModel.noteVersions.collectAsState()
+    var showVersionHistoryDialog by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -134,6 +138,11 @@ fun NoteDetailScreen(
                                 Icon(Icons.Default.DeleteForever, contentDescription = "Delete Forever", tint = PastelRose)
                             }
                         } else {
+                            // Version History & Diff Viewer
+                            IconButton(onClick = { showVersionHistoryDialog = true }) {
+                                Icon(Icons.Default.History, contentDescription = "Version History & Diff", tint = PastelLavender)
+                            }
+
                             // Font Size Override Menu
                             var showFontSizeMenu by remember { mutableStateOf(false) }
                             Box {
@@ -376,6 +385,40 @@ fun NoteDetailScreen(
                                     }
                                 }
                             }
+
+                            // Transcribe Audio Action Button in Detail Screen
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (uiState.isTranscribing) MindGlassSurfaceElevated else MindGlassButtonContainer,
+                                border = BorderStroke(1.dp, MindGlassButtonBorder),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable(enabled = !uiState.isTranscribing) {
+                                        viewModel.transcribeAudio()
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (uiState.isTranscribing) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(15.dp),
+                                            color = PastelLavender,
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Transcribing Audio with Gemini...", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PastelLavender)
+                                    } else {
+                                        Icon(Icons.Default.RecordVoiceOver, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(15.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Transcribe Audio to Note", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PastelLavender)
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -532,14 +575,15 @@ fun NoteDetailScreen(
                             val lineSpacing = LocalLineSpacingMultiplier.current
                             val bodyFontSize = (MaterialTheme.typography.bodyLarge.fontSize.value * noteScale).sp
                             val bodyLineHeight = (bodyFontSize.value * lineSpacing).sp
-                            Text(
+                            RichTextView(
                                 text = note.content,
                                 style = MaterialTheme.typography.bodyLarge.copy(
                                     fontSize = bodyFontSize,
                                     lineHeight = bodyLineHeight,
                                     fontFamily = noteFont
                                 ),
-                                color = MindTextPrimary
+                                color = MindTextPrimary,
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
@@ -984,5 +1028,46 @@ fun NoteDetailScreen(
                 )
             }
         }
+    }
+
+    // Version History & Diff Viewer Dialog
+    if (showVersionHistoryDialog && note != null) {
+        NoteVersionHistoryDialog(
+            currentTitle = note.title,
+            currentContent = note.content,
+            versions = noteVersions,
+            onDismiss = { showVersionHistoryDialog = false },
+            onRestoreVersion = { ver ->
+                viewModel.restoreVersion(ver)
+                Toast.makeText(context, "Restored revision from ${ver.compactDate}", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    // Audio Transcription Error Alert
+    if (uiState.transcribeError != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearTranscribeError() },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.RecordVoiceOver, contentDescription = null, tint = PastelRose, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Audio Transcription", fontWeight = FontWeight.Bold, color = MindTextPrimary)
+                }
+            },
+            text = {
+                Text(
+                    text = uiState.transcribeError ?: "Failed to transcribe audio recording.",
+                    color = MindTextSecondary,
+                    fontSize = 13.5.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearTranscribeError() }) {
+                    Text("OK", color = PastelLavender, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = MindBackgroundAmoled
+        )
     }
 }

@@ -132,6 +132,13 @@ class CompositeBrainstormingEngine(
         }
     }
 
+    override suspend fun transcribeAudio(audioBytes: ByteArray, mimeType: String): String {
+        if (!hasApiKey()) {
+            throw IllegalStateException("A Gemini API key is required to transcribe audio recordings. Please set your free key in Settings, or use the live Microphone button to dictate in real-time.")
+        }
+        return geminiEngine.transcribeAudio(audioBytes, mimeType)
+    }
+
     companion object {
         private const val TAG = "CompositeBrainstorming"
     }

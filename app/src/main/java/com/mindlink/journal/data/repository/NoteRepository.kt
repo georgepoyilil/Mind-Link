@@ -34,4 +34,12 @@ interface NoteRepository {
     fun getThoughtGraph(): Flow<ThoughtGraph>
     suspend fun rebuildSynapticGraph()
     fun getSynapseCount(): Flow<Int>
+
+    // Audio Transcription
+    suspend fun transcribeAudioFile(file: java.io.File): Result<String>
+
+    // Note Versioning & Diff History
+    fun getNoteVersions(noteId: Long): Flow<List<com.mindlink.journal.data.local.entity.NoteVersionEntity>>
+    suspend fun saveNoteVersion(noteId: Long, title: String, content: String): Long
+    suspend fun restoreNoteVersion(versionId: Long): Note?
 }

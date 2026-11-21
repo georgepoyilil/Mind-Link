@@ -150,6 +150,22 @@ class NoteRepositoryImpl(
         val noteId = if (entity.id == 0L) {
             noteDao.insertNote(entity)
         } else {
+            // Snapshot previous revision if content or title changed
+            val existing = noteDao.getNoteByIdSync(entity.id)
+            if (existing != null && (existing.title != entity.title || existing.content != entity.content)) {
+                try {
+                    database.noteVersionDao().insertVersion(
+                        com.mindlink.journal.data.local.entity.NoteVersionEntity(
+                            noteId = entity.id,
+                            title = existing.title,
+                            content = existing.content,
+                            timestamp = existing.updatedAt
+                        )
+                    )
+                } catch (e: Exception) {
+                    android.util.Log.w("NoteRepo", "Could not snapshot note version: ${e.message}")
+                }
+            }
             noteDao.updateNote(entity)
             entity.id
         }
@@ -440,5 +456,68 @@ class NoteRepositoryImpl(
             ExistingWorkPolicy.REPLACE,
             workRequest
         )
+    }
+
+    override suspend fun transcribeAudioFile(file: java.io.File): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            if (!file.exists()) {
+                return@withContext Result.failure(java.io.FileNotFoundException("Audio recording file not found: ${file.absolutePath}"))
+            }
+            val bytes = file.readBytes()
+            val mimeType = when {
+                file.name.endsWith(".m4a", ignoreCase = true) -> "audio/mp4"
+                file.name.endsWith(".mp3", ignoreCase = true) -> "audio/mp3"
+                file.name.endsWith(".wav", ignoreCase = true) -> "audio/wav"
+                file.name.endsWith(".aac", ignoreCase = true) -> "audio/aac"
+                else -> "audio/mp4"
+            }
+            val transcript = brainstormingEngine.transcribeAudio(bytes, mimeType)
+            if (transcript.isBlank()) {
+                Result.failure(RuntimeException("No speech could be detected in audio recording"))
+            } else {
+                Result.success(transcript)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override fun getNoteVersions(noteId: Long): Flow<List<com.mindlink.journal.data.local.entity.NoteVersionEntity>> {
+        return database.noteVersionDao().getVersionsForNote(noteId)
+    }
+
+    override suspend fun saveNoteVersion(noteId: Long, title: String, content: String): Long = withContext(Dispatchers.IO) {
+        database.noteVersionDao().insertVersion(
+            com.mindlink.journal.data.local.entity.NoteVersionEntity(
+                noteId = noteId,
+                title = title,
+                content = content,
+                timestamp = System.currentTimeMillis()
+            )
+        )
+    }
+
+    override suspend fun restoreNoteVersion(versionId: Long): Note? = withContext(Dispatchers.IO) {
+        val version = database.noteVersionDao().getVersionById(versionId) ?: return@withContext null
+        val existing = noteDao.getNoteByIdSync(version.noteId) ?: return@withContext null
+
+        // Snapshot the current state before restoring the older version
+        database.noteVersionDao().insertVersion(
+            com.mindlink.journal.data.local.entity.NoteVersionEntity(
+                noteId = existing.id,
+                title = existing.title,
+                content = existing.content,
+                timestamp = System.currentTimeMillis()
+            )
+        )
+
+        // Restore to target version
+        val restoredEntity = existing.copy(
+            title = version.title,
+            content = version.content,
+            updatedAt = System.currentTimeMillis()
+        )
+        noteDao.updateNote(restoredEntity)
+        Note.fromEntity(restoredEntity)
     }
 }

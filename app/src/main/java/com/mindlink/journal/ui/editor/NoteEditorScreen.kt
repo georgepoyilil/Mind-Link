@@ -50,6 +50,8 @@ import com.mindlink.journal.ui.editor.components.AudioRecordingHelper
 import com.mindlink.journal.ui.editor.components.SpeechRecognitionHelper
 import com.mindlink.journal.ui.editor.components.SpeechState
 import com.mindlink.journal.ui.editor.components.TextRecognitionHelper
+import com.mindlink.journal.ui.components.RichTextView
+import com.mindlink.journal.ui.history.NoteVersionHistoryDialog
 import com.mindlink.journal.ui.theme.*
 import kotlinx.coroutines.launch
 import java.io.File
@@ -87,6 +89,30 @@ fun NoteEditorScreen(
     // Selection-aware text field value for markdown formatting & selection operations
     var contentValue by remember {
         mutableStateOf(TextFieldValue(uiState.content, TextRange(uiState.content.length)))
+    }
+
+    val undoRedoManager = remember { UndoRedoManager() }
+    var canUndo by remember { mutableStateOf(false) }
+    var canRedo by remember { mutableStateOf(false) }
+    var showVersionHistoryDialog by remember { mutableStateOf(false) }
+    var isWordPreviewMode by remember { mutableStateOf(false) }
+
+    val performUndo: () -> Unit = {
+        undoRedoManager.undo(contentValue)?.let { prev ->
+            contentValue = prev
+            viewModel.updateContent(prev.text)
+            canUndo = undoRedoManager.canUndo
+            canRedo = undoRedoManager.canRedo
+        }
+    }
+
+    val performRedo: () -> Unit = {
+        undoRedoManager.redo(contentValue)?.let { next ->
+            contentValue = next
+            viewModel.updateContent(next.text)
+            canUndo = undoRedoManager.canUndo
+            canRedo = undoRedoManager.canRedo
+        }
     }
 
     // Keep contentValue in sync when content changes from external sources (e.g. load, OCR, dictation)
@@ -315,8 +341,9 @@ fun NoteEditorScreen(
     // IMPORTANT FIX: For OCR mode, do NOT launch camera directly on screen entry!
     // Instead, the screen opens with a prominent camera scan button ready for the user.
 
-    // Markdown Selection-Aware Formatting Helpers
+    // Markdown & MS Word-style Selection-Aware Formatting Helpers
     fun wrapSelection(prefix: String, suffix: String = prefix) {
+        undoRedoManager.record(contentValue, force = true)
         val text = contentValue.text
         val selection = contentValue.selection
         if (!selection.collapsed) {
@@ -338,9 +365,12 @@ fun NoteEditorScreen(
             )
             viewModel.updateContent(newText)
         }
+        canUndo = undoRedoManager.canUndo
+        canRedo = undoRedoManager.canRedo
     }
 
     fun insertLinePrefix(prefix: String) {
+        undoRedoManager.record(contentValue, force = true)
         val text = contentValue.text
         val cursor = contentValue.selection.start
         val lineStart = text.lastIndexOf('\n', (cursor - 1).coerceAtLeast(0)).let { if (it == -1) 0 else it + 1 }
@@ -350,6 +380,8 @@ fun NoteEditorScreen(
             selection = TextRange(cursor + prefix.length)
         )
         viewModel.updateContent(newText)
+        canUndo = undoRedoManager.canUndo
+        canRedo = undoRedoManager.canRedo
     }
 
     DisposableEffect(Unit) {
@@ -379,6 +411,51 @@ fun NoteEditorScreen(
                     }
                 },
                 actions = {
+                    // Revisions & Version Diff History
+                    if (uiState.id > 0 || uiState.noteVersions.isNotEmpty()) {
+                        IconButton(
+                            onClick = { showVersionHistoryDialog = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.History,
+                                contentDescription = "Version History & Diff",
+                                tint = PastelLavender,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    // Undo Button
+                    IconButton(
+                        onClick = performUndo,
+                        enabled = canUndo,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Undo,
+                            contentDescription = "Undo",
+                            tint = if (canUndo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Redo Button
+                    IconButton(
+                        onClick = performRedo,
+                        enabled = canRedo,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Redo,
+                            contentDescription = "Redo",
+                            tint = if (canRedo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(2.dp))
+
                     // Less prominent, sleek voice recording icon in top bar
                     IconButton(
                         onClick = { toggleSpeech(false) },
@@ -638,6 +715,33 @@ fun NoteEditorScreen(
                         .background(MindGlassBorderSubtle)
                 )
 
+                // Undo
+                IconButton(onClick = performUndo, enabled = canUndo, modifier = Modifier.size(34.dp)) {
+                    Icon(
+                        Icons.Default.Undo,
+                        contentDescription = "Undo",
+                        tint = if (canUndo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                // Redo
+                IconButton(onClick = performRedo, enabled = canRedo, modifier = Modifier.size(34.dp)) {
+                    Icon(
+                        Icons.Default.Redo,
+                        contentDescription = "Redo",
+                        tint = if (canRedo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .height(20.dp)
+                        .width(1.dp)
+                        .background(MindGlassBorderSubtle)
+                )
+
                 // Bold
                 IconButton(onClick = { wrapSelection("**") }, modifier = Modifier.size(34.dp)) {
                     Icon(Icons.Default.FormatBold, contentDescription = "Bold", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
@@ -646,6 +750,11 @@ fun NoteEditorScreen(
                 // Italic
                 IconButton(onClick = { wrapSelection("*") }, modifier = Modifier.size(34.dp)) {
                     Icon(Icons.Default.FormatItalic, contentDescription = "Italic", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                }
+
+                // Underline (MS Word standard)
+                IconButton(onClick = { wrapSelection("__") }, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Default.FormatUnderlined, contentDescription = "Underline", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
                 }
 
                 // Strikethrough
@@ -915,14 +1024,13 @@ fun NoteEditorScreen(
                                 // Transcribe Option
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
-                                    color = MindGlassButtonContainer,
+                                    color = if (uiState.isTranscribingAudio) MindGlassSurfaceElevated else MindGlassButtonContainer,
                                     border = BorderStroke(1.dp, MindGlassButtonBorder),
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
+                                        .clickable(enabled = !uiState.isTranscribingAudio) {
                                             viewModel.transcribeAudio()
-                                            Toast.makeText(context, "Audio transcribed and added to note", Toast.LENGTH_SHORT).show()
                                         }
                                 ) {
                                     Row(
@@ -930,9 +1038,19 @@ fun NoteEditorScreen(
                                         horizontalArrangement = Arrangement.Center,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(Icons.Default.RecordVoiceOver, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(15.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Transcribe to Text", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PastelLavender)
+                                        if (uiState.isTranscribingAudio) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(15.dp),
+                                                color = PastelLavender,
+                                                strokeWidth = 2.dp
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Transcribing with Gemini...", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PastelLavender)
+                                        } else {
+                                            Icon(Icons.Default.RecordVoiceOver, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(15.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Transcribe to Text", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PastelLavender)
+                                        }
                                     }
                                 }
 
@@ -1304,46 +1422,165 @@ fun NoteEditorScreen(
 
                 HorizontalDivider(color = MindBorderDark.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 2.dp))
 
-                // Markdown Body Field (Selection-Aware!)
                 val bodyFontSize = (MaterialTheme.typography.bodyLarge.fontSize.value * editorNoteScale).sp
                 val bodyLineHeight = (bodyFontSize.value * activeLineSpacing).sp
-                TextField(
-                    value = contentValue,
-                    onValueChange = { newValue ->
-                        contentValue = newValue
-                        viewModel.updateContent(newValue.text)
-                    },
-                    placeholder = {
-                        Text(
-                            text = "Write your thoughts freely. Dictate with the mic, snap photos, or scan documents with OCR...",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontSize = bodyFontSize,
-                                lineHeight = bodyLineHeight,
-                                fontFamily = currentFontFamily
-                            ),
-                            color = MindTextTertiary
-                        )
-                    },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(
-                        fontSize = bodyFontSize,
-                        lineHeight = bodyLineHeight,
-                        fontFamily = currentFontFamily
-                    ),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        focusedTextColor = MindTextPrimary,
-                        unfocusedTextColor = MindTextPrimary
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .defaultMinSize(minHeight = 350.dp)
-                )
+
+                // View Mode Pill: Live Rich Editor vs MS Word Document View
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isWordPreviewMode) "MS Word Document View (Formatted)" else "Journal Body (Rich Text)",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MindTextTertiary
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isWordPreviewMode) PastelLavender.copy(alpha = 0.25f) else MindGlassButtonContainer,
+                        border = BorderStroke(1.dp, if (isWordPreviewMode) PastelLavender else MindGlassButtonBorder),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { isWordPreviewMode = !isWordPreviewMode }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (isWordPreviewMode) Icons.Default.Edit else Icons.Default.Visibility,
+                                contentDescription = null,
+                                tint = if (isWordPreviewMode) PastelLavender else MindTextPrimary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = if (isWordPreviewMode) "Edit Mode" else "Word View",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isWordPreviewMode) PastelLavender else MindTextPrimary
+                            )
+                        }
+                    }
+                }
+
+                if (isWordPreviewMode) {
+                    // MS Word Document View: zero raw markdown punctuation!
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 350.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MindGlassSurface),
+                        border = BorderStroke(1.dp, MindGlassBorderSubtle)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            RichTextView(
+                                text = if (contentValue.text.isBlank()) "*(Empty note body)*" else contentValue.text,
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontSize = bodyFontSize,
+                                    lineHeight = bodyLineHeight,
+                                    fontFamily = currentFontFamily
+                                ),
+                                color = MindTextPrimary,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                } else {
+                    // Markdown Body Field (Selection-Aware & Real-time Styled!)
+                    TextField(
+                        value = contentValue,
+                        onValueChange = { newValue ->
+                            undoRedoManager.record(contentValue)
+                            contentValue = newValue
+                            viewModel.updateContent(newValue.text)
+                            canUndo = undoRedoManager.canUndo
+                            canRedo = undoRedoManager.canRedo
+                        },
+                        visualTransformation = remember(bodyFontSize) {
+                            MarkdownVisualTransformation(baseFontSizeSp = bodyFontSize.value)
+                        },
+                        placeholder = {
+                            Text(
+                                text = "Write your thoughts freely. Dictate with the mic, snap photos, or scan documents with OCR...",
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontSize = bodyFontSize,
+                                    lineHeight = bodyLineHeight,
+                                    fontFamily = currentFontFamily
+                                ),
+                                color = MindTextTertiary
+                            )
+                        },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                            fontSize = bodyFontSize,
+                            lineHeight = bodyLineHeight,
+                            fontFamily = currentFontFamily
+                        ),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = MindTextPrimary,
+                            unfocusedTextColor = MindTextPrimary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 350.dp)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(100.dp))
             }
         }
+    }
+
+    // Revisions & Version Diff Dialog
+    if (showVersionHistoryDialog) {
+        NoteVersionHistoryDialog(
+            currentTitle = uiState.title,
+            currentContent = contentValue.text,
+            versions = uiState.noteVersions,
+            onDismiss = { showVersionHistoryDialog = false },
+            onRestoreVersion = { version ->
+                undoRedoManager.record(contentValue, force = true)
+                viewModel.restoreVersion(version)
+                contentValue = TextFieldValue(version.content, TextRange(version.content.length))
+                canUndo = undoRedoManager.canUndo
+                canRedo = undoRedoManager.canRedo
+                Toast.makeText(context, "Restored revision from ${version.compactDate}", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    // Audio Transcription Error Notification Dialog
+    if (uiState.transcriptionError != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearTranscriptionError() },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.RecordVoiceOver, contentDescription = null, tint = PastelRose, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Audio Transcription", fontWeight = FontWeight.Bold, color = MindTextPrimary)
+                }
+            },
+            text = {
+                Text(
+                    text = uiState.transcriptionError ?: "Failed to transcribe audio recording.",
+                    color = MindTextSecondary,
+                    fontSize = 13.5.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearTranscriptionError() }) {
+                    Text("OK", color = PastelLavender, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = MindBackgroundAmoled
+        )
     }
 }

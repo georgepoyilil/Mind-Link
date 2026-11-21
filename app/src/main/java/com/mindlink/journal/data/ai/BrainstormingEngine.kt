@@ -26,9 +26,10 @@ data class SynthesisResult(
 
 /**
  * Interface for AI-powered note analysis, metadata extraction, reflection prompts,
- * and conversational multi-note synthesis.
+ * audio transcription, and conversational multi-note synthesis.
  */
 interface BrainstormingEngine {
     suspend fun analyzeNote(title: String, content: String): NoteAnalysisResult
     suspend fun synthesizeNotes(query: String, notes: List<Note>): SynthesisResult
+    suspend fun transcribeAudio(audioBytes: ByteArray, mimeType: String = "audio/mp4"): String = ""
 }

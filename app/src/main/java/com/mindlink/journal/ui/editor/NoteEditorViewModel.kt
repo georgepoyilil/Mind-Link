@@ -3,6 +3,7 @@ package com.mindlink.journal.ui.editor
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.mindlink.journal.data.local.entity.NoteVersionEntity
 import com.mindlink.journal.data.repository.NoteRepository
 import com.mindlink.journal.domain.model.Note
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.UUID
 
 data class ChecklistItem(
@@ -28,6 +30,8 @@ data class NoteEditorUiState(
     val isVoiceRecording: Boolean = false,
     val speechPartialText: String = "",
     val speechError: String? = null,
+    val isTranscribingAudio: Boolean = false,
+    val transcriptionError: String? = null,
     val imageUri: String? = null,
     val imageCaption: String? = null,
     val audioUri: String? = null,
@@ -41,7 +45,8 @@ data class NoteEditorUiState(
     val summary: String? = null,
     val mood: String? = null,
     val reflectionPrompts: List<String> = emptyList(),
-    val isProcessed: Boolean = false
+    val isProcessed: Boolean = false,
+    val noteVersions: List<NoteVersionEntity> = emptyList()
 )
 
 class NoteEditorViewModel(
@@ -121,6 +126,12 @@ class NoteEditorViewModel(
                         isProcessed = note.isProcessed
                     )
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            repository.getNoteVersions(id).collect { versions ->
+                _uiState.update { it.copy(noteVersions = versions) }
             }
         }
     }
@@ -243,18 +254,60 @@ class NoteEditorViewModel(
     }
 
     fun transcribeAudio() {
-        _uiState.update { state ->
-            val transcript = state.recordedAudioTranscript.ifBlank {
-                "Voice journal entry recorded on ${java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.getDefault()).format(java.util.Date())}"
+        val audioUriStr = _uiState.value.audioUri ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isTranscribingAudio = true, transcriptionError = null) }
+            try {
+                val file = if (audioUriStr.startsWith("file://")) {
+                    File(java.net.URI(audioUriStr).path)
+                } else {
+                    File(audioUriStr)
+                }
+                val result = repository.transcribeAudioFile(file)
+                result.onSuccess { transcript ->
+                    _uiState.update { state ->
+                        val newContent = if (state.content.isBlank()) {
+                            transcript
+                        } else if (!state.content.contains(transcript)) {
+                            "${state.content}\n\n$transcript"
+                        } else {
+                            state.content
+                        }
+                        state.copy(
+                            content = newContent,
+                            recordedAudioTranscript = transcript,
+                            isTranscribingAudio = false
+                        )
+                    }
+                }.onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            isTranscribingAudio = false,
+                            transcriptionError = error.message ?: "Transcription failed"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isTranscribingAudio = false,
+                        transcriptionError = e.message ?: "Could not open audio recording"
+                    )
+                }
             }
-            val newContent = if (state.content.isBlank()) {
-                transcript
-            } else if (!state.content.contains(transcript)) {
-                "${state.content}\n\n$transcript"
-            } else {
-                state.content
-            }
-            state.copy(content = newContent)
+        }
+    }
+
+    fun clearTranscriptionError() {
+        _uiState.update { it.copy(transcriptionError = null) }
+    }
+
+    fun restoreVersion(version: NoteVersionEntity) {
+        _uiState.update {
+            it.copy(
+                title = version.title,
+                content = version.content
+            )
         }
     }
 

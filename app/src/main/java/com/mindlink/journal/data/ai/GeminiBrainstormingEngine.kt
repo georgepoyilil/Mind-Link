@@ -80,6 +80,57 @@ class GeminiBrainstormingEngine(
         parseSynthesisResponse(responseJson)
     }
 
+    override suspend fun transcribeAudio(audioBytes: ByteArray, mimeType: String): String = withContext(Dispatchers.IO) {
+        val apiKey = apiKeyProvider()
+        if (apiKey.isNullOrBlank()) {
+            throw IllegalStateException("Gemini API key is not configured in Settings")
+        }
+
+        val base64Audio = android.util.Base64.encodeToString(audioBytes, android.util.Base64.NO_WRAP)
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey"
+
+        val payload = JsonObject().apply {
+            val contentsArray = com.google.gson.JsonArray().apply {
+                val contentObj = JsonObject().apply {
+                    val partsArray = com.google.gson.JsonArray().apply {
+                        val inlineData = JsonObject().apply {
+                            addProperty("mime_type", mimeType)
+                            addProperty("data", base64Audio)
+                        }
+                        val partAudio = JsonObject().apply {
+                            add("inline_data", inlineData)
+                        }
+                        val partText = JsonObject().apply {
+                            addProperty("text", "Please transcribe this audio recording accurately and verbatim. Return ONLY the transcribed spoken text without any extra commentary, introductory remarks, timestamps, or markdown quotation.")
+                        }
+                        add(partAudio)
+                        add(partText)
+                    }
+                    add("parts", partsArray)
+                }
+                add(contentObj)
+            }
+            add("contents", contentsArray)
+        }
+
+        val body = payload.toString().toRequestBody(jsonMediaType)
+        val request = Request.Builder()
+            .url(url)
+            .post(body)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                val errorBody = response.body?.string() ?: ""
+                Log.e(TAG, "Gemini Audio Transcription error: HTTP ${response.code} - $errorBody")
+                throw RuntimeException("Gemini transcription failed (${response.code}): $errorBody")
+            }
+
+            val respString = response.body?.string() ?: ""
+            extractTextFromGeminiResponse(respString).trim()
+        }
+    }
+
     private fun callGeminiApi(apiKey: String, prompt: String, jsonSchemaMode: Boolean): String {
         val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey"
 

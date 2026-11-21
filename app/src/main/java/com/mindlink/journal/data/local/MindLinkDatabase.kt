@@ -12,19 +12,22 @@ import com.mindlink.journal.data.local.dao.EmbeddingDao
 import com.mindlink.journal.data.local.dao.NoteDao
 import com.mindlink.journal.data.local.dao.NoteFtsDao
 import com.mindlink.journal.data.local.dao.NoteLinkDao
+import com.mindlink.journal.data.local.dao.NoteVersionDao
 import com.mindlink.journal.data.local.entity.NoteEmbeddingEntity
 import com.mindlink.journal.data.local.entity.NoteEntity
 import com.mindlink.journal.data.local.entity.NoteFtsEntity
 import com.mindlink.journal.data.local.entity.NoteLinkEntity
+import com.mindlink.journal.data.local.entity.NoteVersionEntity
 
 @Database(
     entities = [
         NoteEntity::class,
         NoteFtsEntity::class,
         NoteEmbeddingEntity::class,
-        NoteLinkEntity::class
+        NoteLinkEntity::class,
+        NoteVersionEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -34,6 +37,7 @@ abstract class MindLinkDatabase : RoomDatabase() {
     abstract fun noteFtsDao(): NoteFtsDao
     abstract fun embeddingDao(): EmbeddingDao
     abstract fun noteLinkDao(): NoteLinkDao
+    abstract fun noteVersionDao(): NoteVersionDao
 
     companion object {
         @Volatile
@@ -79,6 +83,24 @@ abstract class MindLinkDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `note_versions` (
+                        `versionId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `noteId` INTEGER NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `content` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        FOREIGN KEY(`noteId`) REFERENCES `notes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_note_versions_noteId` ON `note_versions` (`noteId`)")
+            }
+        }
+
         fun getInstance(context: Context): MindLinkDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -86,7 +108,7 @@ abstract class MindLinkDatabase : RoomDatabase() {
                     MindLinkDatabase::class.java,
                     "mindlink_database"
                 )
-                    .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_5_7)
+                    .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_5_7, MIGRATION_7_8)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

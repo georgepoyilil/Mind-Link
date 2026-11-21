@@ -3,21 +3,27 @@ package com.mindlink.journal.ui.detail
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.mindlink.journal.data.local.entity.NoteVersionEntity
 import com.mindlink.journal.data.repository.NoteRepository
 import com.mindlink.journal.domain.model.Note
 import com.mindlink.journal.domain.model.RelatedThought
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 
 data class NoteDetailUiState(
     val note: Note? = null,
     val relatedThoughts: List<RelatedThought> = emptyList(),
     val completedActionIndices: Set<Int> = emptySet(),
     val isLoadingRelated: Boolean = true,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    val isTranscribing: Boolean = false,
+    val transcribeError: String? = null
 )
 
 class NoteDetailViewModel(
@@ -212,6 +218,66 @@ class NoteDetailViewModel(
 
     fun deleteNote(onDeleted: () -> Unit) {
         moveToTrash(onDeleted)
+    }
+
+    val noteVersions: StateFlow<List<NoteVersionEntity>> = repository.getNoteVersions(noteId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun restoreVersion(version: NoteVersionEntity) {
+        viewModelScope.launch {
+            repository.restoreNoteVersion(version.versionId)?.let { restoredNote ->
+                _uiState.update { it.copy(note = restoredNote) }
+            }
+        }
+    }
+
+    fun transcribeAudio() {
+        val currentNote = _uiState.value.note ?: return
+        val audioUriStr = currentNote.audioUri ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isTranscribing = true, transcribeError = null) }
+            try {
+                val file = if (audioUriStr.startsWith("file://")) {
+                    File(java.net.URI(audioUriStr).path)
+                } else {
+                    File(audioUriStr)
+                }
+                val result = repository.transcribeAudioFile(file)
+                result.onSuccess { transcript ->
+                    val updatedContent = if (currentNote.content.isBlank()) {
+                        transcript
+                    } else if (!currentNote.content.contains(transcript)) {
+                        "${currentNote.content}\n\n$transcript"
+                    } else {
+                        currentNote.content
+                    }
+                    val updatedNote = currentNote.copy(
+                        content = updatedContent,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    repository.saveNote(updatedNote)
+                    _uiState.update { it.copy(note = updatedNote, isTranscribing = false) }
+                }.onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            isTranscribing = false,
+                            transcribeError = error.message ?: "Transcription failed"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isTranscribing = false,
+                        transcribeError = e.message ?: "Audio file access error"
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearTranscribeError() {
+        _uiState.update { it.copy(transcribeError = null) }
     }
 
     class Factory(

@@ -53,7 +53,10 @@ data class Note(
         }
 
     val previewText: String
-        get() = summary?.takeIf { it.isNotBlank() } ?: content.take(160).replace("\n", " ")
+        get() {
+            val raw = summary?.takeIf { it.isNotBlank() } ?: content
+            return raw.replace(Regex("[*~_#`]+"), "").take(160).replace("\n", " ").trim()
+        }
 
     val formattedAudioDuration: String
         get() {
