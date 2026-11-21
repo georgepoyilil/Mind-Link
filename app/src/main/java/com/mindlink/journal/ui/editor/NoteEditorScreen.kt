@@ -37,6 +37,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -618,20 +619,32 @@ fun NoteEditorScreen(
                 fontSizeOptions.forEach { (scale, label) ->
                     val isSelected = if (scale == null) noteFontScale == null else noteFontScale != null && Math.abs(noteFontScale - scale) < 0.05f
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) MindIndigo.copy(alpha = 0.35f) else MindGlassButtonContainer,
-                        border = BorderStroke(0.8.dp, if (isSelected) PastelMint else MindGlassButtonBorder),
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isSelected) MindIndigo.copy(alpha = 0.40f) else MindGlassButtonContainer,
+                        border = BorderStroke(
+                            width = if (isSelected) 1.2.dp else 0.8.dp,
+                            color = if (isSelected) PastelMint else MindGlassButtonBorder
+                        ),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .height(28.dp)
+                            .defaultMinSize(minWidth = 34.dp)
+                            .clip(RoundedCornerShape(10.dp))
                             .clickable { viewModel.setFontSizeScale(scale) }
                     ) {
-                        Text(
-                            text = label,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) PastelMint else MindTextSecondary,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .padding(horizontal = 8.dp)
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) PastelMint else MindTextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
 
@@ -652,23 +665,35 @@ fun NoteEditorScreen(
                 lineSpacingOptions.forEach { (mult, label) ->
                     val isSelected = Math.abs(activeLineSpacing - mult) < 0.05f
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) MindIndigo.copy(alpha = 0.35f) else MindGlassButtonContainer,
-                        border = BorderStroke(0.8.dp, if (isSelected) PastelSky else MindGlassButtonBorder),
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isSelected) MindIndigo.copy(alpha = 0.40f) else MindGlassButtonContainer,
+                        border = BorderStroke(
+                            width = if (isSelected) 1.2.dp else 0.8.dp,
+                            color = if (isSelected) PastelSky else MindGlassButtonBorder
+                        ),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .height(28.dp)
+                            .defaultMinSize(minWidth = 38.dp)
+                            .clip(RoundedCornerShape(10.dp))
                             .clickable {
                                 activeLineSpacing = mult
                                 serviceLocator.updateLineSpacingMultiplier(mult)
                             }
                     ) {
-                        Text(
-                            text = label,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) PastelSky else MindTextSecondary,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .padding(horizontal = 8.dp)
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) PastelSky else MindTextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
 

@@ -1,5 +1,6 @@
 package com.mindlink.journal.ui.settings
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mindlink.journal.BuildConfig
@@ -38,6 +41,7 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var isKeyVisible by remember { mutableStateOf(false) }
+    var isThemeCardExpanded by rememberSaveable { mutableStateOf(false) }
     var showUserGuideDialog by remember { mutableStateOf(false) }
     var showOnboardingDialog by remember { mutableStateOf(false) }
 
@@ -96,31 +100,64 @@ fun SettingsScreen(
                     )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Palette,
-                            contentDescription = "Themes",
-                            tint = PastelLavender,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Visual Atmosphere & Themes",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MindTextPrimary
-                        )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { isThemeCardExpanded = !isThemeCardExpanded },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = "Themes",
+                                tint = PastelLavender,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Visual Atmosphere & Themes",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MindTextPrimary
+                                )
+                                val currentTheme = remember(uiState.appTheme) { MindTheme.fromId(uiState.appTheme) }
+                                Text(
+                                    text = currentTheme.title,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = PastelLavender
+                                )
+                            }
+                        }
+                        IconButton(onClick = { isThemeCardExpanded = !isThemeCardExpanded }) {
+                            Icon(
+                                imageVector = if (isThemeCardExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (isThemeCardExpanded) "Minimize" else "Expand",
+                                tint = MindTextSecondary
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    AnimatedVisibility(
+                        visible = isThemeCardExpanded,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column {
+                            Spacer(modifier = Modifier.height(10.dp))
 
-                    Text(
-                        text = "Tailor your aesthetic ritual with custom glassy, AMOLED, Pixel, and light modes:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MindTextSecondary
-                    )
+                            Text(
+                                text = "Tailor your aesthetic ritual with custom glassy, AMOLED, Pixel, and light modes:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MindTextSecondary
+                            )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
                     MindTheme.entries.forEach { theme ->
                         val isSelected = uiState.appTheme.equals(theme.id, ignoreCase = true)
@@ -207,6 +244,8 @@ fun SettingsScreen(
                                     )
                                 )
                             }
+                        }
+                    }
                         }
                     }
                 }
@@ -380,17 +419,23 @@ fun SettingsScreen(
                                 ),
                                 modifier = Modifier
                                     .weight(1f)
+                                    .height(36.dp)
                                     .clip(RoundedCornerShape(10.dp))
                                     .clickable { viewModel.updateLineSpacingMultiplier(mult) }
                             ) {
-                                Text(
-                                    text = label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) PastelMint else MindTextSecondary,
-                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
-                                    maxLines = 1
-                                )
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp)
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) PastelMint else MindTextSecondary,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
                     }

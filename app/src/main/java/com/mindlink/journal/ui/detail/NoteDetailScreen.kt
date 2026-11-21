@@ -614,20 +614,27 @@ fun NoteDetailScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.AddComment, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(16.dp))
+                                Row(
+                                    modifier = Modifier.weight(1f, fill = false),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.AddComment, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = "Add Follow-up Point",
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = MindTextPrimary
+                                        color = MindTextPrimary,
+                                        maxLines = 1
                                     )
                                 }
                                 Text(
                                     text = "Auto-reprocesses AI correlations",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MindTextTertiary
+                                    fontSize = 10.sp,
+                                    lineHeight = 13.sp,
+                                    fontWeight = FontWeight.Normal,
+                                    color = MindTextTertiary.copy(alpha = 0.60f),
+                                    modifier = Modifier.padding(start = 14.dp)
                                 )
                             }
 

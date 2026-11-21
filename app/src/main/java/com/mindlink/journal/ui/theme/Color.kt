@@ -19,15 +19,15 @@ enum class MindTheme(val id: String, val title: String, val subtitle: String, va
     ),
     IOS_GLASSY(
         id = "ios_glassy",
-        title = "iOS Liquid Glass (Dark)",
-        subtitle = "Ultra-frosted midnight glass, iridescent specular rims",
+        title = "Frosted Glass (Dark)",
+        subtitle = "Ultra-frosted midnight acrylic, delicate specular rims",
         isDark = true,
         isGlassy = true
     ),
     IOS_GLASSY_LIGHT(
         id = "ios_glassy_light",
-        title = "iOS Liquid Glass (Light)",
-        subtitle = "Crystalline frosted acrylic with radiant specular gleam",
+        title = "Frosted Glass (Light)",
+        subtitle = "Silky pearl frosted acrylic, radiant specular gleam",
         isDark = false,
         isGlassy = true
     ),

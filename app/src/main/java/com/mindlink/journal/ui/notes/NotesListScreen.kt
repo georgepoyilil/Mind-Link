@@ -29,8 +29,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -204,12 +206,38 @@ fun NotesListScreen(
             Column(modifier = Modifier.background(if (MindIsGlassy) Color.Transparent else MindBackgroundAmoled)) {
                 TopAppBar(
                     title = {
-                        Text(
-                            text = "MindLink",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MindTextPrimary
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            listOf(PastelLavender.copy(alpha = 0.35f), PastelSky.copy(alpha = 0.20f))
+                                        ),
+                                        shape = RoundedCornerShape(9.dp)
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = PastelLavender.copy(alpha = 0.50f),
+                                        shape = RoundedCornerShape(9.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Psychology,
+                                    contentDescription = null,
+                                    tint = PastelLavender,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "MindLink",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MindTextPrimary
+                            )
+                        }
                     },
                     actions = {
                         // 1. Google Keep Style Layout Switching Vector Icon
@@ -235,16 +263,50 @@ fun NotesListScreen(
                             )
                         }
 
-                        // 2. Intelligent Synaptic Network ("i" Icon)
-                        IconButton(onClick = onThoughtGraphClick) {
+                        // 2. Dark / Bright Mode Switch (Right next to card layout switcher)
+                        val isHeaderDark = LocalMindLinkColors.current.isDark
+                        val currentAppThemeId by serviceLocator.appTheme.collectAsState()
+                        IconButton(onClick = {
+                            val targetTheme = if (isHeaderDark) {
+                                if (currentAppThemeId == "ios_glassy") "ios_glassy_light" else "light_clean"
+                            } else {
+                                if (currentAppThemeId == "ios_glassy_light") "ios_glassy" else "amoled_black"
+                            }
+                            serviceLocator.updateAppTheme(targetTheme)
+                        }) {
                             Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Intelligence Graph",
-                                tint = MindIndigo
+                                imageVector = if (isHeaderDark) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                contentDescription = if (isHeaderDark) "Switch to Light Mode" else "Switch to Dark Mode",
+                                tint = if (isHeaderDark) PastelAmber else MindTextPrimary
                             )
                         }
 
-                        // 3. Settings Icon
+                        // 3. Intelligent Synaptic Network (Noticeable Hub Badge Icon)
+                        IconButton(onClick = onThoughtGraphClick) {
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .background(
+                                        color = if (isHeaderDark) Color(0x33818CF8) else Color(0x206366F1),
+                                        shape = CircleShape
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isHeaderDark) Color(0x55A5B4FC) else Color(0x406366F1),
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Hub,
+                                    contentDescription = "Synaptic Intelligence Graph",
+                                    tint = if (isHeaderDark) Color(0xFFA5B4FC) else Color(0xFF4F46E5),
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
+                        }
+
+                        // 4. Settings Icon
                         IconButton(onClick = onSettingsClick) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
@@ -430,27 +492,50 @@ fun NotesListScreen(
         },
         floatingActionButton = {
             if (uiState.selectedTab == NotesTab.JOURNAL) {
+                val isFabDark = LocalMindLinkColors.current.isDark
+                val fabShape = CircleShape
                 FloatingActionButton(
                     onClick = { showJournalingMethodsSheet = true },
-                    containerColor = if (MindIsGlassy) Color.Transparent else PastelLavender,
-                    contentColor = if (MindIsGlassy) MindTextPrimary else Color.Black,
-                    shape = CircleShape,
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = if (MindIsGlassy) 0.dp else 6.dp),
+                    containerColor = if (MindIsGlassy) {
+                        if (isFabDark) Color(0xEB1E2738) else Color(0xF2FFFFFF)
+                    } else PastelLavender,
+                    contentColor = if (MindIsGlassy) {
+                        if (isFabDark) Color.White else Color(0xFF0F172A)
+                    } else Color.Black,
+                    shape = fabShape,
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 8.dp,
+                        pressedElevation = 12.dp
+                    ),
                     modifier = if (MindIsGlassy) {
-                        Modifier.liquidGlass(
-                            shape = CircleShape,
-                            cornerRadius = 28.dp,
-                            isGlassy = true,
-                            isDark = LocalMindLinkColors.current.isDark,
-                            cardBackground = androidx.compose.ui.graphics.Brush.verticalGradient(
-                                listOf(
-                                    Color.White.copy(alpha = 0.50f),
-                                    PastelLavender.copy(alpha = 0.35f)
-                                )
-                            ),
-                            cardBorder = MindGlassCardBorder,
-                            elevation = 6.dp
-                        )
+                        Modifier
+                            .shadow(
+                                elevation = 10.dp,
+                                shape = fabShape,
+                                ambientColor = if (isFabDark) Color(0x70000000) else Color(0x250F172A),
+                                spotColor = if (isFabDark) Color(0x90000000) else Color(0x350F172A)
+                            )
+                            .border(
+                                width = 1.5.dp,
+                                brush = if (isFabDark) {
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color(0x99FFFFFF),
+                                            Color(0x30FFFFFF),
+                                            Color(0x10FFFFFF)
+                                        )
+                                    )
+                                } else {
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color(0xFFFFFFFF),
+                                            Color(0x80CBD5E1),
+                                            Color(0x3094A3B8)
+                                        )
+                                    )
+                                },
+                                shape = fabShape
+                            )
                     } else Modifier
                 ) {
                     Icon(
