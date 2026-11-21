@@ -2,4 +2,6 @@
 <full-backup-content>
     <include domain="database" path="mindlink_database" />
     <include domain="sharedpref" path="mindlink_preferences.xml" />
+    <include domain="file" path="note_images" />
+    <include domain="file" path="backups" />
 </full-backup-content>

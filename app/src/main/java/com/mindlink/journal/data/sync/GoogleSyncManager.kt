@@ -1,13 +1,22 @@
 package com.mindlink.journal.data.sync
 
+import android.accounts.Account
 import android.accounts.AccountManager
+import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.util.Log
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.google.android.gms.auth.GoogleAuthException
 import com.google.android.gms.auth.GoogleAuthUtil
+import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
@@ -21,14 +30,18 @@ import com.mindlink.journal.data.local.dao.NoteDao
 import com.mindlink.journal.data.local.entity.NoteEntity
 import com.mindlink.journal.data.worker.BackupWorker
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.InputStream
@@ -132,6 +145,9 @@ class GoogleSyncManager(
     private val _backupFrequency = MutableStateFlow(prefs.getString("backup_frequency", "Daily") ?: "Daily")
     val backupFrequency: StateFlow<String> = _backupFrequency.asStateFlow()
 
+    private val _userConsentIntent = MutableSharedFlow<Intent>(extraBufferCapacity = 1)
+    val userConsentIntent: SharedFlow<Intent> = _userConsentIntent.asSharedFlow()
+
     val formattedLastBackup: String
         get() {
             val t = _lastBackupTime.value
@@ -201,7 +217,133 @@ class GoogleSyncManager(
             .apply()
     }
 
+    private fun getGoogleAccount(): Account? {
+        val user = _currentUser.value
+        if (user != null && user.email.isNotBlank()) {
+            return Account(user.email, "com.google")
+        }
+        val last = GoogleSignIn.getLastSignedInAccount(context)
+        if (last != null && last.account != null) {
+            return last.account
+        }
+        return null
+    }
+
+    /**
+     * Mirrors the given backup ZIP file to public Downloads/MindLink/mindlink_backup_latest.zip.
+     * This location survives app uninstallation and allows instant auto-restore on reinstallation.
+     */
+    private fun mirrorBackupToDownloads(zipFile: File) {
+        if (!zipFile.exists() || zipFile.length() <= 0) return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val resolver = context.contentResolver
+                val queryUri = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND ${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?"
+                val selectionArgs = arrayOf("mindlink_backup_latest.zip", "%MindLink%")
+                try {
+                    resolver.query(queryUri, arrayOf(MediaStore.MediaColumns._ID), selection, selectionArgs, null)?.use { cursor ->
+                        while (cursor.moveToNext()) {
+                            val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID))
+                            val itemUri = ContentUris.withAppendedId(queryUri, id)
+                            resolver.delete(itemUri, null, null)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w("GoogleSyncManager", "MediaStore cleanup warning: ${e.message}")
+                }
+
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, "mindlink_backup_latest.zip")
+                    put(MediaStore.MediaColumns.MIME_TYPE, "application/zip")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/MindLink")
+                }
+                val uri = resolver.insert(queryUri, values)
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { out ->
+                        zipFile.inputStream().use { input -> input.copyTo(out) }
+                    }
+                }
+            } else {
+                val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MindLink")
+                if (!dir.exists()) dir.mkdirs()
+                val targetFile = File(dir, "mindlink_backup_latest.zip")
+                zipFile.copyTo(targetFile, overwrite = true)
+            }
+            Log.i("GoogleSyncManager", "Mirrored backup to public Downloads/MindLink/mindlink_backup_latest.zip")
+        } catch (e: Exception) {
+            Log.w("GoogleSyncManager", "Failed to mirror backup to Downloads: ${e.message}")
+        }
+    }
+
+    /**
+     * Discovers and opens an InputStream for the mirrored backup in Downloads/MindLink/.
+     */
+    fun openMirroredBackupStream(): InputStream? {
+        // 1. Direct file access (fastest if accessible)
+        try {
+            val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MindLink")
+            if (dir.exists()) {
+                val latest = File(dir, "mindlink_backup_latest.zip")
+                if (latest.exists() && latest.length() > 0) {
+                    return latest.inputStream()
+                }
+                val zips = dir.listFiles { f -> f.extension == "zip" && f.length() > 0 }
+                val newest = zips?.maxByOrNull { it.lastModified() }
+                if (newest != null) {
+                    return newest.inputStream()
+                }
+            }
+        } catch (_: Exception) {}
+
+        // 2. Query MediaStore.Downloads (Android 10+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val resolver = context.contentResolver
+                val uri = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                val projection = arrayOf(
+                    MediaStore.MediaColumns._ID,
+                    MediaStore.MediaColumns.DISPLAY_NAME,
+                    MediaStore.MediaColumns.DATE_MODIFIED
+                )
+                val selection = "(${MediaStore.MediaColumns.DISPLAY_NAME} = ? OR ${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?) AND ${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?"
+                val selectionArgs = arrayOf("mindlink_backup_latest.zip", "mindlink_backup_%.zip", "%MindLink%")
+                val sortOrder = "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
+
+                resolver.query(uri, projection, selection, selectionArgs, sortOrder)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID))
+                        val contentUri = ContentUris.withAppendedId(uri, id)
+                        return resolver.openInputStream(contentUri)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("GoogleSyncManager", "MediaStore query error: ${e.message}")
+            }
+        }
+
+        return null
+    }
+
     fun refreshBackupSlots() {
+        val slot1 = File(backupsDir, "backup_slot_1.zip")
+        if (!slot1.exists() || slot1.length() == 0L) {
+            // Auto-recover from mirrored public Downloads/MindLink backup
+            val stream = openMirroredBackupStream()
+            if (stream != null) {
+                try {
+                    stream.use { input ->
+                        slot1.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    Log.i("GoogleSyncManager", "Recovered slot 1 from public Downloads/MindLink mirror!")
+                } catch (e: Exception) {
+                    Log.w("GoogleSyncManager", "Failed to restore mirrored backup: ${e.message}")
+                }
+            }
+        }
+
         val slots = mutableListOf<BackupSlotInfo>()
         for (i in 1..3) {
             val zipFile = File(backupsDir, "backup_slot_$i.zip")
@@ -232,6 +374,12 @@ class GoogleSyncManager(
             }
         }
         _backupSlots.value = slots
+
+        val s1 = slots.firstOrNull { it.slot == 1 }
+        if (s1 != null && _lastBackupTime.value <= 0L) {
+            _lastBackupTime.value = s1.timestamp
+            _lastBackupSize.value = s1.sizeBytes
+        }
     }
 
     private fun readPayloadFromZip(file: File): MindLinkBackupPayload? {
@@ -290,7 +438,7 @@ class GoogleSyncManager(
                 return Result.success(profile)
             }
         } catch (apiEx: Exception) {
-            android.util.Log.w("GoogleSyncManager", "GoogleSignInApiException: ${apiEx.message}")
+            Log.w("GoogleSyncManager", "GoogleSignInApiException: ${apiEx.message}")
         }
 
         // Try AccountManager fallback
@@ -355,6 +503,7 @@ class GoogleSyncManager(
      * new -> slot 1
      * Keeps exactly the last 3 redundant backups.
      * Bundles all thoughts and attached photos into a compressed ZIP package.
+     * Also mirrors to public Downloads and uploads to Google Drive cloud.
      */
     suspend fun createBackup(isAuto: Boolean = false): Result<BackupSlotInfo> = withContext(Dispatchers.IO) {
         _syncState.value = SyncState.Syncing("Reading thoughts database and photos...")
@@ -368,10 +517,12 @@ class GoogleSyncManager(
                 var imageFileName: String? = null
                 if (!entity.imageUri.isNullOrBlank()) {
                     try {
-                        val path = Uri.parse(entity.imageUri).path ?: ""
-                        val f = File(path)
-                        val candidate = if (f.exists()) f else File(imagesDir, f.name)
-                        if (candidate.exists()) {
+                        val uri = Uri.parse(entity.imageUri)
+                        val nameCandidate = uri.lastPathSegment?.substringAfterLast('/')
+                            ?: File(uri.path ?: "").name
+                        val localCandidate = File(imagesDir, nameCandidate)
+                        val candidate = if (localCandidate.exists()) localCandidate else File(uri.path ?: "")
+                        if (candidate.exists() && candidate.isFile) {
                             imageFileName = candidate.name
                             if (!imageFilesToPack.contains(candidate)) {
                                 imageFilesToPack.add(candidate)
@@ -449,8 +600,11 @@ class GoogleSyncManager(
 
             refreshBackupSlots()
 
-            // Try Cloud Drive Upload if user is signed in
-            tryCloudUpload(jsonString)
+            // 1. Mirror backup to public device Downloads (persists across uninstalls!)
+            mirrorBackupToDownloads(slot1)
+
+            // 2. Try Cloud Drive Upload (ZIP containing thoughts + photos)
+            tryCloudUpload(slot1)
 
             val info = _backupSlots.value.firstOrNull { it.slot == 1 }
                 ?: BackupSlotInfo(1, "backup_slot_1.zip", now, dtos.size, size, BuildConfig.VERSION_NAME)
@@ -466,59 +620,90 @@ class GoogleSyncManager(
         }
     }
 
-    private suspend fun tryCloudUpload(jsonString: String) {
+    /**
+     * Uploads the full ZIP backup (thoughts + images) to Google Drive appDataFolder.
+     */
+    private suspend fun tryCloudUpload(zipFile: File) {
+        if (!zipFile.exists() || zipFile.length() <= 0) return
         val user = _currentUser.value ?: return
+        val account = getGoogleAccount() ?: return
+
         try {
-            val account = GoogleSignIn.getLastSignedInAccount(context)
-            if (account != null && account.account != null) {
-                val token = GoogleAuthUtil.getToken(
+            var uploadAuthError: String? = null
+            val token = try {
+                GoogleAuthUtil.getToken(
                     context,
-                    account.account!!,
+                    account,
                     "oauth2:https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file"
                 )
-                // Search for existing file
-                val searchReq = Request.Builder()
-                    .url("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='mindlink_backup.json'&fields=files(id)")
+            } catch (userEx: UserRecoverableAuthException) {
+                Log.w("GoogleSyncManager", "User recoverable auth exception for Drive: ${userEx.message}")
+                userEx.intent?.let { _userConsentIntent.emit(it) }
+                return
+            } catch (authEx: Exception) {
+                uploadAuthError = authEx.message
+                Log.w("GoogleSyncManager", "Could not obtain Drive OAuth token: ${authEx.message}")
+                null
+            }
+
+            if (token == null) {
+                if (uploadAuthError?.contains("UnregisteredOnApiConsole", ignoreCase = true) == true) {
+                    _syncState.value = SyncState.Error(
+                        "Google Drive OAuth pending registration in Google Cloud Console. Local & Downloads backup created successfully!"
+                    )
+                }
+                return
+            }
+
+            // Search for existing mindlink_backup.zip in appDataFolder
+            val searchReq = Request.Builder()
+                .url("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='mindlink_backup.zip'&fields=files(id)")
+                .header("Authorization", "Bearer $token")
+                .build()
+            val searchRes = okHttpClient.newCall(searchReq).execute()
+            var fileId: String? = null
+            if (searchRes.isSuccessful) {
+                val sJson = gson.fromJson(searchRes.body?.string(), JsonObject::class.java)
+                val arr = sJson.getAsJsonArray("files")
+                if (arr != null && arr.size() > 0) {
+                    fileId = arr[0].asJsonObject.get("id")?.asString
+                }
+            }
+
+            val uploadUrl = if (fileId != null) {
+                "https://www.googleapis.com/upload/drive/v3/files/$fileId?uploadType=media"
+            } else {
+                "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
+            }
+
+            val uploadReq = if (fileId != null) {
+                Request.Builder()
+                    .url(uploadUrl)
+                    .patch(zipFile.asRequestBody("application/zip".toMediaType()))
                     .header("Authorization", "Bearer $token")
                     .build()
-                val searchRes = okHttpClient.newCall(searchReq).execute()
-                var fileId: String? = null
-                if (searchRes.isSuccessful) {
-                    val sJson = gson.fromJson(searchRes.body?.string(), JsonObject::class.java)
-                    val arr = sJson.getAsJsonArray("files")
-                    if (arr != null && arr.size() > 0) {
-                        fileId = arr[0].asJsonObject.get("id")?.asString
-                    }
-                }
-
-                val uploadUrl = if (fileId != null) {
-                    "https://www.googleapis.com/upload/drive/v3/files/$fileId?uploadType=media"
-                } else {
-                    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
-                }
-
-                val uploadReq = if (fileId != null) {
-                    Request.Builder()
-                        .url(uploadUrl)
-                        .patch(jsonString.toRequestBody("application/json".toMediaType()))
-                        .header("Authorization", "Bearer $token")
-                        .build()
-                } else {
-                    val metadata = "{\"name\":\"mindlink_backup.json\",\"parents\":[\"appDataFolder\"]}"
-                    val multipart = MultipartBody.Builder()
-                        .setType(MultipartBody.FORM)
-                        .addFormDataPart("metadata", "", metadata.toRequestBody("application/json; charset=UTF-8".toMediaType()))
-                        .addFormDataPart("file", "mindlink_backup.json", jsonString.toRequestBody("application/json".toMediaType()))
-                        .build()
-                    Request.Builder()
-                        .url(uploadUrl)
-                        .post(multipart)
-                        .header("Authorization", "Bearer $token")
-                        .build()
-                }
-                okHttpClient.newCall(uploadReq).execute()
+            } else {
+                val metadata = "{\"name\":\"mindlink_backup.zip\",\"parents\":[\"appDataFolder\"]}"
+                val multipart = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("metadata", "", metadata.toRequestBody("application/json; charset=UTF-8".toMediaType()))
+                    .addFormDataPart("file", "mindlink_backup.zip", zipFile.asRequestBody("application/zip".toMediaType()))
+                    .build()
+                Request.Builder()
+                    .url(uploadUrl)
+                    .post(multipart)
+                    .header("Authorization", "Bearer $token")
+                    .build()
             }
-        } catch (_: Exception) {}
+            val res = okHttpClient.newCall(uploadReq).execute()
+            if (res.isSuccessful) {
+                Log.i("GoogleSyncManager", "Uploaded mindlink_backup.zip to Google Drive appDataFolder successfully!")
+            } else {
+                Log.w("GoogleSyncManager", "Google Drive upload HTTP ${res.code}: ${res.message}")
+            }
+        } catch (e: Exception) {
+            Log.w("GoogleSyncManager", "tryCloudUpload exception: ${e.message}")
+        }
     }
 
     /**
@@ -616,7 +801,12 @@ class GoogleSyncManager(
             payload.notes.forEach { dto ->
                 val resolvedImageUri = if (!dto.imageFileName.isNullOrBlank()) {
                     val localImg = File(imagesDir, dto.imageFileName)
-                    if (localImg.exists()) Uri.fromFile(localImg).toString() else null
+                    if (localImg.exists()) {
+                        Uri.fromFile(localImg).toString()
+                    } else {
+                        val match = imagesDir.listFiles()?.firstOrNull { it.name == dto.imageFileName }
+                        if (match != null) Uri.fromFile(match).toString() else null
+                    }
                 } else null
 
                 val entity = NoteEntity(
@@ -645,6 +835,7 @@ class GoogleSyncManager(
 
             val msg = "Successfully restored $count thoughts and attached photos!"
             _syncState.value = SyncState.Success(msg)
+            refreshBackupSlots()
             Result.success(count)
         } catch (e: Exception) {
             val err = e.message ?: "Failed to restore thoughts"
@@ -694,20 +885,20 @@ class GoogleSyncManager(
         val fileName = "mindlink_backup_$timestamp.zip"
 
         try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                val values = android.content.ContentValues().apply {
-                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/zip")
-                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/MindLink")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "application/zip")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/MindLink")
                 }
                 val resolver = context.contentResolver
-                val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
                     ?: return@withContext Result.failure(Exception("Failed to create file in Downloads"))
                 resolver.openOutputStream(uri)?.use { out ->
                     slot1.inputStream().use { input -> input.copyTo(out) }
                 }
             } else {
-                val dir = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "MindLink")
+                val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MindLink")
                 if (!dir.exists()) dir.mkdirs()
                 val targetFile = File(dir, fileName)
                 slot1.copyTo(targetFile, overwrite = true)
@@ -748,92 +939,135 @@ class GoogleSyncManager(
     }
 
     /**
-     * Downloads mindlink_backup.json from Google Drive cloud and restores into Room SQLite.
+     * Automatically discovers and restores thoughts and photos from:
+     * 1. Google Drive cloud (appDataFolder mindlink_backup.zip or json)
+     * 2. Persistent public device storage (Downloads/MindLink/mindlink_backup_latest.zip)
+     * 3. Local internal backup slots
+     * Automatically unpacking notes and photos into the Room database and files directory.
      */
     suspend fun restoreNotesFromGoogleDrive(): Result<Int> = withContext(Dispatchers.IO) {
+        _syncState.value = SyncState.Syncing("Searching for Google cloud backup...")
         val user = _currentUser.value
-        if (user == null) {
-            val err = "Please sign in with Google first."
-            _syncState.value = SyncState.Error(err)
-            return@withContext Result.failure(Exception(err))
+        val account = getGoogleAccount()
+        var lastAuthError: String? = null
+
+        // 1. Try Google Drive cloud download if account is available
+        if (account != null) {
+            try {
+                val token = try {
+                    GoogleAuthUtil.getToken(
+                        context,
+                        account,
+                        "oauth2:https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file"
+                    )
+                } catch (userEx: UserRecoverableAuthException) {
+                    Log.w("GoogleSyncManager", "User recoverable auth required: ${userEx.message}")
+                    userEx.intent?.let { _userConsentIntent.emit(it) }
+                    null
+                } catch (authEx: Exception) {
+                    lastAuthError = authEx.message
+                    Log.w("GoogleSyncManager", "Drive auth warning: ${authEx.message}")
+                    null
+                }
+
+                if (token != null) {
+                    _syncState.value = SyncState.Syncing("Connecting to Google Drive (${account.name})...")
+
+                    // Search for mindlink_backup.zip first
+                    val searchReq = Request.Builder()
+                        .url("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='mindlink_backup.zip'&fields=files(id,name,modifiedTime)")
+                        .header("Authorization", "Bearer $token")
+                        .build()
+                    val searchRes = okHttpClient.newCall(searchReq).execute()
+                    var zipFileId: String? = null
+                    if (searchRes.isSuccessful) {
+                        val sJson = gson.fromJson(searchRes.body?.string(), JsonObject::class.java)
+                        val arr = sJson.getAsJsonArray("files")
+                        if (arr != null && arr.size() > 0) {
+                            zipFileId = arr[0].asJsonObject.get("id")?.asString
+                        }
+                    }
+
+                    if (zipFileId != null) {
+                        _syncState.value = SyncState.Syncing("Downloading backup archive and photos from Google Drive...")
+                        val dlReq = Request.Builder()
+                            .url("https://www.googleapis.com/drive/v3/files/$zipFileId?alt=media")
+                            .header("Authorization", "Bearer $token")
+                            .build()
+                        val dlRes = okHttpClient.newCall(dlReq).execute()
+                        if (dlRes.isSuccessful && dlRes.body != null) {
+                            val stream = dlRes.body!!.byteStream()
+                            val res = restoreFromZipStream(stream)
+                            if (res.isSuccess) {
+                                refreshBackupSlots()
+                                return@withContext res
+                            }
+                        }
+                    }
+
+                    // Fallback to legacy mindlink_backup.json
+                    val jsonReq = Request.Builder()
+                        .url("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='mindlink_backup.json'&fields=files(id,name,modifiedTime)")
+                        .header("Authorization", "Bearer $token")
+                        .build()
+                    val jsonRes = okHttpClient.newCall(jsonReq).execute()
+                    var jsonFileId: String? = null
+                    if (jsonRes.isSuccessful) {
+                        val sJson = gson.fromJson(jsonRes.body?.string(), JsonObject::class.java)
+                        val arr = sJson.getAsJsonArray("files")
+                        if (arr != null && arr.size() > 0) {
+                            jsonFileId = arr[0].asJsonObject.get("id")?.asString
+                        }
+                    }
+
+                    if (jsonFileId != null) {
+                        _syncState.value = SyncState.Syncing("Downloading backup from Google Drive...")
+                        val dlReq = Request.Builder()
+                            .url("https://www.googleapis.com/drive/v3/files/$jsonFileId?alt=media")
+                            .header("Authorization", "Bearer $token")
+                            .build()
+                        val dlRes = okHttpClient.newCall(dlReq).execute()
+                        if (dlRes.isSuccessful && dlRes.body != null) {
+                            val json = dlRes.body!!.string()
+                            val res = restoreFromJsonString(json)
+                            if (res.isSuccess) {
+                                refreshBackupSlots()
+                                return@withContext res
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("GoogleSyncManager", "Drive restore attempt warning: ${e.message}")
+            }
         }
 
-        // If local redundant backup slot 1 exists, use it as fast instant restore
-        val slot1 = File(backupsDir, "backup_slot_1.json")
-        if (slot1.exists()) {
-            return@withContext restoreFromSlot(1)
+        // 2. Fallback: Search persistent device storage (Downloads/MindLink/)
+        _syncState.value = SyncState.Syncing("Searching persistent device backup...")
+        val mirroredStream = openMirroredBackupStream()
+        if (mirroredStream != null) {
+            val res = restoreFromZipStream(mirroredStream)
+            if (res.isSuccess) {
+                refreshBackupSlots()
+                return@withContext res
+            }
         }
 
-        _syncState.value = SyncState.Syncing("Connecting to Google Drive...")
-
-        try {
-            val account = GoogleSignIn.getLastSignedInAccount(context)
-            if (account == null || account.account == null) {
-                // If no OAuth token, restore from available slot
-                val slots = _backupSlots.value
-                if (slots.isNotEmpty()) {
-                    return@withContext restoreFromSlot(slots.first().slot)
-                }
-                val err = "No local or cloud backup found."
-                _syncState.value = SyncState.Error(err)
-                return@withContext Result.failure(Exception(err))
-            }
-
-            val token = GoogleAuthUtil.getToken(
-                context,
-                account.account!!,
-                "oauth2:https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file"
-            )
-
-            val searchReq = Request.Builder()
-                .url("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='mindlink_backup.json'&fields=files(id,name,modifiedTime)")
-                .header("Authorization", "Bearer $token")
-                .build()
-
-            val searchRes = okHttpClient.newCall(searchReq).execute()
-            if (!searchRes.isSuccessful) {
-                // Fallback to local slots
-                val slots = _backupSlots.value
-                if (slots.isNotEmpty()) {
-                    return@withContext restoreFromSlot(slots.first().slot)
-                }
-                val err = "No existing backup found in Google Drive."
-                _syncState.value = SyncState.Error(err)
-                return@withContext Result.failure(Exception(err))
-            }
-
-            val sJson = gson.fromJson(searchRes.body?.string(), JsonObject::class.java)
-            val arr = sJson.getAsJsonArray("files")
-            if (arr == null || arr.size() == 0) {
-                val slots = _backupSlots.value
-                if (slots.isNotEmpty()) {
-                    return@withContext restoreFromSlot(slots.first().slot)
-                }
-                val err = "No backup found on Google Drive."
-                _syncState.value = SyncState.Error(err)
-                return@withContext Result.failure(Exception(err))
-            }
-
-            val fileId = arr[0].asJsonObject.get("id").asString
-            _syncState.value = SyncState.Syncing("Downloading backup from Google Drive...")
-
-            val downloadReq = Request.Builder()
-                .url("https://www.googleapis.com/drive/v3/files/$fileId?alt=media")
-                .header("Authorization", "Bearer $token")
-                .build()
-
-            val downloadRes = okHttpClient.newCall(downloadReq).execute()
-            val jsonContent = downloadRes.body?.string() ?: ""
-            restoreFromJsonString(jsonContent)
-        } catch (e: Exception) {
-            // Graceful fallback to local redundant slots
-            val slots = _backupSlots.value
-            if (slots.isNotEmpty()) {
-                return@withContext restoreFromSlot(slots.first().slot)
-            }
-            val err = e.message ?: "Restore failed"
-            _syncState.value = SyncState.Error(err)
-            Result.failure(e)
+        // 3. Fallback: Local slots
+        val slots = _backupSlots.value
+        if (slots.isNotEmpty()) {
+            return@withContext restoreFromSlot(slots.first().slot)
         }
+
+        val err = when {
+            lastAuthError?.contains("UnregisteredOnApiConsole", ignoreCase = true) == true ->
+                "Google Drive API requires an OAuth Client ID in Google Cloud Console. Tap 'Restore File' below to restore from Downloads/MindLink/."
+            user != null ->
+                "No backup found on Google Drive for ${user.email} or on device storage. Tap 'Restore File' to load from Downloads/MindLink/."
+            else ->
+                "No local or cloud backup found. Please sign in or backup first."
+        }
+        _syncState.value = SyncState.Error(err)
+        Result.failure(Exception(err))
     }
 }

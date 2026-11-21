@@ -83,6 +83,20 @@ fun SettingsScreen(
         }
     }
 
+    val authConsentLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            viewModel.restoreFromGoogleDrive()
+        }
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.userConsentIntent?.collect { intent ->
+            authConsentLauncher.launch(intent)
+        }
+    }
+
     if (showUserGuideDialog) {
         MindLinkUserGuideDialog(onDismiss = { showUserGuideDialog = false })
     }
@@ -1065,13 +1079,11 @@ fun SettingsScreen(
                                 )
                             }
                         }
-                        IconButton(onClick = { isBackupCardExpanded = !isBackupCardExpanded }) {
-                            Icon(
-                                imageVector = if (isBackupCardExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = if (isBackupCardExpanded) "Minimize" else "Expand",
-                                tint = MindTextSecondary
-                            )
-                        }
+                        Icon(
+                            imageVector = if (isBackupCardExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (isBackupCardExpanded) "Minimize" else "Expand",
+                            tint = MindTextSecondary
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -1359,7 +1371,10 @@ fun SettingsScreen(
                             ) {
                                 Button(
                                     onClick = { viewModel.backupToGoogleDrive() },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(44.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = PastelSky,
                                         contentColor = MindBackgroundDark
@@ -1368,13 +1383,16 @@ fun SettingsScreen(
                                     enabled = uiState.syncState !is com.mindlink.journal.data.sync.SyncState.Syncing
                                 ) {
                                     Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Backup Now", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Backup Now", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                                 }
 
                                 Button(
                                     onClick = { viewModel.downloadBackupToDevice() },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(44.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = PastelMint,
                                         contentColor = MindBackgroundDark
@@ -1383,8 +1401,8 @@ fun SettingsScreen(
                                     enabled = uiState.syncState !is com.mindlink.journal.data.sync.SyncState.Syncing
                                 ) {
                                     Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Download to Device", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Download to Device", fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1, softWrap = false)
                                 }
                             }
 
@@ -1397,13 +1415,16 @@ fun SettingsScreen(
                             ) {
                                 OutlinedButton(
                                     onClick = { viewModel.restoreFromGoogleDrive() },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(38.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelLavender),
                                     border = BorderStroke(1.dp, PastelLavender.copy(alpha = 0.5f)),
                                     shape = RoundedCornerShape(10.dp),
-                                    enabled = uiState.syncState !is com.mindlink.journal.data.sync.SyncState.Syncing && uiState.backupSlots.isNotEmpty()
+                                    enabled = uiState.syncState !is com.mindlink.journal.data.sync.SyncState.Syncing && (uiState.googleUser != null || uiState.backupSlots.isNotEmpty())
                                 ) {
-                                    Text("Restore Latest", fontSize = 11.sp, maxLines = 1)
+                                    Text(if (uiState.googleUser != null) "Restore Cloud" else "Restore Latest", fontSize = 11.sp, maxLines = 1)
                                 }
 
                                 OutlinedButton(
@@ -1411,7 +1432,10 @@ fun SettingsScreen(
                                         val dateStr = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
                                         saveToDriveLauncher.launch("mindlink_backup_$dateStr.zip")
                                     },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(38.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MindTextSecondary),
                                     border = BorderStroke(1.dp, MindBorderDark),
                                     shape = RoundedCornerShape(10.dp)
@@ -1423,7 +1447,10 @@ fun SettingsScreen(
                                     onClick = {
                                         restoreFromPickerLauncher.launch(arrayOf("application/zip", "application/json", "*/*"))
                                     },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(38.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MindTextSecondary),
                                     border = BorderStroke(1.dp, MindBorderDark),
                                     shape = RoundedCornerShape(10.dp)

@@ -174,6 +174,10 @@ class SettingsViewModel(
         }
     }
 
+    val userConsentIntent: SharedFlow<android.content.Intent>?
+        get() = appContext?.let { ServiceLocator.getInstance(it).googleSyncManager.userConsentIntent }
+
+
     fun refreshEngineStatus() {
         val engineName = compositeEngine?.getActiveEngineName() ?: "Local Life-Chapters NLP Engine (Zero Weights)"
         val slmInfo = compositeEngine?.mediaPipeEngine?.getModelInfo() ?: "Not installed"

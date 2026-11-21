@@ -211,7 +211,12 @@ fun NotesListScreen(
             val res = serviceLocator.googleSyncManager.handleSignInResult(result.data)
             if (res.isSuccess) {
                 coroutineScope.launch {
-                    serviceLocator.googleSyncManager.createBackup()
+                    val currentNotes = serviceLocator.database.noteDao().getAllNotesListSync()
+                    if (currentNotes.isEmpty()) {
+                        serviceLocator.googleSyncManager.restoreNotesFromGoogleDrive()
+                    } else {
+                        serviceLocator.googleSyncManager.createBackup()
+                    }
                 }
                 viewModel.dismissOnboarding()
             }
@@ -224,7 +229,12 @@ fun NotesListScreen(
         val res = serviceLocator.googleSyncManager.handleSignInResult(result.data)
         if (res.isSuccess) {
             coroutineScope.launch {
-                serviceLocator.googleSyncManager.createBackup()
+                val currentNotes = serviceLocator.database.noteDao().getAllNotesListSync()
+                if (currentNotes.isEmpty()) {
+                    serviceLocator.googleSyncManager.restoreNotesFromGoogleDrive()
+                } else {
+                    serviceLocator.googleSyncManager.createBackup()
+                }
             }
             viewModel.dismissOnboarding()
         } else {

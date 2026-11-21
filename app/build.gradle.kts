@@ -43,6 +43,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            val releaseConfig = signingConfigs.getByName("release")
+            if (releaseConfig.storeFile != null) {
+                signingConfig = releaseConfig
+            }
+        }
         release {
             isMinifyEnabled = false
             val releaseConfig = signingConfigs.getByName("release")
