@@ -44,6 +44,7 @@ import kotlinx.coroutines.delay
 import com.mindlink.journal.di.ServiceLocator
 import com.mindlink.journal.domain.model.Note
 import com.mindlink.journal.ui.components.MindLinkOnboardingDialog
+import com.mindlink.journal.ui.components.liquidGlass
 import com.mindlink.journal.ui.notes.components.NoteCard
 import com.mindlink.journal.ui.notes.components.NoteViewMode
 import com.mindlink.journal.ui.theme.*
@@ -200,7 +201,7 @@ fun NotesListScreen(
 
     Scaffold(
         topBar = {
-            Column(modifier = Modifier.background(MindBackgroundAmoled)) {
+            Column(modifier = Modifier.background(if (MindIsGlassy) Color.Transparent else MindBackgroundAmoled)) {
                 TopAppBar(
                     title = {
                         Text(
@@ -253,18 +254,26 @@ fun NotesListScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MindBackgroundAmoled
+                        containerColor = if (MindIsGlassy) Color.Transparent else MindBackgroundAmoled
                     )
                 )
 
                 // WhatsApp-Style Persistent Search & Second Brain Bar
                 Surface(
-                    color = MindGlassSurface,
-                    border = BorderStroke(1.dp, MindPrismGlassCardBorder),
+                    color = if (MindIsGlassy) Color.Transparent else MindGlassSurface,
+                    border = if (MindIsGlassy) null else BorderStroke(1.dp, MindPrismGlassCardBorder),
                     shape = RoundedCornerShape(24.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .liquidGlass(
+                            shape = RoundedCornerShape(24.dp),
+                            cornerRadius = 24.dp,
+                            isGlassy = MindIsGlassy,
+                            isDark = LocalMindLinkColors.current.isDark,
+                            cardBackground = MindGlassCardBackground,
+                            cardBorder = MindGlassCardBorder
+                        )
                         .clickable {
                             searchFocusRequester.requestFocus()
                             keyboardController?.show()
@@ -380,12 +389,20 @@ fun NotesListScreen(
                         }
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) accent.copy(alpha = 0.2f) else MindGlassSurface,
-                            border = BorderStroke(1.dp, if (isSelected) accent.copy(alpha = 0.5f) else MindGlassBorderSubtle),
+                            color = if (isSelected) accent.copy(alpha = if (MindIsGlassy) 0.35f else 0.2f) else if (MindIsGlassy) Color.Transparent else MindGlassSurface,
+                            border = if (MindIsGlassy) null else BorderStroke(1.dp, if (isSelected) accent.copy(alpha = 0.5f) else MindGlassBorderSubtle),
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { viewModel.selectTab(tab) }
+                                .liquidGlass(
+                                    shape = RoundedCornerShape(12.dp),
+                                    cornerRadius = 12.dp,
+                                    isGlassy = MindIsGlassy,
+                                    isDark = LocalMindLinkColors.current.isDark,
+                                    cardBackground = if (isSelected) androidx.compose.ui.graphics.Brush.verticalGradient(listOf(accent.copy(alpha = 0.28f), accent.copy(alpha = 0.16f))) else MindGlassCardBackground,
+                                    cardBorder = if (isSelected) androidx.compose.ui.graphics.Brush.verticalGradient(listOf(accent.copy(alpha = 0.8f), accent.copy(alpha = 0.4f))) else MindGlassCardBorder,
+                                    elevation = 2.dp,
+                                    onClick = { viewModel.selectTab(tab) }
+                                )
                         ) {
                             Row(
                                 modifier = Modifier.padding(vertical = 8.dp),
@@ -415,10 +432,26 @@ fun NotesListScreen(
             if (uiState.selectedTab == NotesTab.JOURNAL) {
                 FloatingActionButton(
                     onClick = { showJournalingMethodsSheet = true },
-                    containerColor = PastelLavender,
-                    contentColor = Color.Black,
+                    containerColor = if (MindIsGlassy) Color.Transparent else PastelLavender,
+                    contentColor = if (MindIsGlassy) MindTextPrimary else Color.Black,
                     shape = CircleShape,
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = if (MindIsGlassy) 0.dp else 6.dp),
+                    modifier = if (MindIsGlassy) {
+                        Modifier.liquidGlass(
+                            shape = CircleShape,
+                            cornerRadius = 28.dp,
+                            isGlassy = true,
+                            isDark = LocalMindLinkColors.current.isDark,
+                            cardBackground = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                listOf(
+                                    Color.White.copy(alpha = 0.50f),
+                                    PastelLavender.copy(alpha = 0.35f)
+                                )
+                            ),
+                            cardBorder = MindGlassCardBorder,
+                            elevation = 6.dp
+                        )
+                    } else Modifier
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
@@ -428,7 +461,7 @@ fun NotesListScreen(
                 }
             }
         },
-        containerColor = MindBackgroundAmoled
+        containerColor = if (MindIsGlassy) Color.Transparent else MindBackgroundAmoled
     ) { paddingValues ->
         Column(
             modifier = Modifier

@@ -40,6 +40,7 @@ import com.mindlink.journal.ui.detail.components.RelatedThoughtsCard
 import com.mindlink.journal.ui.editor.components.TextRecognitionHelper
 import com.mindlink.journal.ui.notes.components.MoodBadge
 import com.mindlink.journal.ui.components.RichTextView
+import com.mindlink.journal.ui.components.liquidGlass
 import com.mindlink.journal.ui.history.NoteVersionHistoryDialog
 import com.mindlink.journal.ui.theme.*
 import kotlinx.coroutines.launch
@@ -202,11 +203,11 @@ fun NoteDetailScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MindBackgroundDark
+                    containerColor = if (MindIsGlassy) Color.Transparent else MindBackgroundDark
                 )
             )
         },
-        containerColor = MindBackgroundDark
+        containerColor = if (MindIsGlassy) Color.Transparent else MindBackgroundDark
     ) { paddingValues ->
         if (note == null) {
             Box(
@@ -554,11 +555,23 @@ fun NoteDetailScreen(
                     }
 
                     // 1. RAW USER JOURNAL CONTENT
+                    val detailGlassy = MindIsGlassy
+                    val detailDark = LocalMindLinkColors.current.isDark
+                    val journalCardShape = RoundedCornerShape(18.dp)
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(containerColor = MindGlassSurface),
-                        border = BorderStroke(1.dp, MindGlassCardBorder)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .liquidGlass(
+                                shape = journalCardShape,
+                                cornerRadius = 18.dp,
+                                isGlassy = detailGlassy,
+                                isDark = detailDark,
+                                cardBackground = MindGlassCardBackground,
+                                cardBorder = MindGlassCardBorder
+                            ),
+                        shape = journalCardShape,
+                        colors = CardDefaults.cardColors(containerColor = if (detailGlassy) Color.Transparent else MindGlassSurface),
+                        border = if (detailGlassy) null else BorderStroke(1.dp, MindGlassCardBorder)
                     ) {
                         Column(modifier = Modifier.padding(18.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {

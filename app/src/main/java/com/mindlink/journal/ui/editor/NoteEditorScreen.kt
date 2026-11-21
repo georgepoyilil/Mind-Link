@@ -493,10 +493,10 @@ fun NoteEditorScreen(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MindBackgroundAmoled)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = if (MindIsGlassy) Color.Transparent else MindBackgroundAmoled)
             )
         },
-        containerColor = MindBackgroundAmoled
+        containerColor = if (MindIsGlassy) Color.Transparent else MindBackgroundAmoled
     ) { paddingValues ->
         Column(
             modifier = Modifier

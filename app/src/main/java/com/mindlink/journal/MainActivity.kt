@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.mindlink.journal.di.ServiceLocator
+import com.mindlink.journal.ui.components.LiquidGlassAtmosphere
 import com.mindlink.journal.ui.navigation.MindLinkNavHost
 import com.mindlink.journal.ui.theme.MindLinkTheme
 import com.mindlink.journal.ui.theme.MindTheme
@@ -54,7 +55,12 @@ class MainActivity : ComponentActivity() {
                     showEmojis = showEmojis,
                     lineSpacingMultiplier = lineSpacingMultiplier
                 ) {
-                    MindLinkNavHost()
+                    LiquidGlassAtmosphere(
+                        isDark = mindTheme.isDark,
+                        isGlassy = mindTheme.isGlassy
+                    ) {
+                        MindLinkNavHost()
+                    }
                 }
             }
         }

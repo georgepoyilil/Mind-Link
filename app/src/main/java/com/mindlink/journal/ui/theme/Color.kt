@@ -9,42 +9,48 @@ import androidx.compose.ui.graphics.Color
 // Core Theme Definitions & Atmosphere
 // -------------------------------------------------------------
 
-enum class MindTheme(val id: String, val title: String, val subtitle: String, val isDark: Boolean) {
+enum class MindTheme(val id: String, val title: String, val subtitle: String, val isDark: Boolean, val isGlassy: Boolean = false) {
     AMOLED_BLACK(
         id = "amoled_black",
         title = "AMOLED Pitch Black",
         subtitle = "Pure #000000 pixels-off, ultra high contrast",
-        isDark = true
+        isDark = true,
+        isGlassy = false
     ),
     IOS_GLASSY(
         id = "ios_glassy",
         title = "iOS Liquid Glass (Dark)",
         subtitle = "Ultra-frosted midnight glass, iridescent specular rims",
-        isDark = true
+        isDark = true,
+        isGlassy = true
     ),
     IOS_GLASSY_LIGHT(
         id = "ios_glassy_light",
         title = "iOS Liquid Glass (Light)",
         subtitle = "Crystalline frosted acrylic with radiant specular gleam",
-        isDark = false
+        isDark = false,
+        isGlassy = true
     ),
     PIXEL_MINIMAL(
         id = "pixel_minimal",
         title = "Pixel Material You",
         subtitle = "Monet charcoal with warm pastel dynamic accents",
-        isDark = true
+        isDark = true,
+        isGlassy = false
     ),
     LIGHT_CLEAN(
         id = "light_clean",
         title = "Daylight Minimal",
         subtitle = "Crisp slate white with high-contrast ink",
-        isDark = false
+        isDark = false,
+        isGlassy = false
     ),
     LIGHT_PAPER(
         id = "light_paper",
         title = "Warm Paper Journal",
         subtitle = "Moleskine cream parchment with espresso ink",
-        isDark = false
+        isDark = false,
+        isGlassy = false
     );
 
     companion object {
@@ -72,7 +78,11 @@ data class MindLinkColors(
     val accentSecondary: Color,
     val glassCardBorder: Brush,
     val bottomDock: Color,
-    val isDark: Boolean
+    val isDark: Boolean,
+    val isGlassy: Boolean = false,
+    val glassCardBackground: Brush = Brush.linearGradient(listOf(glassSurface, glassSurface)),
+    val glassTopHighlight: Brush = Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent)),
+    val glassInnerSheen: Brush = Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
 )
 
 // Brand Accents
@@ -195,60 +205,98 @@ fun getThemeColors(theme: MindTheme): MindLinkColors = when (theme) {
         isDark = true
     )
     MindTheme.IOS_GLASSY -> MindLinkColors(
-        background = Color(0xFF040716), // Cosmic deep space midnight
-        surface = Color(0x3810234D),    // Ultra-translucent liquid glass (~22% opacity)
-        surfaceElevated = Color(0x5218326B), // Translucent elevated glass (~32% opacity)
-        surfaceVariant = Color(0x2E1E3A8A),  // Translucent variant
-        glassSurface = Color(0x380E1E45),    // Translucent liquid acrylic
-        glassSurfaceElevated = Color(0x59152F69),
-        glassSurfaceVariant = Color(0x291E3A8A),
-        glassBorder = Color(0x8038BDF8),    // Electric iridescent sky-cyan specular rim
-        glassBorderSubtle = Color(0x4DFFFFFF), // Crisp specular white edge highlight
-        border = Color(0x4D38BDF8),
-        textPrimary = Color(0xFFFFFFFF),
-        textSecondary = Color(0xFFBAE6FD),  // Light ethereal ice blue
-        textTertiary = Color(0xFF7DD3FC),
+        background = Color(0xFF080C16), // Apple Space Black / Deep Midnight
+        surface = Color(0xD91E2738),    // 85% silky frosted smoky slate
+        surfaceElevated = Color(0xE6242F42), // 90% elevated frosted glass
+        surfaceVariant = Color(0x99182030),  // 60% frosted variant
+        glassSurface = Color(0xD91E2738),    // Silky frosted acrylic
+        glassSurfaceElevated = Color(0xE6242F42),
+        glassSurfaceVariant = Color(0x99182030),
+        glassBorder = Color(0x33FFFFFF),    // Delicate 20% white specular rim
+        glassBorderSubtle = Color(0x1AFFFFFF), // 10% subtle edge
+        border = Color(0x2EFFFFFF),
+        textPrimary = Color(0xFFF8FAFC),
+        textSecondary = Color(0xFF94A3B8),
+        textTertiary = Color(0xFF64748B),
         accentPrimary = Color(0xFF38BDF8),  // Apple vibrant cyan
         accentSecondary = Color(0xFF818CF8), // Apple electric indigo
-        glassCardBorder = Brush.linearGradient(
+        glassCardBorder = Brush.verticalGradient(
             listOf(
-                Color(0xCCFFFFFF), // Pure white specular edge gleam
-                Color(0x9938BDF8), // Electric cyan light leak
-                Color(0x73818CF8), // Indigo refraction
-                Color(0x66EC4899), // Neon magenta chromatic aberration
-                Color(0x99FFFFFF)  // Pure specular gleam
+                Color(0x40FFFFFF), // Subtle top specular white highlight
+                Color(0x20FFFFFF), // Mid translucent edge
+                Color(0x0AFFFFFF)  // Soft bottom rim
             )
         ),
-        bottomDock = Color(0xCC040716),     // Translucent frosted bottom dock
-        isDark = true
+        bottomDock = Color(0xE6080C16),     // Frosted midnight dock
+        isDark = true,
+        isGlassy = true,
+        glassCardBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xD91E2738), // 85% smoky charcoal top
+                Color(0xBF161E2E), // 75% frosted midnight
+                Color(0xB3101624)  // 70% deep frosted slate
+            )
+        ),
+        glassTopHighlight = Brush.horizontalGradient(
+            listOf(
+                Color.Transparent,
+                Color.White.copy(alpha = 0.30f),
+                Color.Transparent
+            )
+        ),
+        glassInnerSheen = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.08f),
+                Color.Transparent
+            )
+        )
     )
     MindTheme.IOS_GLASSY_LIGHT -> MindLinkColors(
-        background = Color(0xFFEDF2FD),     // Crystalline airy ice
-        surface = Color(0xB8FFFFFF),        // ~72% translucent crystalline white glass
-        surfaceElevated = Color(0xD9FFFFFF), // ~85% translucent elevated acrylic glass
-        surfaceVariant = Color(0x80DBEAFE),  // ~50% translucent frosted ice-sky
-        glassSurface = Color(0xB8FFFFFF),   // Translucent white glass
-        glassSurfaceElevated = Color(0xE6FFFFFF),
-        glassSurfaceVariant = Color(0x80DBEAFE),
-        glassBorder = Color(0x8038BDF8),    // Brilliant cyan specular rim
-        glassBorderSubtle = Color(0xB3FFFFFF), // Brilliant pure white specular rim
-        border = Color(0x4D38BDF8),
-        textPrimary = Color(0xFF0F172A),    // Crisp deep slate ink
+        background = Color(0xFFE8EEF7),     // Apple Daylight Opalescent Mist
+        surface = Color(0xE6FFFFFF),        // 90% silky frosted white milk
+        surfaceElevated = Color(0xF5FFFFFF), // 96% elevated frosted white
+        surfaceVariant = Color(0xCCF1F5F9),  // 80% soft frosted mist
+        glassSurface = Color(0xE6FFFFFF),   // Milky frosted glass
+        glassSurfaceElevated = Color(0xF5FFFFFF),
+        glassSurfaceVariant = Color(0xCCF1F5F9),
+        glassBorder = Color(0x80FFFFFF),    // Crisp 50% white specular rim
+        glassBorderSubtle = Color(0x40FFFFFF), // 25% white rim
+        border = Color(0x200F172A),         // Soft depth rim
+        textPrimary = Color(0xFF0F172A),    // Crisp Apple slate ink
         textSecondary = Color(0xFF334155),  // Subtle slate
         textTertiary = Color(0xFF64748B),
         accentPrimary = Color(0xFF0284C7),  // Apple vibrant sky blue
         accentSecondary = Color(0xFF6366F1), // Apple royal indigo
-        glassCardBorder = Brush.linearGradient(
+        glassCardBorder = Brush.verticalGradient(
             listOf(
-                Color(0xFFFFFFFF), // Pure white specular edge
-                Color(0x8038BDF8), // Iridescent cyan refraction
-                Color(0x59818CF8), // Violet refraction
-                Color(0x40F43F5E), // Rose chromatic leak
-                Color(0xFFFFFFFF)  // Pure white gleam
+                Color(0xCCFFFFFF), // Crisp 80% white specular top highlight
+                Color(0x66FFFFFF), // Soft 40% translucent edge
+                Color(0x200F172A)  // Subtle shadow rim at bottom for contrast
             )
         ),
-        bottomDock = Color(0xE6EDF2FD),     // Frosted ice dock
-        isDark = false
+        bottomDock = Color(0xE6E8EEF7),     // Frosted daylight dock
+        isDark = false,
+        isGlassy = true,
+        glassCardBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xF2FFFFFF), // 95% crisp sunlit white glass top
+                Color(0xD9FFFFFF), // 85% silky frosted milk
+                Color(0xCCF1F5F9)  // 80% soft pearl mist
+            )
+        ),
+        glassTopHighlight = Brush.horizontalGradient(
+            listOf(
+                Color.Transparent,
+                Color.White.copy(alpha = 0.50f),
+                Color.Transparent
+            )
+        ),
+        glassInnerSheen = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.15f),
+                Color.Transparent
+            )
+        )
     )
     MindTheme.PIXEL_MINIMAL -> MindLinkColors(
         background = Color(0xFF131314),
@@ -367,3 +415,8 @@ val MindGlassButtonBorder: Color @Composable @ReadOnlyComposable get() =
 
 val MindGlassButtonText: Color @Composable @ReadOnlyComposable get() =
     if (LocalMindLinkColors.current.isDark) Color(0xFFE2E8F0) else LocalMindLinkColors.current.textPrimary
+
+val MindIsGlassy: Boolean @Composable @ReadOnlyComposable get() = LocalMindLinkColors.current.isGlassy
+val MindGlassCardBackground: Brush @Composable @ReadOnlyComposable get() = LocalMindLinkColors.current.glassCardBackground
+val MindGlassTopHighlight: Brush @Composable @ReadOnlyComposable get() = LocalMindLinkColors.current.glassTopHighlight
+val MindGlassInnerSheen: Brush @Composable @ReadOnlyComposable get() = LocalMindLinkColors.current.glassInnerSheen

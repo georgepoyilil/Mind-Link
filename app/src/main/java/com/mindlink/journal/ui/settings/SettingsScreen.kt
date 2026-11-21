@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.mindlink.journal.BuildConfig
 import com.mindlink.journal.ui.components.MindLinkOnboardingDialog
 import com.mindlink.journal.ui.components.MindLinkUserGuideDialog
+import com.mindlink.journal.ui.components.liquidGlass
 import com.mindlink.journal.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,10 +65,10 @@ fun SettingsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MindTextPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MindBackgroundDark)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = if (MindIsGlassy) Color.Transparent else MindBackgroundDark)
             )
         },
-        containerColor = MindBackgroundDark
+        containerColor = if (MindIsGlassy) Color.Transparent else MindBackgroundDark
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -78,10 +79,21 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // 0. Visual Atmosphere & Themes Card
+            val isSettingsGlassy = MindIsGlassy
+            val isSettingsDark = LocalMindLinkColors.current.isDark
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
-                modifier = Modifier.fillMaxWidth()
+                colors = CardDefaults.cardColors(containerColor = if (isSettingsGlassy) Color.Transparent else MindSurfaceDark),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .liquidGlass(
+                        shape = RoundedCornerShape(16.dp),
+                        cornerRadius = 16.dp,
+                        isGlassy = isSettingsGlassy,
+                        isDark = isSettingsDark,
+                        cardBackground = MindGlassCardBackground,
+                        cardBorder = MindGlassCardBorder
+                    )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

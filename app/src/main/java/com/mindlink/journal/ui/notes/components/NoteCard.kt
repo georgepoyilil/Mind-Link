@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.mindlink.journal.domain.model.Note
+import com.mindlink.journal.ui.components.liquidGlass
 import com.mindlink.journal.ui.theme.*
 
 enum class NoteViewMode(val label: String, val icon: ImageVector) {
@@ -54,15 +55,25 @@ fun NoteStandardCard(
     modifier: Modifier = Modifier
 ) {
     val cardFont = resolveNoteFontFamily(note.fontFamily)
+    val isGlassy = MindIsGlassy
+    val isDark = LocalMindLinkColors.current.isDark
+    val cardShape = RoundedCornerShape(14.dp)
 
     Card(
+        onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MindGlassSurface),
-        border = BorderStroke(1.2.dp, MindPrismGlassCardBorder),
+            .liquidGlass(
+                shape = cardShape,
+                cornerRadius = 14.dp,
+                isGlassy = isGlassy,
+                isDark = isDark,
+                cardBackground = MindGlassCardBackground,
+                cardBorder = MindGlassCardBorder
+            ),
+        shape = cardShape,
+        colors = CardDefaults.cardColors(containerColor = if (isGlassy) Color.Transparent else MindGlassSurface),
+        border = if (isGlassy) null else BorderStroke(1.2.dp, MindPrismGlassCardBorder),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -222,14 +233,25 @@ fun NoteCompactItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isGlassy = MindIsGlassy
+    val isDark = LocalMindLinkColors.current.isDark
+    val compactShape = RoundedCornerShape(10.dp)
+
     Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = MindGlassSurface,
-        border = BorderStroke(1.dp, MindPrismGlassCardBorder),
+        onClick = onClick,
+        shape = compactShape,
+        color = if (isGlassy) Color.Transparent else MindGlassSurface,
+        border = if (isGlassy) null else BorderStroke(1.dp, MindPrismGlassCardBorder),
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
+            .liquidGlass(
+                shape = compactShape,
+                cornerRadius = 10.dp,
+                isGlassy = isGlassy,
+                isDark = isDark,
+                cardBackground = MindGlassCardBackground,
+                cardBorder = MindGlassCardBorder
+            )
     ) {
         Row(
             modifier = Modifier
@@ -312,15 +334,26 @@ fun NoteFullWidthCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isGlassy = MindIsGlassy
+    val isDark = LocalMindLinkColors.current.isDark
+    val fullShape = RoundedCornerShape(16.dp)
+
     Card(
+        onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MindGlassSurface),
-        border = BorderStroke(1.dp, MindPrismBorder),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            .liquidGlass(
+                shape = fullShape,
+                cornerRadius = 16.dp,
+                isGlassy = isGlassy,
+                isDark = isDark,
+                cardBackground = MindGlassCardBackground,
+                cardBorder = MindGlassCardBorder
+            ),
+        shape = fullShape,
+        colors = CardDefaults.cardColors(containerColor = if (isGlassy) Color.Transparent else MindGlassSurface),
+        border = if (isGlassy) null else BorderStroke(1.dp, MindPrismBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isGlassy) 0.dp else 3.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Optional Header Image
