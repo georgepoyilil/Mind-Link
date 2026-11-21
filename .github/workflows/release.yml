@@ -50,8 +50,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: dist/*.apk
-          name: "MindLink ${{ github.ref_name || 'v1.1.0' }}"
-          tag_name: ${{ github.ref_name || 'v1.1.0' }}
+          name: "MindLink ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
           generate_release_notes: true
           draft: false
           prerelease: false
