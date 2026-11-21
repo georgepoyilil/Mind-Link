@@ -24,7 +24,9 @@ import com.mindlink.journal.ui.theme.*
 @Composable
 fun MindLinkOnboardingDialog(
     onDismiss: () -> Unit,
-    onLoadSamples: (() -> Unit)? = null
+    onLoadSamples: (() -> Unit)? = null,
+    onGoogleSignIn: (() -> Unit)? = null,
+    googleUser: com.mindlink.journal.data.sync.GoogleUserProfile? = null
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -40,7 +42,7 @@ fun MindLinkOnboardingDialog(
             border = BorderStroke(1.dp, MindGlassButtonBorder),
             modifier = Modifier
                 .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.85f)
+                .fillMaxHeight(0.88f)
         ) {
             Column(
                 modifier = Modifier
@@ -116,52 +118,140 @@ fun MindLinkOnboardingDialog(
                         title = "4. 100% Offline & Private",
                         description = "All thoughts, vector embeddings, and media are stored locally in Room SQLite. Zero trackers, zero cloud dependencies."
                     )
+                    OnboardingFeatureCard(
+                        icon = Icons.Default.CloudSync,
+                        iconColor = PastelSky,
+                        title = "5. Redundant Cloud & Photo Backup",
+                        description = "Optional Google Drive backup keeps 3 rolling historical snapshots with all your notes and attached photos safe."
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Action buttons
+                // Action buttons (Sign in with Google or Skip / Get Started)
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(
-                        onClick = onDismiss,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = PastelLavender,
-                            contentColor = MindBackgroundAmoled
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = if (onLoadSamples != null) "Get Started (Clean Slate)" else "Close Intro",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
-                        )
-                    }
+                    if (googleUser != null) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MindEmerald.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, MindEmerald.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MindEmerald, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Connected: ${googleUser.email}",
+                                    color = MindEmerald,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
 
-                    if (onLoadSamples != null) {
-                        OutlinedButton(
-                            onClick = onLoadSamples,
+                        Button(
+                            onClick = onDismiss,
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = PastelSky
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PastelLavender,
+                                contentColor = MindBackgroundAmoled
                             ),
-                            border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.5f)),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Load 8 Sample Thoughts",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp
+                                text = "Get Started",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
                             )
+                        }
+                    } else if (onGoogleSignIn != null) {
+                        // Sign in with Google Button
+                        Button(
+                            onClick = onGoogleSignIn,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.White,
+                                contentColor = Color(0xFF1F1F1F)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AccountCircle,
+                                contentDescription = null,
+                                tint = Color(0xFF4285F4),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Sign in with Google",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = Color(0xFF1F1F1F)
+                            )
+                        }
+
+                        // Skip & Continue Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = onDismiss) {
+                                Text(
+                                    text = "Skip for Now",
+                                    color = MindTextSecondary,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 13.sp
+                                )
+                            }
+
+                            if (onLoadSamples != null) {
+                                TextButton(onClick = onLoadSamples) {
+                                    Text(
+                                        text = "Load Sample Thoughts",
+                                        color = PastelSky,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = onDismiss,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PastelLavender,
+                                contentColor = MindBackgroundAmoled
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = if (onLoadSamples != null) "Get Started" else "Close Intro",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+                        }
+
+                        if (onLoadSamples != null) {
+                            OutlinedButton(
+                                onClick = onLoadSamples,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelSky),
+                                border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.5f)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Load 8 Sample Thoughts", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            }
                         }
                     }
                 }

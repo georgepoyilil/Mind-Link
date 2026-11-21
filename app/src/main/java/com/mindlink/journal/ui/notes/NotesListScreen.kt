@@ -1,5 +1,8 @@
 package com.mindlink.journal.ui.notes
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.launch
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -63,6 +66,7 @@ fun NotesListScreen(
     onSettingsClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val serviceLocator = remember { ServiceLocator.getInstance(context) }
     val savedViewModeStr by serviceLocator.noteViewMode.collectAsState()
     val initialViewMode = remember(savedViewModeStr) {
@@ -198,11 +202,51 @@ fun NotesListScreen(
         }
     }
 
+    val googleUser by serviceLocator.googleSyncManager.currentUser.collectAsState()
+
+    val accountChooserLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.data != null) {
+            val res = serviceLocator.googleSyncManager.handleSignInResult(result.data)
+            if (res.isSuccess) {
+                coroutineScope.launch {
+                    serviceLocator.googleSyncManager.createBackup()
+                }
+                viewModel.dismissOnboarding()
+            }
+        }
+    }
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val res = serviceLocator.googleSyncManager.handleSignInResult(result.data)
+        if (res.isSuccess) {
+            coroutineScope.launch {
+                serviceLocator.googleSyncManager.createBackup()
+            }
+            viewModel.dismissOnboarding()
+        } else {
+            val fallback = serviceLocator.googleSyncManager.getAccountChooserIntent()
+            if (fallback != null) accountChooserLauncher.launch(fallback)
+        }
+    }
+
     // First-Time User Onboarding Modal
     if (uiState.showOnboarding) {
         MindLinkOnboardingDialog(
             onDismiss = { viewModel.dismissOnboarding() },
-            onLoadSamples = { viewModel.loadSampleThoughtsAndDismiss() }
+            onLoadSamples = { viewModel.loadSampleThoughtsAndDismiss() },
+            onGoogleSignIn = {
+                val chooser = serviceLocator.googleSyncManager.getAccountChooserIntent()
+                if (chooser != null) {
+                    accountChooserLauncher.launch(chooser)
+                } else {
+                    googleSignInLauncher.launch(serviceLocator.googleSyncManager.getSignInIntent())
+                }
+            },
+            googleUser = googleUser
         )
     }
 
@@ -308,7 +352,6 @@ fun NotesListScreen(
                         }
 
                         // 4. Google Account Status Avatar (Shows signed-in state & backup status)
-                        val googleUser by serviceLocator.googleSyncManager.currentUser.collectAsState()
                         if (googleUser != null) {
                             val initial = (googleUser!!.displayName.firstOrNull() ?: googleUser!!.email.firstOrNull() ?: 'G').uppercaseChar()
                             IconButton(

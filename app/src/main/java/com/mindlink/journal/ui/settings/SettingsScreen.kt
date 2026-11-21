@@ -88,7 +88,10 @@ fun SettingsScreen(
     }
 
     if (showOnboardingDialog) {
-        MindLinkOnboardingDialog(onDismiss = { showOnboardingDialog = false })
+        MindLinkOnboardingDialog(
+            onDismiss = { showOnboardingDialog = false },
+            googleUser = uiState.googleUser
+        )
     }
 
     Scaffold(
