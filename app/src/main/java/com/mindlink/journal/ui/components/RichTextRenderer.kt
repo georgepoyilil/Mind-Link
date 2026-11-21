@@ -99,8 +99,35 @@ object RichTextRenderer {
                             length
                         )
                     }
-                    trimmed.startsWith("- ") || trimmed.startsWith("* ") -> {
-                        val bulletText = trimmed.substring(2).trim()
+                    // Task Lists / Checkboxes: - [ ], - [x], • [], • [ ], [ ], [x], etc.
+                    trimmed.matches(Regex("""^([-*•]\s*)?\[[ xX]?\].*""")) -> {
+                        val isChecked = trimmed.contains("[x]", ignoreCase = true)
+                        val taskText = trimmed.replaceFirst(Regex("""^([-*•]\s*)?\[[ xX]?\]\s*"""), "")
+
+                        val boxStart = length
+                        append(if (isChecked) "  ☑  " else "  ☐  ")
+                        addStyle(
+                            SpanStyle(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = (baseFontSizeSp * 1.1f).sp,
+                                color = if (isChecked) PastelLavender else if (baseColor != Color.Unspecified) baseColor.copy(alpha = 0.85f) else Color.Unspecified
+                            ),
+                            boxStart,
+                            length
+                        )
+
+                        val textStart = length
+                        append(parseInlineStyles(taskText, if (isChecked && baseColor != Color.Unspecified) baseColor.copy(alpha = 0.6f) else baseColor))
+                        if (isChecked) {
+                            addStyle(
+                                SpanStyle(textDecoration = TextDecoration.LineThrough),
+                                textStart,
+                                length
+                            )
+                        }
+                    }
+                    trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("• ") -> {
+                        val bulletText = trimmed.removePrefix("- ").removePrefix("* ").removePrefix("• ").trim()
                         append("  •  ")
                         append(parseInlineStyles(bulletText, baseColor))
                     }

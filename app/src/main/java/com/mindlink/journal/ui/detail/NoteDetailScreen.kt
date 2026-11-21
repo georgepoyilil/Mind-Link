@@ -1,7 +1,9 @@
 package com.mindlink.journal.ui.detail
 
+import android.content.Intent
 import android.media.MediaPlayer
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,17 +15,21 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -32,8 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import android.widget.Toast
 import coil.compose.AsyncImage
+
 import com.mindlink.journal.data.ai.LocalHeuristicBrainstormingEngine
 import com.mindlink.journal.ui.detail.components.ReflectionPromptsCard
 import com.mindlink.journal.ui.detail.components.RelatedThoughtsCard
@@ -315,108 +321,111 @@ fun NoteDetailScreen(
                             border = BorderStroke(1.dp, MindIndigo.copy(alpha = 0.4f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = if (isPlayingAudio) PastelRose else PastelLavender,
-                                        modifier = Modifier
-                                            .size(42.dp)
-                                            .clip(CircleShape)
-                                            .clickable {
-                                                try {
-                                                    if (isPlayingAudio) {
-                                                        mediaPlayer?.pause()
-                                                        isPlayingAudio = false
-                                                    } else {
-                                                        if (mediaPlayer == null) {
-                                                            val player = MediaPlayer.create(context, Uri.parse(note.audioUri))
-                                                            player?.setOnCompletionListener {
-                                                                isPlayingAudio = false
-                                                            }
-                                                            player?.setOnErrorListener { mp, _, _ ->
-                                                                mp.release()
-                                                                mediaPlayer = null
-                                                                isPlayingAudio = false
-                                                                true
-                                                            }
-                                                            mediaPlayer = player
-                                                        }
-                                                        mediaPlayer?.let { player ->
-                                                            if (player.currentPosition >= player.duration - 200) {
-                                                                player.seekTo(0)
-                                                            }
-                                                            player.start()
-                                                            isPlayingAudio = true
-                                                        }
-                                                    }
-                                                } catch (e: Exception) {
-                                                    isPlayingAudio = false
-                                                }
-                                            }
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        modifier = Modifier.weight(1f),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = if (isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                                contentDescription = if (isPlayingAudio) "Pause" else "Play",
-                                                tint = Color.Black,
-                                                modifier = Modifier.size(22.dp)
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = if (isPlayingAudio) PastelRose else PastelLavender,
+                                            modifier = Modifier
+                                                .size(42.dp)
+                                                .clip(CircleShape)
+                                                .clickable {
+                                                    try {
+                                                        if (isPlayingAudio) {
+                                                            mediaPlayer?.pause()
+                                                            isPlayingAudio = false
+                                                        } else {
+                                                            if (mediaPlayer == null) {
+                                                                val player = MediaPlayer.create(context, Uri.parse(note.audioUri))
+                                                                player?.setOnCompletionListener {
+                                                                    isPlayingAudio = false
+                                                                }
+                                                                player?.setOnErrorListener { mp, _, _ ->
+                                                                    mp.release()
+                                                                    mediaPlayer = null
+                                                                    isPlayingAudio = false
+                                                                    true
+                                                                }
+                                                                mediaPlayer = player
+                                                            }
+                                                            mediaPlayer?.let { player ->
+                                                                if (player.currentPosition >= player.duration - 200) {
+                                                                    player.seekTo(0)
+                                                                }
+                                                                player.start()
+                                                                isPlayingAudio = true
+                                                            }
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        isPlayingAudio = false
+                                                    }
+                                                }
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = if (isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                                    contentDescription = if (isPlayingAudio) "Pause" else "Play",
+                                                    tint = Color.Black,
+                                                    modifier = Modifier.size(22.dp)
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = if (isPlayingAudio) "Playing Voice Note..." else "Recorded Voice Note",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MindTextPrimary
+                                            )
+                                            Text(
+                                                text = "Duration: ${note.formattedAudioDuration} · High-efficiency AAC",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MindTextSecondary
                                             )
                                         }
                                     }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(
-                                            text = if (isPlayingAudio) "Playing Voice Note..." else "Recorded Voice Note",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MindTextPrimary
-                                        )
-                                        Text(
-                                            text = "Duration: ${note.formattedAudioDuration} · High-efficiency AAC",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MindTextSecondary
-                                        )
-                                    }
                                 }
-                            }
 
-                            // Transcribe Audio Action Button in Detail Screen
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (uiState.isTranscribing) MindGlassSurfaceElevated else MindGlassButtonContainer,
-                                border = BorderStroke(1.dp, MindGlassButtonBorder),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable(enabled = !uiState.isTranscribing) {
-                                        viewModel.transcribeAudio()
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
+                                // Transcribe Audio Action Button in Detail Screen
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (uiState.isTranscribing) MindGlassSurfaceElevated else MindGlassButtonContainer,
+                                    border = BorderStroke(1.dp, MindGlassButtonBorder),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable(enabled = !uiState.isTranscribing) {
+                                            viewModel.transcribeAudio()
+                                        }
                                 ) {
-                                    if (uiState.isTranscribing) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(15.dp),
-                                            color = PastelLavender,
-                                            strokeWidth = 2.dp
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Transcribing Audio with Gemini...", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PastelLavender)
-                                    } else {
-                                        Icon(Icons.Default.RecordVoiceOver, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(15.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Transcribe Audio to Note", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PastelLavender)
+                                    Row(
+                                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (uiState.isTranscribing) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(15.dp),
+                                                color = PastelLavender,
+                                                strokeWidth = 2.dp
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Transcribing Audio with Gemini...", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PastelLavender)
+                                        } else {
+                                            Icon(Icons.Default.RecordVoiceOver, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(15.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Transcribe Audio to Note", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PastelLavender)
+                                        }
                                     }
                                 }
                             }
@@ -733,8 +742,9 @@ fun NoteDetailScreen(
                         }
                     }
 
-                    // 2. AI TL;DR Summary Card
-                    if (note.summary != null) {
+                    // 2. AI TL;DR Summary Card (Validated - no raw JSON or code fences!)
+                    val validSummary = remember(note.summary) { note.cleanSummary }
+                    if (!validSummary.isNullOrBlank()) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
@@ -756,7 +766,7 @@ fun NoteDetailScreen(
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = note.summary,
+                                        text = validSummary,
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MindTextPrimary,
                                         lineHeight = 20.sp
@@ -839,12 +849,11 @@ fun NoteDetailScreen(
                                 }
                                 Spacer(modifier = Modifier.height(10.dp))
                                 note.actionItems.forEachIndexed { index, rawItem ->
-                                    val isChecked = rawItem.startsWith("[x] ", ignoreCase = true) || uiState.completedActionIndices.contains(index)
-                                    val cleanText = when {
-                                        rawItem.startsWith("[x] ", ignoreCase = true) -> rawItem.substring(4)
-                                        rawItem.startsWith("[ ] ") -> rawItem.substring(4)
-                                        else -> rawItem
-                                    }
+                                    val isChecked = rawItem.contains("[x]", ignoreCase = true) || rawItem.startsWith("x ", ignoreCase = true) || uiState.completedActionIndices.contains(index)
+                                    val cleanText = rawItem
+                                        .replace(Regex("""^([-*•]\s*)?\[[ xX]?\]\s*"""), "")
+                                        .replace(Regex("""^[-*•]\s*"""), "")
+                                        .trim()
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -902,44 +911,181 @@ fun NoteDetailScreen(
                         isLoading = uiState.isLoadingRelated,
                         onThoughtClick = onThoughtClick
                     )
+
+                    Spacer(modifier = Modifier.height(96.dp))
                 }
 
-                // Ergonomic Bottom Edit Dock (Thumb reachable!)
+                // Ergonomic Hovering Glass Bottom Dock
+                val isDockDark = LocalMindLinkColors.current.isDark
+                val dockShape = RoundedCornerShape(28.dp)
+                val clipboardManager = LocalClipboardManager.current
                 Surface(
-                    color = MindGlassBottomDock,
-                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                    border = BorderStroke(1.dp, MindGlassBorder),
+                    shape = dockShape,
+                    color = if (MindIsGlassy) {
+                        if (isDockDark) Color(0xF2182234) else Color(0xF6FFFFFF)
+                    } else MindGlassBottomDock,
+                    border = BorderStroke(
+                        width = 1.2.dp,
+                        brush = if (isDockDark) {
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0x90FFFFFF),
+                                    Color(0x30FFFFFF),
+                                    Color(0x10FFFFFF)
+                                )
+                            )
+                        } else {
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0xFFFFFFFF),
+                                    Color(0x80CBD5E1),
+                                    Color(0x3094A3B8)
+                                )
+                            )
+                        }
+                    ),
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
+                        .padding(horizontal = 16.dp, vertical = 18.dp)
                         .fillMaxWidth()
+                        .shadow(
+                            elevation = 14.dp,
+                            shape = dockShape,
+                            ambientColor = if (isDockDark) Color(0x90000000) else Color(0x300F172A),
+                            spotColor = if (isDockDark) Color(0xB0000000) else Color(0x400F172A)
+                        )
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TextButton(onClick = onNavigateBack) {
-                            Text("← Back", color = MindTextSecondary)
+                        // 1. Hover Back Button
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isDockDark) Color(0x25FFFFFF) else Color(0x150F172A),
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .clickable { onNavigateBack() }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = MindTextPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
 
+                        // 2. Middle Useful Quick Actions
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Copy Thought
+                            Surface(
+                                shape = CircleShape,
+                                color = if (isDockDark) Color(0x25FFFFFF) else Color(0x150F172A),
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .clickable {
+                                        clipboardManager.setText(
+                                            androidx.compose.ui.text.AnnotatedString(
+                                                "${note.title}\n\n${note.content}"
+                                            )
+                                        )
+                                        Toast.makeText(context, "Copied thought to clipboard!", Toast.LENGTH_SHORT).show()
+                                    }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Copy Thought",
+                                        tint = PastelSky,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                }
+                            }
+
+                            // Share Thought
+                            Surface(
+                                shape = CircleShape,
+                                color = if (isDockDark) Color(0x25FFFFFF) else Color(0x150F172A),
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .clickable {
+                                        val sendIntent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            putExtra(Intent.EXTRA_TEXT, "${note.title}\n\n${note.content}")
+                                            type = "text/plain"
+                                        }
+                                        context.startActivity(Intent.createChooser(sendIntent, "Share Thought"))
+                                    }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "Share Thought",
+                                        tint = PastelLavender,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                }
+                            }
+
+                            // Version History & Diff Shortcut
+                            Surface(
+                                shape = CircleShape,
+                                color = if (isDockDark) Color(0x25FFFFFF) else Color(0x150F172A),
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .clickable { showVersionHistoryDialog = true }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.History,
+                                        contentDescription = "Version History",
+                                        tint = PastelMint,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // 3. Edit Thought Button (Floating Glass Pill)
                         if (!note.isDeleted) {
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MindGlassButtonContainer,
-                                border = BorderStroke(1.dp, MindGlassButtonBorder),
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (isDockDark) PastelLavender.copy(alpha = 0.25f) else PastelLavender.copy(alpha = 0.35f),
+                                border = BorderStroke(1.2.dp, PastelLavender.copy(alpha = 0.60f)),
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .height(38.dp)
+                                    .clip(RoundedCornerShape(20.dp))
                                     .clickable { onEditClick(note.id) }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    modifier = Modifier.padding(horizontal = 14.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Edit, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(16.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = null,
+                                        tint = if (isDockDark) PastelLavender else Color(0xFF6B21A8),
+                                        modifier = Modifier.size(15.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Edit Thought", fontWeight = FontWeight.Bold, color = MindGlassButtonText, fontSize = 14.sp)
+                                    Text(
+                                        text = "Edit Thought",
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDockDark) Color.White else Color(0xFF4A148C),
+                                        fontSize = 13.5.sp
+                                    )
                                 }
                             }
                         }

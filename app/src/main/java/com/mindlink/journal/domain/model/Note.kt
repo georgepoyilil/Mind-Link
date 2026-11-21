@@ -52,9 +52,12 @@ data class Note(
             return (30 - elapsedDays).coerceAtLeast(0)
         }
 
+    val cleanSummary: String?
+        get() = sanitizeSummary(summary)
+
     val previewText: String
         get() {
-            val raw = summary?.takeIf { it.isNotBlank() } ?: content
+            val raw = cleanSummary?.takeIf { it.isNotBlank() } ?: content
             return raw.replace(Regex("[*~_#`]+"), "").take(160).replace("\n", " ").trim()
         }
 
@@ -126,4 +129,47 @@ data class Note(
             )
         }
     }
+}
+
+/**
+ * Validates and sanitizes AI TL;DR summaries before showing in the UI.
+ * Strips raw JSON wrapper keys, markdown code fences (```json), and handles malformed output.
+ */
+fun sanitizeSummary(raw: String?): String? {
+    if (raw.isNullOrBlank()) return null
+    var cleaned = raw.trim()
+
+    // 1. Remove markdown code fences ```json or ```
+    if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(Regex("^```[a-zA-Z]*\\s*"), "")
+            .replace(Regex("\\s*```$"), "")
+            .trim()
+    }
+
+    // 2. If it contains "summary": "...", extract the actual human summary sentence
+    val summaryMatch = Regex("\"summary\"\\s*:\\s*\"([^\"]+)\"").find(cleaned)
+    if (summaryMatch != null) {
+        cleaned = summaryMatch.groupValues[1].trim()
+    } else {
+        // Strip out stray JSON wrapper syntax if present
+        cleaned = cleaned
+            .removePrefix("{")
+            .removeSuffix("}")
+            .replace(Regex("^\"[a-zA-Z0-9_]+\"\\s*:\\s*"), "")
+            .replace(Regex("^\"|\"$"), "")
+            .trim()
+    }
+
+    // 3. Reject if it still looks like raw JSON, code fence, or is too short to be a real sentence
+    if (cleaned.isBlank() ||
+        cleaned.startsWith("```") ||
+        cleaned.startsWith("{") ||
+        cleaned.equals("json", ignoreCase = true) ||
+        cleaned.length < 8 ||
+        cleaned.all { it in "{}\"[]:,\n\r " }
+    ) {
+        return null
+    }
+
+    return cleaned
 }

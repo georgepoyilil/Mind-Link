@@ -2,6 +2,7 @@ package com.mindlink.journal.ui.notes.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -17,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -482,14 +484,49 @@ fun NoteFullWidthCard(
                                 )
                             }
                             Spacer(modifier = Modifier.height(4.dp))
-                            note.actionItems.take(2).forEach { action ->
-                                Text(
-                                    text = "• $action",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MindTextPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                            note.actionItems.take(2).forEach { rawAction ->
+                                val isDone = rawAction.startsWith("[x] ", ignoreCase = true) || rawAction.startsWith("x ", ignoreCase = true)
+                                val actionText = rawAction
+                                    .removePrefix("[ ] ")
+                                    .removePrefix("[x] ")
+                                    .removePrefix("[X] ")
+                                    .removePrefix("• ")
+                                    .trim()
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(13.dp)
+                                            .clip(RoundedCornerShape(3.5.dp))
+                                            .background(if (isDone) PastelMint.copy(alpha = 0.25f) else Color.Transparent)
+                                            .border(
+                                                width = 1.2.dp,
+                                                color = if (isDone) PastelMint else MindTextTertiary,
+                                                shape = RoundedCornerShape(3.5.dp)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isDone) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = PastelMint,
+                                                modifier = Modifier.size(9.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = actionText,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (isDone) MindTextTertiary else MindTextPrimary,
+                                        textDecoration = if (isDone) TextDecoration.LineThrough else null,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }

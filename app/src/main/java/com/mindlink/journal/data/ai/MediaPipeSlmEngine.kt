@@ -272,12 +272,21 @@ class MediaPipeSlmEngine(
                 .filter { it.isNotBlank() && !it.endsWith("?") }
                 .take(4)
             val summaryCandidate = lines.firstOrNull { 
-                !it.trim().startsWith("{") && !it.trim().startsWith("}") && !it.trim().startsWith("#") && 
-                !it.contains("\"") && it.trim().length > 15 && !it.trim().endsWith("?") 
-            } ?: lines.firstOrNull { !it.trim().startsWith("{") && !it.trim().startsWith("}") }?.take(140) ?: "Reflective insight"
+                val t = it.trim()
+                !t.startsWith("{") && !t.startsWith("}") && !t.startsWith("#") && 
+                !t.startsWith("`") && !t.equals("json", ignoreCase = true) &&
+                !t.contains("\"") && t.length > 15 && !t.endsWith("?") 
+            } ?: lines.firstOrNull { 
+                val t = it.trim()
+                !t.startsWith("{") && !t.startsWith("}") && 
+                !t.startsWith("`") && !t.equals("json", ignoreCase = true) &&
+                t.length > 10
+            }?.take(140) ?: "Reflective insight"
+
+            val cleanSummaryText = com.mindlink.journal.domain.model.sanitizeSummary(summaryCandidate) ?: "Reflective insight"
 
             NoteAnalysisResult(
-                summary = summaryCandidate,
+                summary = cleanSummaryText,
                 mood = "Reflective",
                 tags = listOf("OnDeviceSLM", "Qwen"),
                 actionItems = actions,

@@ -171,7 +171,7 @@ class ServiceLocator private constructor(context: Context) {
         const val PREF_ENGINE_MODE = "pref_engine_mode" // "AUTO", "SLM", "GEMINI", "LOCAL"
         const val PREF_GLOBAL_FONT_SCALE = "pref_global_font_scale"
         const val PREF_HAS_SEEN_ONBOARDING = "pref_has_seen_onboarding"
-        const val PREF_TECH_MODE = "pref_tech_mode"
+        const val PREF_TECH_MODE = "pref_neural_inspector_enabled" // Defaults strictly to false
         const val PREF_APP_THEME = "pref_app_theme"
         const val PREF_SHOW_EMOJIS = "pref_show_emojis"
         const val PREF_LINE_SPACING_MULTIPLIER = "pref_line_spacing_multiplier"
