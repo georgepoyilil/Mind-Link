@@ -35,13 +35,13 @@ jobs:
         run: |
           mkdir -p dist
           APK_PATH=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
-          cp "$APK_PATH" dist/MindLink-v1.0.0.apk
+          cp "$APK_PATH" "dist/MindLink-${{ github.ref_name || 'release' }}.apk"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MindLink-v1.0.0-APK
-          path: dist/MindLink-v1.0.0.apk
+          name: MindLink-APK
+          path: dist/*.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -49,9 +49,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: dist/MindLink-v1.0.0.apk
-          name: "MindLink ${{ github.ref_name || 'v1.0.0' }} (On-Device AI & OTA Updates)"
-          tag_name: ${{ github.ref_name || 'v1.0.0' }}
+          files: dist/*.apk
+          name: "MindLink ${{ github.ref_name || 'v1.1.0' }}"
+          tag_name: ${{ github.ref_name || 'v1.1.0' }}
           generate_release_notes: true
           draft: false
           prerelease: false
