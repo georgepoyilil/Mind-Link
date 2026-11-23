@@ -199,6 +199,13 @@ class NoteDetailViewModel(
         }
     }
 
+    fun togglePin() {
+        val current = _uiState.value.note ?: return
+        viewModelScope.launch {
+            repository.updatePinnedStatus(current.id, !current.isPinned)
+        }
+    }
+
     fun updateFontSizeScale(scale: Float?) {
         val current = _uiState.value.note ?: return
         val updated = current.copy(fontSizeScale = scale, updatedAt = System.currentTimeMillis())

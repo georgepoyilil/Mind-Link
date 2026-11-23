@@ -5,6 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
@@ -39,7 +40,8 @@ import kotlin.math.sqrt
 fun ThoughtGraphScreen(
     viewModel: ThoughtGraphViewModel,
     onNavigateBack: () -> Unit,
-    onNoteClick: (Long) -> Unit
+    onNoteClick: (Long) -> Unit,
+    onSecondBrainClick: () -> Unit = {}
 ) {
     val isTechMode = LocalTechMode.current
     val uiState by viewModel.uiState.collectAsState()
@@ -127,37 +129,42 @@ fun ThoughtGraphScreen(
                 .padding(paddingValues)
                 .background(MindBackgroundAmoled)
         ) {
+            val currentNodes by rememberUpdatedState(uiState.graph.nodes)
+            val currentScale by rememberUpdatedState(scale)
+            val currentOffset by rememberUpdatedState(offset)
+
             // Interactive 2D Canvas for Synaptic Graph
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(Unit) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            scale = (scale * zoom).coerceIn(0.35f, 3.5f)
-                            offset += pan
-                        }
-                    }
-                    .pointerInput(uiState.graph.nodes) {
                         detectTapGestures { tapOffset ->
-                            val centerX = size.width / 2f + offset.x
-                            val centerY = size.height / 2f + offset.y
+                            val centerX = size.width / 2f + currentOffset.x
+                            val centerY = size.height / 2f + currentOffset.y
 
-                            // Test collision with nodes
-                            var clickedNode: ThoughtGraphNode? = null
-                            for (node in uiState.graph.nodes) {
-                                val nodeScreenX = centerX + node.x * scale
-                                val nodeScreenY = centerY + node.y * scale
+                            // Test collision with nodes: select closest node within touch tolerance
+                            var closestNode: ThoughtGraphNode? = null
+                            var minDistance = Float.MAX_VALUE
+                            for (node in currentNodes) {
+                                val nodeScreenX = centerX + node.x * currentScale
+                                val nodeScreenY = centerY + node.y * currentScale
                                 val dx = tapOffset.x - nodeScreenX
                                 val dy = tapOffset.y - nodeScreenY
                                 val dist = sqrt(dx * dx + dy * dy)
-                                val hitRadius = (node.radius * scale).coerceAtLeast(36f)
+                                val hitRadius = (node.radius * currentScale).coerceAtLeast(65f)
 
-                                if (dist <= hitRadius) {
-                                    clickedNode = node
-                                    break
+                                if (dist <= hitRadius && dist < minDistance) {
+                                    minDistance = dist
+                                    closestNode = node
                                 }
                             }
-                            viewModel.selectNode(clickedNode)
+                            viewModel.selectNode(closestNode)
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(0.35f, 3.5f)
+                            offset += pan
                         }
                     }
             ) {
@@ -425,17 +432,71 @@ fun ThoughtGraphScreen(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Tags & Open Button Row
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            // Connected Insights Section (Interactive traversal)
+                            val connectedNodeIds = remember(node.id, uiState.graph.edges) {
+                                uiState.graph.edges
+                                    .filter { it.sourceId == node.id || it.targetId == node.id }
+                                    .map { if (it.sourceId == node.id) it.targetId else it.sourceId }
+                                    .toSet()
+                            }
+                            val connectedNodes = remember(connectedNodeIds, uiState.graph.nodes) {
+                                uiState.graph.nodes.filter { it.id in connectedNodeIds }
+                            }
+
+                            if (connectedNodes.isNotEmpty()) {
+                                Text(
+                                    text = "Connected Synaptic Links (${connectedNodes.size})",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = PastelLavender,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Row(
-                                    modifier = Modifier.weight(1f),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    node.tags.take(3).forEach { tag ->
+                                    connectedNodes.forEach { neighbor ->
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MindGlassSurfaceVariant,
+                                            border = BorderStroke(0.5.dp, Color(neighbor.colorLong).copy(alpha = 0.5f)),
+                                            modifier = Modifier.clickable { viewModel.selectNode(neighbor) }
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(6.dp)
+                                                        .background(Color(neighbor.colorLong), CircleShape)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = neighbor.title,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MindTextPrimary,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                            }
+
+                            // Tags Row
+                            if (node.tags.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    node.tags.forEach { tag ->
                                         Surface(
                                             shape = RoundedCornerShape(6.dp),
                                             color = MindGlassSurfaceVariant,
@@ -450,15 +511,122 @@ fun ThoughtGraphScreen(
                                         }
                                     }
                                 }
+                                Spacer(modifier = Modifier.height(10.dp))
+                            }
+
+                            // Action Buttons Row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = onSecondBrainClick,
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                    border = BorderStroke(1.dp, MindIndigo.copy(alpha = 0.6f)),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Psychology,
+                                        contentDescription = null,
+                                        tint = MindIndigo,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Synthesize", fontSize = 12.sp, color = MindIndigo, fontWeight = FontWeight.Bold)
+                                }
 
                                 Button(
                                     onClick = { onNoteClick(node.id) },
                                     colors = ButtonDefaults.buttonColors(containerColor = MindIndigo),
                                     shape = RoundedCornerShape(12.dp),
-                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                    modifier = Modifier.weight(1f)
                                 ) {
                                     Text("Open Thought", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Overview Bottom Intelligence Panel (Active when no single node is selected)
+            AnimatedVisibility(
+                visible = uiState.selectedNode == null && uiState.graph.nodes.isNotEmpty(),
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                modifier = Modifier.align(Alignment.BottomCenter)
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MindGlassSurfaceElevated),
+                    border = BorderStroke(1.dp, MindPrismGlassCardBorder),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Hub,
+                                    contentDescription = null,
+                                    tint = PastelLavender,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Thought Constellation",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MindTextPrimary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "${uiState.graph.nodes.size} thoughts · ${uiState.graph.edges.size} synapses · Tap node to inspect",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MindTextSecondary
+                            )
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            IconButton(
+                                onClick = {
+                                    scale = 1.0f
+                                    offset = Offset.Zero
+                                },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CenterFocusStrong,
+                                    contentDescription = "Center View",
+                                    tint = MindTextSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            Button(
+                                onClick = onSecondBrainClick,
+                                colors = ButtonDefaults.buttonColors(containerColor = MindIndigo),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Psychology,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Synthesize Brain", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

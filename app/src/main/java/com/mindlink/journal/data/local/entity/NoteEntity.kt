@@ -36,5 +36,7 @@ data class NoteEntity(
     @ColumnInfo(defaultValue = "NULL")
     val fontSizeScale: Float? = null,
     @ColumnInfo(defaultValue = "0")
-    val isLocked: Boolean = false
+    val isLocked: Boolean = false,
+    @ColumnInfo(defaultValue = "0")
+    val isPinned: Boolean = false
 )

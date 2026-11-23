@@ -85,6 +85,7 @@ class UndoRedoAndDiffTest {
         val deletedLines = diff.lines.filter { it.operation == DiffOperation.DELETED }
         val unchangedLines = diff.lines.filter { it.operation == DiffOperation.UNCHANGED }
 
+        assertTrue(deletedLines.isNotEmpty())
         assertTrue(addedLines.any { it.text.contains("Line 4: Next steps") })
         assertTrue(unchangedLines.any { it.text.contains("Line 1: Meeting Notes") })
     }

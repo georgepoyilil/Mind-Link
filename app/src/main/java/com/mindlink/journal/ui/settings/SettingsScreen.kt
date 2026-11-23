@@ -393,106 +393,103 @@ fun SettingsScreen(
                         color = MindTextSecondary
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    val fontOptions = listOf(
-                        Triple(0.85f, "Small", "0.85x"),
-                        Triple(1.0f, "Default", "1.0x"),
-                        Triple(1.15f, "Large", "1.15x"),
-                        Triple(1.30f, "Huge", "1.30x")
-                    )
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        fontOptions.forEach { (scale, label, sub) ->
-                            val isSelected = Math.abs(uiState.fontScale - scale) < 0.05f
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) MindSurfaceVariantDark else Color.Transparent,
-                                border = BorderStroke(
-                                    width = if (isSelected) 1.2.dp else 0.8.dp,
-                                    color = if (isSelected) PastelLavender else MindBorderDark.copy(alpha = 0.5f)
-                                ),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable { viewModel.updateFontScale(scale) }
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = label,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) PastelLavender else MindTextPrimary
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = sub,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isSelected) PastelLavender.copy(alpha = 0.8f) else MindTextTertiary
-                                    )
-                                }
-                            }
+                        Text(
+                            text = "Font Scale: ${String.format(java.util.Locale.US, "%.2fx", uiState.fontScale)}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = PastelLavender
+                        )
+                        val fontLabel = when {
+                            uiState.fontScale < 0.92f -> "Small"
+                            uiState.fontScale < 1.08f -> "Default"
+                            uiState.fontScale < 1.23f -> "Large"
+                            else -> "Huge"
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MindSurfaceVariantDark,
+                            border = BorderStroke(0.5.dp, PastelLavender.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = fontLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = PastelLavender,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Line Height Spacing Row
-                    Text(
-                        text = "Journal Body Line Spacing:",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MindTextPrimary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    val lineSpacingOptions = listOf(
-                        Pair(1.25f, "Compact"),
-                        Pair(1.45f, "Normal"),
-                        Pair(1.75f, "Relaxed"),
-                        Pair(2.0f, "Spacious")
+                    Slider(
+                        value = uiState.fontScale,
+                        onValueChange = { viewModel.updateFontScale(it) },
+                        valueRange = 0.80f..1.35f,
+                        steps = 10,
+                        colors = SliderDefaults.colors(
+                            thumbColor = PastelLavender,
+                            activeTrackColor = PastelLavender,
+                            inactiveTrackColor = MindBorderDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        lineSpacingOptions.forEach { (mult, label) ->
-                            val isSelected = Math.abs(uiState.lineSpacingMultiplier - mult) < 0.05f
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (isSelected) MindSurfaceVariantDark else Color.Transparent,
-                                border = BorderStroke(
-                                    width = if (isSelected) 1.2.dp else 0.8.dp,
-                                    color = if (isSelected) PastelMint else MindBorderDark.copy(alpha = 0.5f)
-                                ),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(36.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable { viewModel.updateLineSpacingMultiplier(mult) }
-                            ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp)
-                                ) {
-                                    Text(
-                                        text = label,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) PastelMint else MindTextSecondary,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1
-                                    )
-                                }
-                            }
-                        }
+                        Text("0.80x (Small)", style = MaterialTheme.typography.labelSmall, color = MindTextTertiary, fontSize = 10.sp)
+                        Text("1.00x (Default)", style = MaterialTheme.typography.labelSmall, color = MindTextTertiary, fontSize = 10.sp)
+                        Text("1.35x (Huge)", style = MaterialTheme.typography.labelSmall, color = MindTextTertiary, fontSize = 10.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Line Height Spacing Slider
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Journal Line Spacing",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MindTextPrimary
+                        )
+                        Text(
+                            text = String.format(java.util.Locale.US, "%.2fx", uiState.lineSpacingMultiplier),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = PastelMint
+                        )
+                    }
+
+                    Slider(
+                        value = uiState.lineSpacingMultiplier,
+                        onValueChange = { viewModel.updateLineSpacingMultiplier(it) },
+                        valueRange = 1.15f..2.05f,
+                        steps = 8,
+                        colors = SliderDefaults.colors(
+                            thumbColor = PastelMint,
+                            activeTrackColor = PastelMint,
+                            inactiveTrackColor = MindBorderDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Compact (1.15x)", style = MaterialTheme.typography.labelSmall, color = MindTextTertiary, fontSize = 10.sp)
+                        Text("Normal (1.45x)", style = MaterialTheme.typography.labelSmall, color = MindTextTertiary, fontSize = 10.sp)
+                        Text("Spacious (2.05x)", style = MaterialTheme.typography.labelSmall, color = MindTextTertiary, fontSize = 10.sp)
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))

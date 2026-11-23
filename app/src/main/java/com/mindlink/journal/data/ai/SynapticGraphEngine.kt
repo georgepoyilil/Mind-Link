@@ -23,7 +23,6 @@ class SynapticGraphEngine {
         if (notes.size < 2) return emptyList()
 
         val generatedLinks = mutableListOf<NoteLinkEntity>()
-        val notesById = notes.associateBy { it.id }
         val titleToIdMap = notes.associate { it.title.trim().lowercase(Locale.ROOT) to it.id }
 
         // Track existing edge pairs to avoid redundant reciprocal edges

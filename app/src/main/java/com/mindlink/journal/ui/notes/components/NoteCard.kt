@@ -1,5 +1,7 @@
 package com.mindlink.journal.ui.notes.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -33,49 +36,83 @@ enum class NoteViewMode(val label: String, val icon: ImageVector) {
     COMPACT_LIST("List", Icons.Default.Dashboard)
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NoteCard(
     note: Note,
     onClick: () -> Unit,
     viewMode: NoteViewMode = NoteViewMode.GRID,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isSelected: Boolean = false,
+    isInSelectionMode: Boolean = false,
+    onLongClick: (() -> Unit)? = null
 ) {
     when (viewMode) {
-        NoteViewMode.COMPACT_LIST -> NoteCompactItem(note = note, onClick = onClick, modifier = modifier)
-        NoteViewMode.CARDS -> NoteFullWidthCard(note = note, onClick = onClick, modifier = modifier)
-        NoteViewMode.GRID -> NoteStandardCard(note = note, onClick = onClick, modifier = modifier)
+        NoteViewMode.COMPACT_LIST -> NoteCompactItem(
+            note = note,
+            onClick = onClick,
+            modifier = modifier,
+            isSelected = isSelected,
+            isInSelectionMode = isInSelectionMode,
+            onLongClick = onLongClick
+        )
+        NoteViewMode.CARDS -> NoteFullWidthCard(
+            note = note,
+            onClick = onClick,
+            modifier = modifier,
+            isSelected = isSelected,
+            isInSelectionMode = isInSelectionMode,
+            onLongClick = onLongClick
+        )
+        NoteViewMode.GRID -> NoteStandardCard(
+            note = note,
+            onClick = onClick,
+            modifier = modifier,
+            isSelected = isSelected,
+            isInSelectionMode = isInSelectionMode,
+            onLongClick = onLongClick
+        )
     }
 }
 
 /**
  * Standard Card View: Balanced preview with tags and mood chip, optimized for 2-column staggered Google Keep grid
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NoteStandardCard(
     note: Note,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isSelected: Boolean = false,
+    isInSelectionMode: Boolean = false,
+    onLongClick: (() -> Unit)? = null
 ) {
     val cardFont = resolveNoteFontFamily(note.fontFamily)
     val isGlassy = MindIsGlassy
     val isDark = LocalMindLinkColors.current.isDark
     val cardShape = RoundedCornerShape(14.dp)
+    val selectionBorder = if (isSelected) BorderStroke(1.8.dp, MindIndigo) else null
 
     Card(
-        onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
+            .clip(cardShape)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .liquidGlass(
                 shape = cardShape,
                 cornerRadius = 14.dp,
                 isGlassy = isGlassy,
                 isDark = isDark,
-                cardBackground = MindGlassCardBackground,
-                cardBorder = MindGlassCardBorder
+                cardBackground = if (isSelected) SolidColor(MindIndigo.copy(alpha = 0.16f)) else MindGlassCardBackground,
+                cardBorder = if (isSelected) SolidColor(MindIndigo) else MindGlassCardBorder
             ),
         shape = cardShape,
-        colors = CardDefaults.cardColors(containerColor = if (isGlassy) Color.Transparent else MindGlassSurface),
-        border = if (isGlassy) null else BorderStroke(1.2.dp, MindPrismGlassCardBorder),
+        colors = CardDefaults.cardColors(containerColor = if (isSelected) MindIndigo.copy(alpha = 0.14f) else if (isGlassy) Color.Transparent else MindGlassSurface),
+        border = selectionBorder ?: (if (isGlassy) null else BorderStroke(1.2.dp, MindPrismGlassCardBorder)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -97,44 +134,69 @@ fun NoteStandardCard(
                     .fillMaxWidth()
                     .padding(11.dp)
             ) {
-                // Header Row: Mood Chip / Lock Badge & Date
+                // Header Row: Checkbox, Mood Chip / Lock Badge & Date / Pin
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (note.isLocked) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MindIndigo.copy(alpha = 0.16f),
-                            border = BorderStroke(0.6.dp, MindIndigo.copy(alpha = 0.4f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Lock,
-                                    contentDescription = "Locked",
-                                    tint = MindIndigo,
-                                    modifier = Modifier.size(10.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = "Locked",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MindIndigo
-                                )
-                            }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        if (isInSelectionMode) {
+                            Icon(
+                                imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                contentDescription = if (isSelected) "Selected" else "Not Selected",
+                                tint = if (isSelected) MindIndigo else MindTextTertiary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                         }
-                    } else if (note.mood != null) {
-                        MoodBadge(mood = note.mood, emoji = note.moodEmoji)
-                    } else {
-                        Box(modifier = Modifier.width(1.dp))
+
+                        if (note.isLocked) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MindIndigo.copy(alpha = 0.16f),
+                                border = BorderStroke(0.6.dp, MindIndigo.copy(alpha = 0.4f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = "Locked",
+                                        tint = MindIndigo,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "Locked",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MindIndigo
+                                    )
+                                }
+                            }
+                        } else if (note.mood != null) {
+                            MoodBadge(mood = note.mood, emoji = note.moodEmoji)
+                        } else {
+                            Box(modifier = Modifier.width(1.dp))
+                        }
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (note.isPinned) {
+                            Icon(
+                                imageVector = Icons.Default.PushPin,
+                                contentDescription = "Pinned",
+                                tint = PastelAmber,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
+
                         if (note.audioUri != null && !note.isLocked) {
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
@@ -221,16 +283,18 @@ fun NoteStandardCard(
                         ) {
                             Row(
                                 modifier = Modifier.weight(1f),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 note.tags.take(2).forEach { tag ->
+                                    val displayTag = if (tag.startsWith("#")) tag else "#$tag"
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
                                         color = MindGlassSurfaceVariant,
                                         border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
                                     ) {
                                         Text(
-                                            text = "#$tag",
+                                            text = displayTag,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MindTextSecondary,
                                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
@@ -238,6 +302,24 @@ fun NoteStandardCard(
                                             maxLines = 1,
                                             softWrap = false,
                                             overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                if (note.tags.size > 2) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = MindGlassSurfaceVariant.copy(alpha = 0.6f),
+                                        border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
+                                    ) {
+                                        Text(
+                                            text = "+${note.tags.size - 2}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MindTextTertiary,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            softWrap = false
                                         )
                                     }
                                 }
@@ -280,30 +362,39 @@ fun NoteStandardCard(
 /**
  * Compact List View: Sleek, dense rows for rapid skimming
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NoteCompactItem(
     note: Note,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isSelected: Boolean = false,
+    isInSelectionMode: Boolean = false,
+    onLongClick: (() -> Unit)? = null
 ) {
     val isGlassy = MindIsGlassy
     val isDark = LocalMindLinkColors.current.isDark
     val compactShape = RoundedCornerShape(10.dp)
+    val selectionBorder = if (isSelected) BorderStroke(1.8.dp, MindIndigo) else null
 
     Surface(
-        onClick = onClick,
         shape = compactShape,
-        color = if (isGlassy) Color.Transparent else MindGlassSurface,
-        border = if (isGlassy) null else BorderStroke(1.dp, MindPrismGlassCardBorder),
+        color = if (isSelected) MindIndigo.copy(alpha = 0.14f) else if (isGlassy) Color.Transparent else MindGlassSurface,
+        border = selectionBorder ?: (if (isGlassy) null else BorderStroke(1.dp, MindPrismGlassCardBorder)),
         modifier = modifier
             .fillMaxWidth()
+            .clip(compactShape)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .liquidGlass(
                 shape = compactShape,
                 cornerRadius = 10.dp,
                 isGlassy = isGlassy,
                 isDark = isDark,
-                cardBackground = MindGlassCardBackground,
-                cardBorder = MindGlassCardBorder
+                cardBackground = if (isSelected) SolidColor(MindIndigo.copy(alpha = 0.16f)) else MindGlassCardBackground,
+                cardBorder = if (isSelected) SolidColor(MindIndigo) else MindGlassCardBorder
             )
     ) {
         Row(
@@ -317,6 +408,26 @@ fun NoteCompactItem(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
+                if (isInSelectionMode) {
+                    Icon(
+                        imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                        contentDescription = if (isSelected) "Selected" else "Not Selected",
+                        tint = if (isSelected) MindIndigo else MindTextTertiary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+
+                if (note.isPinned) {
+                    Icon(
+                        imageVector = Icons.Default.PushPin,
+                        contentDescription = "Pinned",
+                        tint = PastelAmber,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+
                 if (note.isLocked) {
                     Icon(
                         imageVector = Icons.Default.Lock,
@@ -349,11 +460,16 @@ fun NoteCompactItem(
                         )
                         if (!note.isLocked) {
                             if (note.tags.isNotEmpty()) {
+                                val firstTag = note.tags.first()
+                                val displayTag = if (firstTag.startsWith("#")) firstTag else "#$firstTag"
                                 Text(
-                                    text = " · #${note.tags.first()}",
+                                    text = " · $displayTag",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MindIndigo,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                             if (note.actionItems.isNotEmpty()) {
@@ -392,31 +508,40 @@ fun NoteCompactItem(
 /**
  * Full Width Stream View: Immersive card with image preview and full summary
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NoteFullWidthCard(
     note: Note,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isSelected: Boolean = false,
+    isInSelectionMode: Boolean = false,
+    onLongClick: (() -> Unit)? = null
 ) {
     val isGlassy = MindIsGlassy
     val isDark = LocalMindLinkColors.current.isDark
     val fullShape = RoundedCornerShape(16.dp)
+    val selectionBorder = if (isSelected) BorderStroke(1.8.dp, MindIndigo) else null
 
     Card(
-        onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
+            .clip(fullShape)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .liquidGlass(
                 shape = fullShape,
                 cornerRadius = 16.dp,
                 isGlassy = isGlassy,
                 isDark = isDark,
-                cardBackground = MindGlassCardBackground,
-                cardBorder = MindGlassCardBorder
+                cardBackground = if (isSelected) SolidColor(MindIndigo.copy(alpha = 0.16f)) else MindGlassCardBackground,
+                cardBorder = if (isSelected) SolidColor(MindIndigo) else MindGlassCardBorder
             ),
         shape = fullShape,
-        colors = CardDefaults.cardColors(containerColor = if (isGlassy) Color.Transparent else MindGlassSurface),
-        border = if (isGlassy) null else BorderStroke(1.dp, MindPrismBorder),
+        colors = CardDefaults.cardColors(containerColor = if (isSelected) MindIndigo.copy(alpha = 0.14f) else if (isGlassy) Color.Transparent else MindGlassSurface),
+        border = selectionBorder ?: (if (isGlassy) null else BorderStroke(1.dp, MindPrismBorder)),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isGlassy) 0.dp else 3.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -433,42 +558,67 @@ fun NoteFullWidthCard(
             }
 
             Column(modifier = Modifier.padding(14.dp)) {
-                // Header: Mood badge / Lock & Date
+                // Header: Checkbox, Mood badge / Lock & Date / Pin
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (note.isLocked) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MindIndigo.copy(alpha = 0.16f),
-                            border = BorderStroke(0.6.dp, MindIndigo.copy(alpha = 0.4f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Lock,
-                                    contentDescription = "Locked",
-                                    tint = MindIndigo,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Protected Thought",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MindIndigo
-                                )
-                            }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        if (isInSelectionMode) {
+                            Icon(
+                                imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                contentDescription = if (isSelected) "Selected" else "Not Selected",
+                                tint = if (isSelected) MindIndigo else MindTextTertiary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                         }
-                    } else if (note.mood != null) {
-                        MoodBadge(mood = note.mood, emoji = note.moodEmoji)
+
+                        if (note.isLocked) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MindIndigo.copy(alpha = 0.16f),
+                                border = BorderStroke(0.6.dp, MindIndigo.copy(alpha = 0.4f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = "Locked",
+                                        tint = MindIndigo,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Protected Thought",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MindIndigo
+                                    )
+                                }
+                            }
+                        } else if (note.mood != null) {
+                            MoodBadge(mood = note.mood, emoji = note.moodEmoji)
+                        }
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (note.isPinned) {
+                            Icon(
+                                imageVector = Icons.Default.PushPin,
+                                contentDescription = "Pinned",
+                                tint = PastelAmber,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
+
                         if (note.audioUri != null && !note.isLocked) {
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
@@ -658,17 +808,36 @@ fun NoteFullWidthCard(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         note.tags.take(5).forEach { tag ->
+                            val displayTag = if (tag.startsWith("#")) tag else "#$tag"
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = MindGlassSurfaceVariant,
                                 border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
                             ) {
                                 Text(
-                                    text = "#$tag",
+                                    text = displayTag,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MindTextSecondary,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                     fontSize = 11.sp,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
+                        if (note.tags.size > 5) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MindGlassSurfaceVariant.copy(alpha = 0.6f),
+                                border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
+                            ) {
+                                Text(
+                                    text = "+${note.tags.size - 5}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MindTextTertiary,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     softWrap = false
                                 )

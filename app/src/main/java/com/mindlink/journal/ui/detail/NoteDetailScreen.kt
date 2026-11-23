@@ -182,6 +182,15 @@ fun NoteDetailScreen(
                                 )
                             }
 
+                            // Pin / Unpin Note
+                            IconButton(onClick = { viewModel.togglePin() }) {
+                                Icon(
+                                    imageVector = Icons.Default.PushPin,
+                                    contentDescription = if (note.isPinned) "Unpin Note" else "Pin Note to Top",
+                                    tint = if (note.isPinned) PastelAmber else MindTextSecondary
+                                )
+                            }
+
                             // Font Size Override Menu
                             var showFontSizeMenu by remember { mutableStateOf(false) }
                             Box {
@@ -617,13 +626,14 @@ fun NoteDetailScreen(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             note.tags.forEach { tag ->
+                                val displayTag = if (tag.startsWith("#")) tag else "#$tag"
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
                                     color = MindGlassSurfaceVariant,
                                     border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
                                 ) {
                                     Text(
-                                        text = "#$tag",
+                                        text = displayTag,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MindTextSecondary,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),

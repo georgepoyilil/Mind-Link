@@ -110,7 +110,7 @@ class NoteRepositoryImpl(
     override suspend fun purgeExpiredTrash() = withContext(Dispatchers.IO) {
         val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000L)
         val trashNotes = noteDao.getTrashNotes().firstOrNull() ?: emptyList()
-        trashNotes.filter { it.deletedAt != null && it.deletedAt!! < thirtyDaysAgo }.forEach { note ->
+        trashNotes.filter { it.deletedAt != null && it.deletedAt < thirtyDaysAgo }.forEach { note ->
             note.imageUri?.let { uriStr ->
                 try { java.io.File(android.net.Uri.parse(uriStr).path ?: "").delete() } catch (_: Exception) {}
             }
@@ -286,7 +286,6 @@ class NoteRepositoryImpl(
         val allNotes = if (allIds.isNotEmpty()) noteDao.getNotesByIds(allIds) else (noteDao.getAllNotes().firstOrNull() ?: emptyList())
         if (allNotes.isEmpty()) return@withContext emptyList()
 
-        val notesMap = allNotes.associateBy { it.id }
         val scoreMap = blendedRankings.associate { it.first to it.second }
         val semanticIdSet = semanticMatches.map { it.first }.toSet()
         val keywordIdSet = keywordNoteIds.toSet()
@@ -523,5 +522,33 @@ class NoteRepositoryImpl(
 
     override suspend fun updateLockStatus(id: Long, isLocked: Boolean): Unit = withContext(Dispatchers.IO) {
         noteDao.updateLockStatus(id, isLocked)
+    }
+
+    override suspend fun updatePinnedStatus(id: Long, isPinned: Boolean): Unit = withContext(Dispatchers.IO) {
+        noteDao.updatePinnedStatus(id, isPinned)
+    }
+
+    override suspend fun moveMultipleToTrash(ids: List<Long>): Unit = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext
+        noteDao.moveMultipleToTrash(ids)
+        ids.forEach { noteId ->
+            noteLinkDao.deleteLinksForNote(noteId)
+        }
+    }
+
+    override suspend fun deleteMultiplePermanently(ids: List<Long>): Unit = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext
+        ids.forEach { id ->
+            val note = noteDao.getNoteByIdSync(id)
+            note?.imageUri?.let { uriStr ->
+                try { java.io.File(android.net.Uri.parse(uriStr).path ?: "").delete() } catch (_: Exception) {}
+            }
+            note?.audioUri?.let { uriStr ->
+                try { java.io.File(android.net.Uri.parse(uriStr).path ?: "").delete() } catch (_: Exception) {}
+            }
+            embeddingDao.deleteByNoteId(id)
+            noteLinkDao.deleteLinksForNote(id)
+        }
+        noteDao.deleteNotesByIds(ids)
     }
 }

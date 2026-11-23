@@ -96,6 +96,7 @@ data class BackupNoteDto(
     val isArchived: Boolean,
     val isDeleted: Boolean,
     val isLocked: Boolean,
+    val isPinned: Boolean = false,
     val fontFamily: String,
     val fontSizeScale: Float?,
     val imageFileName: String? = null,
@@ -545,6 +546,7 @@ class GoogleSyncManager(
                     isArchived = entity.isArchived,
                     isDeleted = entity.isDeleted,
                     isLocked = entity.isLocked,
+                    isPinned = entity.isPinned,
                     fontFamily = entity.fontFamily,
                     fontSizeScale = entity.fontSizeScale,
                     imageFileName = imageFileName,
@@ -625,7 +627,7 @@ class GoogleSyncManager(
      */
     private suspend fun tryCloudUpload(zipFile: File) {
         if (!zipFile.exists() || zipFile.length() <= 0) return
-        val user = _currentUser.value ?: return
+        if (_currentUser.value == null) return
         val account = getGoogleAccount() ?: return
 
         try {
@@ -826,6 +828,7 @@ class GoogleSyncManager(
                     isArchived = dto.isArchived,
                     isDeleted = dto.isDeleted,
                     isLocked = dto.isLocked,
+                    isPinned = dto.isPinned,
                     fontFamily = dto.fontFamily,
                     fontSizeScale = dto.fontSizeScale
                 )

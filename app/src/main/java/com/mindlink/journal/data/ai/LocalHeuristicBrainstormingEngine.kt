@@ -190,7 +190,7 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
             answerBuilder.append("\n**Synthesized Pattern:** You have recurring thoughts around ${notes.firstOrNull()?.tags?.joinToString(", ") ?: "these areas"}, showing active iteration and focus.")
         }
 
-        val (patternAlert, suggestedReminder) = detectPatternAndReminder(lowerQuery, notes)
+        val (patternAlert, suggestedReminder) = detectPatternAndReminder(notes)
 
         SynthesisResult(
             answer = answerBuilder.toString().trim(),
@@ -200,7 +200,7 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
         )
     }
 
-    private fun detectPatternAndReminder(query: String, notes: List<Note>): Pair<String?, String?> {
+    private fun detectPatternAndReminder(notes: List<Note>): Pair<String?, String?> {
         // Find the first genuine contextual reminder present in the retrieved notes
         for (note in notes) {
             val reminder = extractContextualReminder(note.title, note.content)
@@ -593,49 +593,147 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
 
             if (!latestInsight.isNullOrBlank()) {
                 val insightSnippet = if (latestInsight.length > 50) latestInsight.take(47) + "..." else latestInsight
-                prompts.add("You reflected: \"$insightSnippet\". What is one tangible, 15-minute experiment you can run in the next 24 hours to test this?")
-                prompts.add("If someone you deeply respect evaluated this realization, what blind spot would they gently challenge?")
-                prompts.add("What will be the hardest obstacle to remaining consistent with this insight when unexpected stress hits?")
-                return prompts
+                val seed = (insightSnippet.hashCode() xor mood.hashCode()).let { if (it < 0) -it else it }
+                val followUpPool = listOf(
+                    "You reflected: \"$insightSnippet\". What is one tangible, 15-minute experiment you can run in the next 24 hours to test this?",
+                    "Regarding your insight (\"$insightSnippet\"): what belief will be hardest to maintain when unexpected friction arrives?",
+                    "You noted: \"$insightSnippet\". If someone you deeply respect evaluated this realization, what blind spot would they gently challenge?",
+                    "Following up on \"$insightSnippet\": what is the exact trigger or environment that might cause you to revert to old habits?"
+                )
+                prompts.add(followUpPool[seed % followUpPool.size])
+                prompts.add(followUpPool[(seed + 1) % followUpPool.size])
+                prompts.add(followUpPool[(seed + 2) % followUpPool.size])
+                return prompts.distinct().take(3)
             }
         }
 
-        // 2. DOMAIN-SILOED SOCRATIC INQUIRY (Firewalled by LifeSphere)
+        // 2. EXTRACT SALIENT DYNAMIC CONCEPTS FROM NOTE
+        val salientTerms = extractSalientConcepts(title, content)
+        val primaryConcept = salientTerms.firstOrNull() ?: title.ifBlank { "this realization" }.removePrefix("Untitled Entry").trim()
+        val secondaryConcept = salientTerms.getOrNull(1) ?: primaryConcept
+        val noteSeed = (title.hashCode() xor (content.take(80).hashCode()) xor mood.hashCode()).let { if (it < 0) -it else it }
+
+        // 3. DYNAMIC SOCRATIC QUESTION 1: Core Dilemma & Sphere-Specific Tension
         when (classification.primarySphere) {
             LifeSphere.RELATIONAL -> {
-                val entity = classification.detectedEntities.firstOrNull()?.replaceFirstChar { it.uppercase() } ?: "Elena"
-                prompts.add("You mentioned $entity and feeling pulled away: what unspoken boundary between work anxiety and evening presence can you establish today?")
-                prompts.add("If $entity could describe the version of you they feel most deeply connected to, what would they say is different about how you show up?")
-                prompts.add("What is one quiet, intentional gesture tonight that honors this realization and shows them they have your undivided attention?")
+                val entity = classification.detectedEntities.firstOrNull()?.replaceFirstChar { it.uppercase() }
+                    ?: (if (primaryConcept.isNotBlank() && primaryConcept[0].isUpperCase()) primaryConcept else "them")
+                val q1Pool = listOf(
+                    "You mentioned $entity: what unspoken boundary between external demands and genuine presence can you establish today?",
+                    "When communicating with $entity around $primaryConcept, what emotion is hiding behind the words you actually chose?",
+                    "If $entity could describe the version of you they feel most deeply understood by, what would change about how you show up?"
+                )
+                prompts.add(q1Pool[noteSeed % q1Pool.size])
             }
-
             LifeSphere.GROWTH_REFLECTION -> {
-                prompts.add("What single part of this situation is entirely within your direct control today, and what expectation must you let go of?")
-                prompts.add("If you remove the pressure of perfectionism, what does 'trusting your preparation' look like in practice right now?")
-                prompts.add("What would you tell a close friend or colleague who came to you with this exact fear of making the wrong choice?")
+                val q1Pool = listOf(
+                    "What part of \"$primaryConcept\" is entirely within your direct agency today, and what expectation must you let go of?",
+                    "If you remove the pressure to prove anything, what does trusting your preparation look like regarding \"$primaryConcept\"?",
+                    "What fear or resistance is currently masquerading as 'need for more time or information' about $primaryConcept?"
+                )
+                prompts.add(q1Pool[noteSeed % q1Pool.size])
             }
-
             LifeSphere.WORK_ENGINEERING -> {
-                prompts.add("What is the single highest-risk assumption in this technical path, and how can you verify it with a minimal test before committing?")
-                prompts.add("If you completely stepped back from this bottleneck for 24 hours, what simpler architectural solution might become visible?")
-                prompts.add("What rollback or fallback plan gives you the psychological safety to move forward decisively today?")
+                val q1Pool = listOf(
+                    "What is the single highest-risk assumption in \"$primaryConcept\", and how can you verify it with a minimal test before building further?",
+                    "If you stepped back from this technical bottleneck for 24 hours, what simpler architectural trade-off might become visible?",
+                    "What rollback or fallback plan around $primaryConcept gives you the psychological safety to ship decisively today?"
+                )
+                prompts.add(q1Pool[noteSeed % q1Pool.size])
             }
-
             LifeSphere.PHYSICAL_WELLBEING -> {
-                prompts.add("Your body is signaling fatigue here: what boundary or ritual can protect your physical recovery before burnout sets in?")
-                prompts.add("What subtle warning signs did you overlook before reaching this level of strain, and how can you catch them sooner?")
-                prompts.add("What is one non-negotiable change to your evening routine that guarantees restful recovery tonight?")
+                val q1Pool = listOf(
+                    "Your reflections around \"$primaryConcept\" signal bodily fatigue: what non-negotiable ritual can protect your recovery tonight?",
+                    "What subtle strain signs did you overlook before reaching this point with $primaryConcept, and how can you detect them earlier?",
+                    "If you treated your energy as a fixed physical budget, which low-value drain related to $primaryConcept would you cut immediately?"
+                )
+                prompts.add(q1Pool[noteSeed % q1Pool.size])
             }
-
             LifeSphere.GENERAL -> {
-                val titleTopic = title.ifBlank { "this reflection" }.removePrefix("Untitled Entry").trim()
-                prompts.add("What is the most honest truth about \"$titleTopic\" that you haven't explicitly typed out yet?")
-                prompts.add("What will this look like one year from now if you act decisively on this insight today?")
-                prompts.add("What is one concrete, low-friction action step that honors what you felt while writing this?")
+                val q1Pool = listOf(
+                    "What is the most honest truth about \"$primaryConcept\" that you felt while typing this, but haven't explicitly articulated?",
+                    "If you viewed \"$primaryConcept\" from an outsider's lens, what obvious strength or opportunity are you overlooking?",
+                    "What fundamental assumption about \"$primaryConcept\" would surprise you most if it turned out to be completely false?"
+                )
+                prompts.add(q1Pool[noteSeed % q1Pool.size])
             }
         }
 
+        // 4. DYNAMIC SOCRATIC QUESTION 2: Perspective Shift & Emotional Valence (Always dynamic, never static)
+        val normalizedMood = mood.lowercase().trim()
+        val q2Pool = when {
+            normalizedMood.contains("stress") || normalizedMood.contains("anxious") || normalizedMood.contains("overwhelm") -> listOf(
+                "Given the tension around '$secondaryConcept', what is one non-essential demand you can give yourself permission to drop today?",
+                "If you treated this anxiety as information rather than a crisis, what boundary is your mind asking for regarding '$secondaryConcept'?",
+                "What is the simplest subtraction you can make in your schedule to create breathing room around $secondaryConcept?",
+                "What would you tell a trusted friend who came to you carrying this exact worry about $secondaryConcept?"
+            )
+            normalizedMood.contains("creative") || normalizedMood.contains("energ") || normalizedMood.contains("excit") -> listOf(
+                "Where does '$secondaryConcept' intersect with an unconventional idea or passion you've kept on the back burner?",
+                "What bold, low-friction experiment around '$secondaryConcept' could leverage the momentum you feel right now?",
+                "If you had total freedom to pursue '$secondaryConcept' without risk of judgment, what would the first prototype look like?",
+                "How can you capture and codify the energy behind '$secondaryConcept' so it sustains you on slower days?"
+            )
+            normalizedMood.contains("analytical") || normalizedMood.contains("focus") -> listOf(
+                "If an external expert audited your approach to '$secondaryConcept', which hidden inefficiency would they flag first?",
+                "What would an 80/20 simplification of '$secondaryConcept' look like if you were forced to deliver in under an hour?",
+                "What counter-intuitive metric will prove whether your trajectory on '$secondaryConcept' was truly the right one?",
+                "What second-order consequences of this decision on '$secondaryConcept' might emerge three months from now?"
+            )
+            else -> listOf(
+                "Looking at '$secondaryConcept', what old habit or mental model are you quietly outgrowing through this experience?",
+                "If future-you from five years ahead could comment on '$secondaryConcept', what perspective would they offer?",
+                "What unspoken value or standard of yours is being tested most strongly by '$secondaryConcept' right now?",
+                "What part of this thought around '$secondaryConcept' feels most vulnerable or challenging to fully accept?"
+            )
+        }
+        prompts.add(q2Pool[(noteSeed + 1) % q2Pool.size])
+
+        // 5. DYNAMIC SOCRATIC QUESTION 3: Actionable Micro-Experiment / Future-Proofing (Always dynamic)
+        val q3Pool = listOf(
+            "What is a single 10-minute micro-action within the next 24 hours that moves \"$primaryConcept\" from contemplation into tangible progress?",
+            "What is the quietest obstacle or friction point that might derail you tomorrow, and what is your plan to bypass it?",
+            "Who is one person whose perspective or feedback on \"$primaryConcept\" could save you weeks of second-guessing?",
+            "How will your daily routine look one month from now if you remain consistent with the insight behind \"$primaryConcept\"?",
+            "What is the single most decisive 'no' you must say this week to protect your focus on \"$primaryConcept\"?"
+        )
+        prompts.add(q3Pool[(noteSeed + 2) % q3Pool.size])
+
         return prompts.distinct().take(3)
+    }
+
+    /**
+     * Extracts top 2-3 salient noun/concept phrases from title and content to anchor dynamic Socratic prompts.
+     */
+    private fun extractSalientConcepts(title: String, content: String): List<String> {
+        val stopWords = setOf(
+            "the", "and", "a", "an", "in", "on", "at", "to", "for", "with", "from", "by", "about",
+            "this", "that", "these", "those", "is", "are", "was", "were", "be", "been", "being",
+            "have", "has", "had", "do", "does", "did", "can", "could", "will", "would", "should",
+            "my", "your", "his", "her", "its", "our", "their", "not", "but", "what", "which",
+            "who", "when", "where", "why", "how", "all", "each", "every", "both", "some", "any",
+            "just", "like", "very", "also", "then", "into", "over", "more", "most", "other",
+            "note", "entry", "journal", "today", "yesterday", "thought", "untitled"
+        )
+
+        val candidateWords = mutableListOf<String>()
+
+        // 1. Title concepts first (high signal)
+        title.split(Regex("[\\s,.:;!?()\\[\\]\"'#*~_/-]+"))
+            .filter { it.length >= 3 && it.lowercase() !in stopWords }
+            .forEach { candidateWords.add(it) }
+
+        // 2. Content concepts
+        content.split(Regex("[\\s,.:;!?()\\[\\]\"'#*~_/-]+"))
+            .filter { it.length >= 4 && it.lowercase() !in stopWords }
+            .take(30)
+            .forEach { candidateWords.add(it) }
+
+        val frequencyMap = candidateWords.groupingBy { it.lowercase() }.eachCount()
+        return frequencyMap.entries
+            .sortedByDescending { it.value }
+            .map { it.key.replaceFirstChar { ch -> ch.uppercase() } }
+            .take(3)
     }
 
     /**

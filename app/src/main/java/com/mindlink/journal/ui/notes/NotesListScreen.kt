@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -44,6 +45,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -265,320 +267,761 @@ fun NotesListScreen(
         if (isHeaderDark) Color(0xF8070B14) else Color(0xF8E8EEF7)
     } else MindBackgroundAmoled
 
-    Scaffold(
-        topBar = {
-            Column(modifier = Modifier.background(topBarBg)) {
-                TopAppBar(
-                    title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(RoundedCornerShape(9.dp))
-                                    .background(Color(0xFF0F172A))
-                                    .border(1.dp, PastelLavender.copy(alpha = 0.35f), RoundedCornerShape(9.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                androidx.compose.foundation.Image(
-                                    painter = androidx.compose.ui.res.painterResource(com.mindlink.journal.R.drawable.ic_launcher_foreground),
-                                    contentDescription = "MindLink App Icon",
-                                    modifier = Modifier.size(30.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val memoryLinkStatus = remember(serviceLocator) {
+        serviceLocator.brainstormingEngine.getMemoryLinkStatus()
+    }
+    var showMemoryLinkInfoDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = {
+                Text(
+                    text = if (uiState.selectedTab == NotesTab.TRASH) "Permanently delete ${uiState.selectedNoteIds.size} thoughts?" else "Move ${uiState.selectedNoteIds.size} thoughts to Trash?",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = if (uiState.selectedTab == NotesTab.TRASH) "This action is permanent and cannot be undone." else "Thoughts in Trash will automatically be purged after 30 days."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                        viewModel.deleteSelectedNotes()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PastelRose)
+                ) {
+                    Text(if (uiState.selectedTab == NotesTab.TRASH) "Delete Permanently" else "Move to Trash", color = Color(0xFF1E293B))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showMemoryLinkInfoDialog) {
+        AlertDialog(
+            onDismissRequest = { showMemoryLinkInfoDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.PsychologyAlt,
+                    contentDescription = null,
+                    tint = Color(0xFFFB7185),
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text("Memory Link Broken", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "MindLink operates with deep neural reasoning when connected to an On-Device Small Language Model (SLM) or Gemini Cloud AI.\n\n" +
+                    "Currently, no AI model is active. MindLink is safely operating on local heuristic pattern matching.\n\n" +
+                    "Download a 100% offline edge model in Settings to activate the neural intelligence link with zero cloud dependency."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showMemoryLinkInfoDialog = false
+                        onSettingsClick()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MindIndigo)
+                ) {
+                    Text("Open AI Settings")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMemoryLinkInfoDialog = false }) {
+                    Text("Dismiss")
+                }
+            }
+        )
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerContainerColor = if (isHeaderDark) Color(0xFF0B0F19) else Color(0xFFF1F5F9),
+                modifier = Modifier.width(310.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 20.dp)
+                ) {
+                    // 1. App Header with Icon & Subtitle
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF0F172A))
+                                .border(1.dp, PastelLavender.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(com.mindlink.journal.R.drawable.ic_launcher_foreground),
+                                contentDescription = "MindLink Logo",
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
                             Text(
                                 text = "MindLink",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MindTextPrimary
                             )
+                            Text(
+                                text = "Intelligent Neural Journal",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MindTextTertiary
+                            )
                         }
-                    },
-                    actions = {
-                        // 1. Google Keep Style Layout Switching Vector Icon
-                        IconButton(onClick = {
-                            val nextMode = when (viewMode) {
-                                NoteViewMode.GRID -> NoteViewMode.CARDS
-                                NoteViewMode.CARDS -> NoteViewMode.COMPACT_LIST
-                                NoteViewMode.COMPACT_LIST -> NoteViewMode.GRID
-                            }
-                            viewMode = nextMode
-                            serviceLocator.updateNoteViewMode(
-                                when (nextMode) {
-                                    NoteViewMode.GRID -> "grid"
-                                    NoteViewMode.CARDS -> "cards"
-                                    NoteViewMode.COMPACT_LIST -> "compact"
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // 2. Google Account Status Card
+                    if (googleUser != null) {
+                        val initial = (googleUser!!.displayName.firstOrNull() ?: googleUser!!.email.firstOrNull() ?: 'G').uppercaseChar()
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MindGlassSurfaceVariant,
+                            border = BorderStroke(0.8.dp, MindGlassBorderSubtle),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    coroutineScope.launch { drawerState.close() }
+                                    onSettingsClick()
                                 }
-                            )
-                        }) {
-                            Icon(
-                                imageVector = viewMode.icon,
-                                contentDescription = viewMode.label,
-                                tint = MindTextPrimary
-                            )
-                        }
-
-                        // 2. Dark / Bright Mode Switch (Right next to card layout switcher)
-                        val currentAppThemeId by serviceLocator.appTheme.collectAsState()
-                        IconButton(onClick = {
-                            val targetTheme = if (isHeaderDark) {
-                                if (currentAppThemeId == "ios_glassy") "ios_glassy_light" else "light_clean"
-                            } else {
-                                if (currentAppThemeId == "ios_glassy_light") "ios_glassy" else "amoled_black"
-                            }
-                            serviceLocator.updateAppTheme(targetTheme)
-                        }) {
-                            Icon(
-                                imageVector = if (isHeaderDark) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                contentDescription = if (isHeaderDark) "Switch to Light Mode" else "Switch to Dark Mode",
-                                tint = if (isHeaderDark) PastelAmber else MindTextPrimary
-                            )
-                        }
-
-                        // 3. Intelligent Synaptic Network (Noticeable Hub Badge Icon)
-                        IconButton(onClick = onThoughtGraphClick) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .background(
-                                        color = if (isHeaderDark) Color(0x33818CF8) else Color(0x206366F1),
-                                        shape = CircleShape
-                                    )
-                                    .border(
-                                        width = 1.dp,
-                                        color = if (isHeaderDark) Color(0x55A5B4FC) else Color(0x406366F1),
-                                        shape = CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                androidx.compose.foundation.Image(
-                                    painter = androidx.compose.ui.res.painterResource(com.mindlink.journal.R.drawable.ic_thought_constellation),
-                                    contentDescription = "Thought Constellation",
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                )
-                            }
-                        }
-
-                        // 4. Google Account Status Avatar (Shows signed-in state & backup status)
-                        if (googleUser != null) {
-                            val initial = (googleUser!!.displayName.firstOrNull() ?: googleUser!!.email.firstOrNull() ?: 'G').uppercaseChar()
-                            IconButton(
-                                onClick = onSettingsClick,
-                                modifier = Modifier.size(36.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(30.dp)
+                                        .size(38.dp)
                                         .background(
                                             brush = Brush.linearGradient(
                                                 listOf(Color(0xFF4285F4), Color(0xFF34A853))
                                             ),
                                             shape = CircleShape
                                         )
-                                        .border(1.dp, Color.White.copy(alpha = 0.7f), CircleShape),
+                                        .border(1.2.dp, Color.White.copy(alpha = 0.8f), CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = initial.toString(),
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomEnd)
-                                            .size(7.dp)
-                                            .background(MindEmerald, CircleShape)
-                                            .border(1.dp, Color(0xFF0F172A), CircleShape)
+                                        fontSize = 15.sp
                                     )
                                 }
-                            }
-                        }
-
-                        // 5. Settings Icon
-                        IconButton(onClick = onSettingsClick) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = MindTextSecondary
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = if (MindIsGlassy) Color.Transparent else MindBackgroundAmoled
-                    )
-                )
-
-                // WhatsApp-Style Persistent Search & Second Brain Bar
-                Surface(
-                    color = if (MindIsGlassy) Color.Transparent else MindGlassSurface,
-                    border = if (MindIsGlassy) null else BorderStroke(1.dp, MindPrismGlassCardBorder),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                        .liquidGlass(
-                            shape = RoundedCornerShape(24.dp),
-                            cornerRadius = 24.dp,
-                            isGlassy = MindIsGlassy,
-                            isDark = LocalMindLinkColors.current.isDark,
-                            cardBackground = MindGlassCardBackground,
-                            cardBorder = MindGlassCardBorder
-                        )
-                        .clickable {
-                            searchFocusRequester.requestFocus()
-                            keyboardController?.show()
-                        }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = {
-                                searchFocusRequester.requestFocus()
-                                keyboardController?.show()
-                            },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = MindTextSecondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable {
-                                    searchFocusRequester.requestFocus()
-                                    keyboardController?.show()
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = googleUser!!.displayName.ifBlank { "Google User" },
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MindTextPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = googleUser!!.email,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MindTextTertiary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
-                        ) {
-                            if (uiState.searchQuery.isEmpty()) {
-                                Text(
-                                    text = "Ask Second Brain or search thoughts...",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MindTextTertiary
-                                )
-                            }
-                            BasicTextField(
-                                value = uiState.searchQuery,
-                                onValueChange = { viewModel.updateSearchQuery(it) },
-                                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MindTextPrimary),
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .focusRequester(searchFocusRequester)
-                            )
-                        }
-                        if (uiState.searchQuery.isNotEmpty()) {
-                            IconButton(
-                                onClick = { viewModel.updateSearchQuery("") },
-                                modifier = Modifier.size(26.dp)
-                            ) {
                                 Icon(
-                                    imageVector = Icons.Default.Clear,
-                                    contentDescription = "Clear",
-                                    tint = MindTextTertiary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                        }
-                        // Second Brain AI Trigger Icon
-                        Surface(
-                            shape = CircleShape,
-                            color = MindIndigo.copy(alpha = 0.2f),
-                            border = BorderStroke(0.5.dp, MindIndigo.copy(alpha = 0.4f)),
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .clickable(onClick = onSecondBrainClick)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Psychology,
-                                    contentDescription = "Second Brain",
-                                    tint = MindIndigo,
+                                    imageVector = Icons.Default.CloudDone,
+                                    contentDescription = "Synced",
+                                    tint = MindEmerald,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
-                    }
-                }
-
-                // Journal / Archive / Trash Tab Selector (Glassy Pastel Pills)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    NotesTab.values().forEach { tab ->
-                        val isSelected = uiState.selectedTab == tab
-                        val count = when (tab) {
-                            NotesTab.JOURNAL -> uiState.notes.size
-                            NotesTab.ARCHIVE -> uiState.archivedNotes.size
-                            NotesTab.TRASH -> uiState.trashNotes.size
-                        }
-                        val icon = when (tab) {
-                            NotesTab.JOURNAL -> Icons.Default.Notes
-                            NotesTab.ARCHIVE -> Icons.Default.Archive
-                            NotesTab.TRASH -> Icons.Default.DeleteOutline
-                        }
-                        val accent = when (tab) {
-                            NotesTab.JOURNAL -> PastelLavender
-                            NotesTab.ARCHIVE -> PastelAmber
-                            NotesTab.TRASH -> PastelRose
-                        }
+                    } else {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) accent.copy(alpha = if (MindIsGlassy) 0.35f else 0.2f) else if (MindIsGlassy) Color.Transparent else MindGlassSurface,
-                            border = if (MindIsGlassy) null else BorderStroke(1.dp, if (isSelected) accent.copy(alpha = 0.5f) else MindGlassBorderSubtle),
+                            shape = RoundedCornerShape(14.dp),
+                            color = MindGlassSurfaceVariant,
+                            border = BorderStroke(0.8.dp, MindGlassBorderSubtle),
                             modifier = Modifier
-                                .weight(1f)
-                                .liquidGlass(
-                                    shape = RoundedCornerShape(12.dp),
-                                    cornerRadius = 12.dp,
-                                    isGlassy = MindIsGlassy,
-                                    isDark = LocalMindLinkColors.current.isDark,
-                                    cardBackground = if (isSelected) androidx.compose.ui.graphics.Brush.verticalGradient(listOf(accent.copy(alpha = 0.28f), accent.copy(alpha = 0.16f))) else MindGlassCardBackground,
-                                    cardBorder = if (isSelected) androidx.compose.ui.graphics.Brush.verticalGradient(listOf(accent.copy(alpha = 0.8f), accent.copy(alpha = 0.4f))) else MindGlassCardBorder,
-                                    elevation = 2.dp,
-                                    onClick = { viewModel.selectTab(tab) }
-                                )
+                                .fillMaxWidth()
+                                .clickable {
+                                    coroutineScope.launch { drawerState.close() }
+                                    onSettingsClick()
+                                }
                         ) {
                             Row(
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = icon,
+                                    imageVector = Icons.Default.AccountCircle,
                                     contentDescription = null,
-                                    tint = if (isSelected) accent else MindTextTertiary,
-                                    modifier = Modifier.size(15.dp)
+                                    tint = PastelSky,
+                                    modifier = Modifier.size(32.dp)
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Google Account",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MindTextPrimary
+                                    )
+                                    Text(
+                                        text = "Tap to sign in & enable backups",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MindTextTertiary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // 3. AI Status Badge inside Drawer
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (memoryLinkStatus.isBroken) Color(0x22F43F5E) else Color(0x2210B981),
+                        border = BorderStroke(0.8.dp, if (memoryLinkStatus.isBroken) Color(0x66F43F5E) else Color(0x6610B981)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch { drawerState.close() }
+                                if (memoryLinkStatus.isBroken) {
+                                    showMemoryLinkInfoDialog = true
+                                } else {
+                                    onSettingsClick()
+                                }
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (memoryLinkStatus.isBroken) Icons.Default.FlashOff else Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = if (memoryLinkStatus.isBroken) Color(0xFFFB7185) else MindEmerald,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "${tab.label} ($count)",
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) accent else MindTextSecondary
+                                    text = memoryLinkStatus.title,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (memoryLinkStatus.isBroken) Color(0xFFFB7185) else MindEmerald
+                                )
+                                Text(
+                                    text = memoryLinkStatus.subtitle,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MindTextTertiary,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = MindBorderDark.copy(alpha = 0.3f))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // 4. Navigation Drawer Items
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Notes, contentDescription = null, tint = if (uiState.selectedTab == NotesTab.JOURNAL) MindIndigo else MindTextSecondary) },
+                        label = { Text("Journal Thoughts (${uiState.notes.size})", fontWeight = if (uiState.selectedTab == NotesTab.JOURNAL) FontWeight.Bold else FontWeight.Medium) },
+                        selected = uiState.selectedTab == NotesTab.JOURNAL,
+                        onClick = {
+                            viewModel.selectTab(NotesTab.JOURNAL)
+                            coroutineScope.launch { drawerState.close() }
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Psychology, contentDescription = null, tint = MindIndigo) },
+                        label = { Text("Second Brain AI Hub", fontWeight = FontWeight.Medium) },
+                        selected = false,
+                        onClick = {
+                            coroutineScope.launch { drawerState.close() }
+                            onSecondBrainClick()
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Hub, contentDescription = null, tint = PastelSky) },
+                        label = { Text("Thought Constellation", fontWeight = FontWeight.Medium) },
+                        selected = false,
+                        onClick = {
+                            coroutineScope.launch { drawerState.close() }
+                            onThoughtGraphClick()
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Archive, contentDescription = null, tint = if (uiState.selectedTab == NotesTab.ARCHIVE) PastelAmber else MindTextSecondary) },
+                        label = { Text("Archived (${uiState.archivedNotes.size})", fontWeight = if (uiState.selectedTab == NotesTab.ARCHIVE) FontWeight.Bold else FontWeight.Medium) },
+                        selected = uiState.selectedTab == NotesTab.ARCHIVE,
+                        onClick = {
+                            viewModel.selectTab(NotesTab.ARCHIVE)
+                            coroutineScope.launch { drawerState.close() }
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = if (uiState.selectedTab == NotesTab.TRASH) PastelRose else MindTextSecondary) },
+                        label = { Text("Trash (${uiState.trashNotes.size})", fontWeight = if (uiState.selectedTab == NotesTab.TRASH) FontWeight.Bold else FontWeight.Medium) },
+                        selected = uiState.selectedTab == NotesTab.TRASH,
+                        onClick = {
+                            viewModel.selectTab(NotesTab.TRASH)
+                            coroutineScope.launch { drawerState.close() }
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    HorizontalDivider(color = MindBorderDark.copy(alpha = 0.3f))
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // 5. Drawer Footer: Theme Toggle & Settings
+                    val currentAppThemeId by serviceLocator.appTheme.collectAsState()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MindGlassSurfaceVariant,
+                            border = BorderStroke(0.8.dp, MindGlassBorderSubtle),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    val targetTheme = if (isHeaderDark) {
+                                        if (currentAppThemeId == "ios_glassy") "ios_glassy_light" else "light_clean"
+                                    } else {
+                                        if (currentAppThemeId == "ios_glassy_light") "ios_glassy" else "amoled_black"
+                                    }
+                                    serviceLocator.updateAppTheme(targetTheme)
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (isHeaderDark) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                    contentDescription = "Toggle Theme",
+                                    tint = if (isHeaderDark) PastelAmber else MindTextPrimary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isHeaderDark) "Light" else "Dark",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MindTextPrimary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MindGlassSurfaceVariant,
+                            border = BorderStroke(0.8.dp, MindGlassBorderSubtle),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    coroutineScope.launch { drawerState.close() }
+                                    onSettingsClick()
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "Settings",
+                                    tint = MindTextSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Settings",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MindTextPrimary,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
                     }
                 }
+            }
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                Column(modifier = Modifier.background(topBarBg)) {
+                    if (uiState.isSelectionMode) {
+                        // Contextual Action Top Bar for Multi-Selection
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = { viewModel.clearSelection() },
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Exit Selection",
+                                    tint = MindTextPrimary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(6.dp))
+
+                            Text(
+                                text = "${uiState.selectedNoteIds.size} selected",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MindTextPrimary,
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            IconButton(
+                                onClick = { viewModel.selectAll() },
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SelectAll,
+                                    contentDescription = "Select All",
+                                    tint = MindTextPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            if (uiState.selectedTab == NotesTab.JOURNAL) {
+                                IconButton(
+                                    onClick = { viewModel.togglePinSelectedNotes() },
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PushPin,
+                                        contentDescription = "Pin / Unpin Selected",
+                                        tint = PastelAmber,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+
+                            IconButton(
+                                onClick = { showDeleteConfirmDialog = true },
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DeleteOutline,
+                                    contentDescription = "Delete Selected",
+                                    tint = PastelRose,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        // Streamlined 1-Row Unified Top Bar: [ ☰ Drawer ] + [ Search Bar & Second Brain ] + [ Layout Switcher ] + [ Constellation ]
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 1. Drawer Hamburger Button (☰)
+                            IconButton(
+                                onClick = { coroutineScope.launch { drawerState.open() } },
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Menu,
+                                    contentDescription = "Open Drawer",
+                                    tint = MindTextPrimary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(4.dp))
+
+                            // 2. Integrated Search Bar (center, fills weight, with clear and Second Brain inside)
+                            Surface(
+                                color = if (MindIsGlassy) Color.Transparent else MindGlassSurface,
+                                border = if (MindIsGlassy) null else BorderStroke(1.dp, MindPrismGlassCardBorder),
+                                shape = RoundedCornerShape(22.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                                    .liquidGlass(
+                                        shape = RoundedCornerShape(22.dp),
+                                        cornerRadius = 22.dp,
+                                        isGlassy = MindIsGlassy,
+                                        isDark = isHeaderDark,
+                                        cardBackground = MindGlassCardBackground,
+                                        cardBorder = MindGlassCardBorder
+                                    )
+                                    .clickable {
+                                        searchFocusRequester.requestFocus()
+                                        keyboardController?.show()
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = "Search",
+                                        tint = MindTextSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable {
+                                                searchFocusRequester.requestFocus()
+                                                keyboardController?.show()
+                                            }
+                                    ) {
+                                        if (uiState.searchQuery.isEmpty()) {
+                                            Text(
+                                                text = "Search thoughts, tags...",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MindTextTertiary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        BasicTextField(
+                                            value = uiState.searchQuery,
+                                            onValueChange = { viewModel.updateSearchQuery(it) },
+                                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MindTextPrimary),
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                            keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .focusRequester(searchFocusRequester)
+                                        )
+                                    }
+                                    if (uiState.searchQuery.isNotEmpty()) {
+                                        IconButton(
+                                            onClick = { viewModel.updateSearchQuery("") },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Clear,
+                                                contentDescription = "Clear",
+                                                tint = MindTextTertiary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    } else {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = MindIndigo.copy(alpha = 0.2f),
+                                            border = BorderStroke(0.5.dp, MindIndigo.copy(alpha = 0.4f)),
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .clickable(onClick = onSecondBrainClick)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Psychology,
+                                                    contentDescription = "Second Brain",
+                                                    tint = MindIndigo,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(4.dp))
+
+                            // 3. Layout Switching Button
+                            IconButton(
+                                onClick = {
+                                    val nextMode = when (viewMode) {
+                                        NoteViewMode.GRID -> NoteViewMode.CARDS
+                                        NoteViewMode.CARDS -> NoteViewMode.COMPACT_LIST
+                                        NoteViewMode.COMPACT_LIST -> NoteViewMode.GRID
+                                    }
+                                    viewMode = nextMode
+                                    serviceLocator.updateNoteViewMode(
+                                        when (nextMode) {
+                                            NoteViewMode.GRID -> "grid"
+                                            NoteViewMode.CARDS -> "cards"
+                                            NoteViewMode.COMPACT_LIST -> "compact"
+                                        }
+                                    )
+                                },
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Icon(
+                                    imageVector = viewMode.icon,
+                                    contentDescription = viewMode.label,
+                                    tint = MindTextPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            // 4. Brain Overview / Thought Graph Button
+                            IconButton(
+                                onClick = onThoughtGraphClick,
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .background(
+                                            color = if (isHeaderDark) Color(0x33818CF8) else Color(0x206366F1),
+                                            shape = CircleShape
+                                        )
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (isHeaderDark) Color(0x55A5B4FC) else Color(0x406366F1),
+                                            shape = CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    androidx.compose.foundation.Image(
+                                        painter = androidx.compose.ui.res.painterResource(com.mindlink.journal.R.drawable.ic_thought_constellation),
+                                        contentDescription = "Thought Constellation",
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .clip(CircleShape)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Prominent "Memory Link Broken" Warning Banner (if running on local heuristics)
+                    if (memoryLinkStatus.isBroken) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0x22F43F5E),
+                            border = BorderStroke(1.dp, Color(0x66F43F5E)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 3.dp)
+                                .clickable { showMemoryLinkInfoDialog = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FlashOff,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFB7185),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "⚡ Memory Link Broken · Local Heuristics Active",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFFB7185)
+                                    )
+                                    Text(
+                                        text = "On-Device SLM or API key offline. Tap to activate neural intelligence.",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MindTextTertiary,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFB7185),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Search Active Header Counter Pill
+                    if (uiState.searchQuery.isNotEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MindGlassSurfaceVariant,
+                            border = BorderStroke(0.6.dp, MindGlassBorderSubtle),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 3.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.FindInPage, contentDescription = null, tint = PastelSky, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Search: ${uiState.filteredNotes.size} match${if (uiState.filteredNotes.size == 1) "" else "es"}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MindTextPrimary
+                                    )
+                                }
+                                Text(
+                                    text = "Clear",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = PastelSky,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.clickable { viewModel.updateSearchQuery("") }
+                                )
+                            }
+                        }
+                    }
 
                 // 4. Horizontal Mood/Pattern Filter Chips (All (39), Reflective, etc.) or Tab Status Banner
                 when (uiState.selectedTab) {
@@ -642,17 +1085,41 @@ fun NotesListScreen(
                                 .padding(horizontal = 16.dp, vertical = 6.dp)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Archive, contentDescription = null, tint = PastelAmber, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Archived Thoughts are stored safely outside your active stream",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = PastelAmber,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Archive, contentDescription = null, tint = PastelAmber, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Archived Thoughts (${uiState.archivedNotes.size})",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = PastelAmber,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = PastelAmber.copy(alpha = 0.2f),
+                                    border = BorderStroke(1.dp, PastelAmber.copy(alpha = 0.4f)),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { viewModel.selectTab(NotesTab.JOURNAL) }
+                                ) {
+                                    Text(
+                                        text = "Back to Journal",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = PastelAmber,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -685,22 +1152,43 @@ fun NotesListScreen(
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
-                                if (uiState.trashNotes.isNotEmpty()) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Surface(
                                         shape = RoundedCornerShape(8.dp),
-                                        color = PastelRose.copy(alpha = 0.25f),
-                                        border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.5f)),
+                                        color = PastelRose.copy(alpha = 0.2f),
+                                        border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.4f)),
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(8.dp))
-                                            .clickable { viewModel.emptyTrash() }
+                                            .clickable { viewModel.selectTab(NotesTab.JOURNAL) }
                                     ) {
                                         Text(
-                                            text = "Empty Trash",
+                                            text = "Back to Journal",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = PastelRose,
                                             fontWeight = FontWeight.Bold,
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                         )
+                                    }
+                                    if (uiState.trashNotes.isNotEmpty()) {
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = PastelRose.copy(alpha = 0.25f),
+                                            border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.5f)),
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable { viewModel.emptyTrash() }
+                                        ) {
+                                            Text(
+                                                text = "Empty Trash",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = PastelRose,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -968,8 +1456,12 @@ fun NotesListScreen(
                             NoteCard(
                                 note = note,
                                 viewMode = viewMode,
+                                isSelected = uiState.selectedNoteIds.contains(note.id),
+                                isInSelectionMode = uiState.isSelectionMode,
                                 onClick = {
-                                    if (note.isLocked) {
+                                    if (uiState.isSelectionMode) {
+                                        viewModel.toggleSelectNote(note.id)
+                                    } else if (note.isLocked) {
                                         val activity = context as? androidx.fragment.app.FragmentActivity
                                         if (activity != null && com.mindlink.journal.ui.security.BiometricHelper.canAuthenticate(context)) {
                                             com.mindlink.journal.ui.security.BiometricHelper.authenticate(
@@ -984,6 +1476,9 @@ fun NotesListScreen(
                                     } else {
                                         onNoteClick(note.id)
                                     }
+                                },
+                                onLongClick = {
+                                    viewModel.toggleSelectNote(note.id)
                                 }
                             )
 
@@ -1092,6 +1587,7 @@ fun NotesListScreen(
             )
         }
     }
+}
 }
 
 @Composable

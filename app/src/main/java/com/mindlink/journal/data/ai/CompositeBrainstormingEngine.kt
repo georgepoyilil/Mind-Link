@@ -139,7 +139,42 @@ class CompositeBrainstormingEngine(
         return geminiEngine.transcribeAudio(audioBytes, mimeType)
     }
 
+    fun isAiModelActive(): Boolean {
+        val mode = engineModeProvider()
+        return when (mode) {
+            "LOCAL" -> false
+            "GEMINI" -> hasApiKey()
+            "SLM" -> mediaPipeEngine.isModelAvailable()
+            else -> hasApiKey() || mediaPipeEngine.isModelAvailable()
+        }
+    }
+
+    fun getMemoryLinkStatus(): MemoryLinkStatus {
+        val mode = engineModeProvider()
+        val hasKey = hasApiKey()
+        val hasSlm = mediaPipeEngine.isModelAvailable()
+        return when {
+            mode == "GEMINI" && hasKey -> MemoryLinkStatus(isBroken = false, title = "Cloud Neural Link Active", subtitle = "Gemini 2.0 Flash", isLocal = false)
+            mode == "SLM" && hasSlm -> MemoryLinkStatus(isBroken = false, title = "On-Device Neural Link Active", subtitle = mediaPipeEngine.getModelInfo(), isLocal = true)
+            mode == "AUTO" && hasKey -> MemoryLinkStatus(isBroken = false, title = "Cloud Neural Link Active", subtitle = "Gemini 2.0 Flash", isLocal = false)
+            mode == "AUTO" && hasSlm -> MemoryLinkStatus(isBroken = false, title = "On-Device Neural Link Active", subtitle = mediaPipeEngine.getModelInfo(), isLocal = true)
+            else -> MemoryLinkStatus(
+                isBroken = true,
+                title = "Memory Link Broken",
+                subtitle = "Local Heuristics Active · No AI Model Running",
+                isLocal = true
+            )
+        }
+    }
+
     companion object {
         private const val TAG = "CompositeBrainstorming"
     }
 }
+
+data class MemoryLinkStatus(
+    val isBroken: Boolean,
+    val title: String,
+    val subtitle: String,
+    val isLocal: Boolean
+)

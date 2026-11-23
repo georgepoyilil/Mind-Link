@@ -125,6 +125,9 @@ fun MindLinkNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 onNoteClick = { noteId ->
                     navController.navigate(Screen.NoteDetail.createRoute(noteId))
+                },
+                onSettingsClick = {
+                    navController.navigate(Screen.Settings.route)
                 }
             )
         }
@@ -139,6 +142,9 @@ fun MindLinkNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 onNoteClick = { noteId ->
                     navController.navigate(Screen.NoteDetail.createRoute(noteId))
+                },
+                onSecondBrainClick = {
+                    navController.navigate(Screen.SecondBrain.route)
                 }
             )
         }

@@ -27,8 +27,11 @@ data class NotesUiState(
     val isLoading: Boolean = true,
     val showOnboarding: Boolean = false,
     val availableUpdate: com.mindlink.journal.data.ota.AppReleaseInfo? = null,
-    val isOtaDismissed: Boolean = false
-)
+    val isOtaDismissed: Boolean = false,
+    val selectedNoteIds: Set<Long> = emptySet()
+) {
+    val isSelectionMode: Boolean get() = selectedNoteIds.isNotEmpty()
+}
 
 class NotesViewModel(
     private val repository: NoteRepository,
@@ -152,6 +155,59 @@ class NotesViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             com.mindlink.journal.data.local.SampleDataSeeder.seedSampleNotes(repository)
+        }
+    }
+
+    fun toggleSelectNote(noteId: Long) {
+        _uiState.update { state ->
+            val updated = if (state.selectedNoteIds.contains(noteId)) {
+                state.selectedNoteIds - noteId
+            } else {
+                state.selectedNoteIds + noteId
+            }
+            state.copy(selectedNoteIds = updated)
+        }
+    }
+
+    fun selectAll() {
+        _uiState.update { state ->
+            val allIds = state.filteredNotes.map { it.id }.toSet()
+            state.copy(selectedNoteIds = allIds)
+        }
+    }
+
+    fun clearSelection() {
+        _uiState.update { it.copy(selectedNoteIds = emptySet()) }
+    }
+
+    fun deleteSelectedNotes() {
+        val ids = _uiState.value.selectedNoteIds.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            if (_uiState.value.selectedTab == NotesTab.TRASH) {
+                repository.deleteMultiplePermanently(ids)
+            } else {
+                repository.moveMultipleToTrash(ids)
+            }
+            clearSelection()
+        }
+    }
+
+    fun togglePinNote(noteId: Long) {
+        viewModelScope.launch {
+            val note = repository.getNoteByIdSync(noteId) ?: return@launch
+            repository.updatePinnedStatus(noteId, !note.isPinned)
+        }
+    }
+
+    fun togglePinSelectedNotes() {
+        val ids = _uiState.value.selectedNoteIds.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            val notes = ids.mapNotNull { repository.getNoteByIdSync(it) }
+            val shouldPin = notes.any { !it.isPinned }
+            ids.forEach { repository.updatePinnedStatus(it, shouldPin) }
+            clearSelection()
         }
     }
 

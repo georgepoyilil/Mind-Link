@@ -41,7 +41,8 @@ import com.mindlink.journal.ui.theme.*
 fun SecondBrainScreen(
     viewModel: SecondBrainViewModel,
     onNavigateBack: () -> Unit,
-    onNoteClick: (Long) -> Unit
+    onNoteClick: (Long) -> Unit,
+    onSettingsClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -150,6 +151,94 @@ fun SecondBrainScreen(
                     .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 150.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Prominent Neural Memory Link Status Banner (Warning if offline heuristics)
+                val memoryLinkStatus = remember {
+                    com.mindlink.journal.di.ServiceLocator.getInstance(context).brainstormingEngine.getMemoryLinkStatus()
+                }
+                var showSecondBrainAiDialog by remember { mutableStateOf(false) }
+
+                if (showSecondBrainAiDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showSecondBrainAiDialog = false },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.PsychologyAlt,
+                                contentDescription = null,
+                                tint = Color(0xFFFB7185),
+                                modifier = Modifier.size(32.dp)
+                            )
+                        },
+                        title = {
+                            Text("Neural Memory Link Offline", fontWeight = FontWeight.Bold)
+                        },
+                        text = {
+                            Text(
+                                "MindLink operates with deep neural reasoning when connected to an On-Device Small Language Model (SLM) or Gemini Cloud AI.\n\n" +
+                                "Currently, no AI model is active. MindLink is operating in fallback heuristic mode.\n\n" +
+                                "Download an edge model in Settings to activate the neural link with zero cloud dependency."
+                            )
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showSecondBrainAiDialog = false
+                                    onSettingsClick()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MindIndigo)
+                            ) {
+                                Text("Open AI Settings")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showSecondBrainAiDialog = false }) {
+                                Text("Dismiss")
+                            }
+                        }
+                    )
+                }
+
+                if (memoryLinkStatus.isBroken) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color(0x22F43F5E),
+                        border = BorderStroke(1.dp, Color(0x66F43F5E)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showSecondBrainAiDialog = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FlashOff,
+                                contentDescription = null,
+                                tint = Color(0xFFFB7185),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "⚡ Memory Link Broken · Local Heuristics Active",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFB7185)
+                                )
+                                Text(
+                                    text = "No on-device SLM or API key. Tap to install model for full associative reasoning.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MindTextTertiary
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = Color(0xFFFB7185),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
                 // Initial State: Hero Card when no search has been run
                 if (uiState.synthesisResponse == null && !uiState.isSynthesizing && uiState.hybridResults.isEmpty()) {
                     Card(

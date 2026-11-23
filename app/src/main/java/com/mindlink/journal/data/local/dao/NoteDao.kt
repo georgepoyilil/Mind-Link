@@ -25,17 +25,26 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE id = :id")
     suspend fun getNoteByIdSync(id: Long): NoteEntity?
 
-    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND isArchived = 0 ORDER BY createdAt DESC")
+    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND isArchived = 0 ORDER BY isPinned DESC, createdAt DESC")
     fun getAllNotes(): Flow<List<NoteEntity>>
 
-    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND isArchived = 1 ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND isArchived = 1 ORDER BY isPinned DESC, updatedAt DESC")
     fun getArchivedNotes(): Flow<List<NoteEntity>>
 
     @Query("SELECT * FROM notes WHERE isDeleted = 1 ORDER BY deletedAt DESC")
     fun getTrashNotes(): Flow<List<NoteEntity>>
 
-    @Query("SELECT * FROM notes WHERE mood = :mood AND isDeleted = 0 AND isArchived = 0 ORDER BY createdAt DESC")
+    @Query("SELECT * FROM notes WHERE mood = :mood AND isDeleted = 0 AND isArchived = 0 ORDER BY isPinned DESC, createdAt DESC")
     fun getNotesByMood(mood: String): Flow<List<NoteEntity>>
+
+    @Query("UPDATE notes SET isPinned = :isPinned WHERE id = :id")
+    suspend fun updatePinnedStatus(id: Long, isPinned: Boolean)
+
+    @Query("UPDATE notes SET isDeleted = 1, deletedAt = :deletedAt WHERE id IN (:ids)")
+    suspend fun moveMultipleToTrash(ids: List<Long>, deletedAt: Long = System.currentTimeMillis())
+
+    @Query("DELETE FROM notes WHERE id IN (:ids)")
+    suspend fun deleteNotesByIds(ids: List<Long>)
 
     @Query("UPDATE notes SET isDeleted = 1, deletedAt = :deletedAt WHERE id = :id")
     suspend fun moveToTrash(id: Long, deletedAt: Long = System.currentTimeMillis())

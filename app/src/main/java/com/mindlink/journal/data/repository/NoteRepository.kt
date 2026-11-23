@@ -38,6 +38,11 @@ interface NoteRepository {
     // Note Lock Protection (Biometrics)
     suspend fun updateLockStatus(id: Long, isLocked: Boolean)
 
+    // Note Pinning & Multi-Select Batch Operations
+    suspend fun updatePinnedStatus(id: Long, isPinned: Boolean)
+    suspend fun moveMultipleToTrash(ids: List<Long>)
+    suspend fun deleteMultiplePermanently(ids: List<Long>)
+
     // Audio Transcription
     suspend fun transcribeAudioFile(file: java.io.File): Result<String>
 
