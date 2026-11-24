@@ -113,6 +113,19 @@ fun NotesListScreen(
         "Fitness"
     )
 
+    val allDynamicTags = remember(uiState.notes) {
+        val counts = mutableMapOf<String, Int>()
+        uiState.notes.forEach { note ->
+            note.tags.forEach { rawTag ->
+                val clean = rawTag.trim().removePrefix("#")
+                if (clean.isNotBlank()) {
+                    counts[clean] = (counts[clean] ?: 0) + 1
+                }
+            }
+        }
+        counts.toList().sortedByDescending { it.second }
+    }
+
     // Essential Space Journaling Methods Modal Bottom Sheet
     if (showJournalingMethodsSheet) {
         ModalBottomSheet(
@@ -357,9 +370,13 @@ fun NotesListScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 20.dp)
                 ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                    ) {
                     // 1. App Header with Icon & Subtitle
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
@@ -603,9 +620,147 @@ fun NotesListScreen(
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
 
-                    Spacer(modifier = Modifier.weight(1f))
+                    HorizontalDivider(
+                        color = MindBorderDark.copy(alpha = 0.3f),
+                        modifier = Modifier.padding(vertical = 12.dp)
+                    )
 
-                    HorizontalDivider(color = MindBorderDark.copy(alpha = 0.3f))
+                    // 5. Hashtags & Topics Section
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "HASHTAGS & TOPICS",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MindTextTertiary,
+                            letterSpacing = 1.sp
+                        )
+                        if (uiState.selectedTag != null || uiState.selectedMood != null) {
+                            Text(
+                                text = "Clear",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = PastelSky,
+                                modifier = Modifier
+                                    .clickable {
+                                        viewModel.clearFilters()
+                                        coroutineScope.launch { drawerState.close() }
+                                    }
+                                    .padding(4.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // All Thoughts Item
+                    NavigationDrawerItem(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.FilterList,
+                                contentDescription = null,
+                                tint = if (uiState.selectedTag == null && uiState.selectedMood == null && uiState.selectedTab == NotesTab.JOURNAL) PastelLavender else MindTextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        label = {
+                            Text(
+                                "All Thoughts (${uiState.notes.size})",
+                                fontWeight = if (uiState.selectedTag == null && uiState.selectedMood == null && uiState.selectedTab == NotesTab.JOURNAL) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
+                        selected = uiState.selectedTag == null && uiState.selectedMood == null && uiState.selectedTab == NotesTab.JOURNAL,
+                        onClick = {
+                            viewModel.selectTab(NotesTab.JOURNAL)
+                            viewModel.clearFilters()
+                            coroutineScope.launch { drawerState.close() }
+                        },
+                        modifier = Modifier.padding(vertical = 1.dp)
+                    )
+
+                    // Dynamic User Hashtags
+                    allDynamicTags.forEach { (tagName, count) ->
+                        val isSelected = uiState.selectedTag.equals(tagName, ignoreCase = true)
+                        NavigationDrawerItem(
+                            icon = {
+                                Text(
+                                    text = "#",
+                                    color = if (isSelected) PastelLavender else MindTextSecondary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp,
+                                    modifier = Modifier.padding(start = 4.dp, end = 2.dp)
+                                )
+                            },
+                            label = {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = tagName,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Text(
+                                        text = count.toString(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isSelected) PastelLavender else MindTextTertiary,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            },
+                            selected = isSelected,
+                            onClick = {
+                                viewModel.selectTab(NotesTab.JOURNAL)
+                                viewModel.selectTagFilter(tagName)
+                                coroutineScope.launch { drawerState.close() }
+                            },
+                            modifier = Modifier.padding(vertical = 1.dp)
+                        )
+                    }
+
+                    // Preset Topics
+                    val existingTagNames = allDynamicTags.map { it.first.lowercase() }.toSet()
+                    filterChips.filter { it.lowercase() !in existingTagNames }.forEach { topicName ->
+                        val isSelected = uiState.selectedTag.equals(topicName, ignoreCase = true) ||
+                                uiState.selectedMood.equals(topicName, ignoreCase = true)
+                        NavigationDrawerItem(
+                            icon = {
+                                Text(
+                                    text = "#",
+                                    color = if (isSelected) PastelLavender else MindTextSecondary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    modifier = Modifier.padding(start = 4.dp, end = 2.dp)
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = topicName,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            selected = isSelected,
+                            onClick = {
+                                viewModel.selectTab(NotesTab.JOURNAL)
+                                viewModel.selectTagFilter(topicName)
+                                coroutineScope.launch { drawerState.close() }
+                            },
+                            modifier = Modifier.padding(vertical = 1.dp)
+                        )
+                    }
+                } // End inner scrollable Column
+
+                HorizontalDivider(color = MindBorderDark.copy(alpha = 0.3f))
                     Spacer(modifier = Modifier.height(14.dp))
 
                     // 5. Drawer Footer: Theme Toggle & Settings
@@ -1023,176 +1178,54 @@ fun NotesListScreen(
                         }
                     }
 
-                // 4. Horizontal Mood/Pattern Filter Chips (All (39), Reflective, etc.) or Tab Status Banner
-                when (uiState.selectedTab) {
-                    NotesTab.JOURNAL -> {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // 4. Active Tag / Mood Filter Indicator (Only shown if a filter is active)
+                if (uiState.selectedTag != null || uiState.selectedMood != null) {
+                    val activeFilterText = uiState.selectedTag?.let { if (it.startsWith("#")) it else "#$it" }
+                        ?: uiState.selectedMood?.let { "#$it" }
+                        ?: ""
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = PastelLavender.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, PastelLavender.copy(alpha = 0.4f))
                         ) {
-                            FilterChip(
-                                selected = uiState.selectedMood == null,
-                                onClick = { viewModel.selectMoodFilter(null) },
-                                label = { Text("All (${uiState.notes.size})") },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = PastelLavender,
-                                    selectedLabelColor = Color.Black,
-                                    containerColor = MindGlassSurface,
-                                    labelColor = MindTextSecondary
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(
-                                    borderColor = if (uiState.selectedMood == null) PastelLavender else MindGlassBorderSubtle,
-                                    selectedBorderColor = PastelLavender,
-                                    enabled = true,
-                                    selected = uiState.selectedMood == null
-                                ),
-                                shape = RoundedCornerShape(16.dp)
-                            )
-
-                            filterChips.forEach { filter ->
-                                val isSelected = uiState.selectedMood.equals(filter, ignoreCase = true)
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = { viewModel.selectMoodFilter(filter) },
-                                    label = { Text(filter) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = PastelLavender,
-                                        selectedLabelColor = Color.Black,
-                                        containerColor = MindGlassSurface,
-                                        labelColor = MindTextSecondary
-                                    ),
-                                    border = FilterChipDefaults.filterChipBorder(
-                                        borderColor = if (isSelected) PastelLavender else MindGlassBorderSubtle,
-                                        selectedBorderColor = PastelLavender,
-                                        enabled = true,
-                                        selected = isSelected
-                                    ),
-                                    shape = RoundedCornerShape(16.dp)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Filtered by ",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MindTextSecondary
+                                )
+                                Text(
+                                    text = activeFilterText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MindTextPrimary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear Filter",
+                                    tint = MindTextSecondary,
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clickable { viewModel.clearFilters() }
                                 )
                             }
                         }
-                    }
-                    NotesTab.ARCHIVE -> {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = PastelAmber.copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, PastelAmber.copy(alpha = 0.35f)),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.Archive, contentDescription = null, tint = PastelAmber, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Archived Thoughts (${uiState.archivedNotes.size})",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = PastelAmber,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = PastelAmber.copy(alpha = 0.2f),
-                                    border = BorderStroke(1.dp, PastelAmber.copy(alpha = 0.4f)),
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { viewModel.selectTab(NotesTab.JOURNAL) }
-                                ) {
-                                    Text(
-                                        text = "Back to Journal",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = PastelAmber,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    NotesTab.TRASH -> {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = PastelRose.copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.35f)),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.Schedule, contentDescription = null, tint = PastelRose, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Notes in Trash auto-purge after 30 days",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = PastelRose,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = PastelRose.copy(alpha = 0.2f),
-                                        border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.4f)),
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable { viewModel.selectTab(NotesTab.JOURNAL) }
-                                    ) {
-                                        Text(
-                                            text = "Back to Journal",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = PastelRose,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                        )
-                                    }
-                                    if (uiState.trashNotes.isNotEmpty()) {
-                                        Surface(
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = PastelRose.copy(alpha = 0.25f),
-                                            border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.5f)),
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .clickable { viewModel.emptyTrash() }
-                                        ) {
-                                            Text(
-                                                text = "Empty Trash",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = PastelRose,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        Text(
+                            text = "${uiState.filteredNotes.size} thoughts",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MindTextTertiary
+                        )
                     }
                 }
 

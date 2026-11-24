@@ -230,6 +230,8 @@ fun NoteEditorScreen(
     }
 
     var isRecordingAudioMemo by remember { mutableStateOf(false) }
+    var showTypographyPanel by remember { mutableStateOf(false) }
+    var showMediaPanel by remember { mutableStateOf(false) }
 
     var performToggleSpeech: ((Boolean) -> Unit)? by remember { mutableStateOf(null) }
 
@@ -569,266 +571,473 @@ fun NoteEditorScreen(
                 }
             }
 
-            // Glassy Formatting & Media Toolbar
-            Row(
+            // Reorganized Professional Editing Toolbar & Inspectors
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MindGlassSurfaceVariant)
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 10.dp, vertical = 5.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Font Selector Pills
-                NoteFontOption.entries.forEach { option ->
-                    val isSelected = uiState.fontFamily.equals(option.key, ignoreCase = true)
+                // 1. Primary Action Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Typography / Font Size Inspector Toggle (Aa)
+                    val activeScale = uiState.fontSizeScale
+                    val sizeLabel = when {
+                        activeScale == null -> "Aa"
+                        activeScale < 0.9f -> "Aa · S"
+                        activeScale < 1.1f -> "Aa · M"
+                        activeScale < 1.25f -> "Aa · L"
+                        else -> "Aa · XL"
+                    }
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) MindIndigo.copy(alpha = 0.35f) else MindGlassButtonContainer,
-                        border = BorderStroke(0.8.dp, if (isSelected) PastelLavender else MindGlassButtonBorder),
+                        color = if (showTypographyPanel) MindIndigo.copy(alpha = 0.35f) else MindGlassButtonContainer,
+                        border = BorderStroke(1.dp, if (showTypographyPanel) PastelLavender else MindGlassButtonBorder),
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable { viewModel.setFontFamily(option.key) }
-                    ) {
-                        Text(
-                            text = option.label,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) PastelLavender else MindTextSecondary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .height(20.dp)
-                        .width(1.dp)
-                        .background(MindGlassBorderSubtle)
-                )
-
-                // Font Size Selector Pills (Note override)
-                val noteFontScale = uiState.fontSizeScale
-                val fontSizeOptions = listOf(
-                    Pair(null, "App"),
-                    Pair(0.85f, "S"),
-                    Pair(1.0f, "M"),
-                    Pair(1.15f, "L"),
-                    Pair(1.30f, "XL")
-                )
-                fontSizeOptions.forEach { (scale, label) ->
-                    val isSelected = if (scale == null) noteFontScale == null else noteFontScale != null && Math.abs(noteFontScale - scale) < 0.05f
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (isSelected) MindIndigo.copy(alpha = 0.40f) else MindGlassButtonContainer,
-                        border = BorderStroke(
-                            width = if (isSelected) 1.2.dp else 0.8.dp,
-                            color = if (isSelected) PastelMint else MindGlassButtonBorder
-                        ),
-                        modifier = Modifier
-                            .height(28.dp)
-                            .defaultMinSize(minWidth = 34.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable { viewModel.setFontSizeScale(scale) }
-                    ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .padding(horizontal = 8.dp)
-                        ) {
-                            Text(
-                                text = label,
-                                fontSize = 11.5.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) PastelMint else MindTextSecondary,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .height(20.dp)
-                        .width(1.dp)
-                        .background(MindGlassBorderSubtle)
-                )
-
-                // Line Height Spacing Pills
-                val lineSpacingOptions = listOf(
-                    Pair(1.25f, "1.2x"),
-                    Pair(1.45f, "1.5x"),
-                    Pair(1.75f, "1.8x"),
-                    Pair(2.0f, "2.0x")
-                )
-                lineSpacingOptions.forEach { (mult, label) ->
-                    val isSelected = Math.abs(activeLineSpacing - mult) < 0.05f
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (isSelected) MindIndigo.copy(alpha = 0.40f) else MindGlassButtonContainer,
-                        border = BorderStroke(
-                            width = if (isSelected) 1.2.dp else 0.8.dp,
-                            color = if (isSelected) PastelSky else MindGlassButtonBorder
-                        ),
-                        modifier = Modifier
-                            .height(28.dp)
-                            .defaultMinSize(minWidth = 38.dp)
-                            .clip(RoundedCornerShape(10.dp))
                             .clickable {
-                                activeLineSpacing = mult
-                                serviceLocator.updateLineSpacingMultiplier(mult)
+                                showTypographyPanel = !showTypographyPanel
+                                if (showTypographyPanel) showMediaPanel = false
                             }
                     ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .padding(horizontal = 8.dp)
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = label,
-                                fontSize = 11.5.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) PastelSky else MindTextSecondary,
-                                textAlign = TextAlign.Center
+                            Icon(
+                                imageVector = Icons.Default.TextFields,
+                                contentDescription = "Typography",
+                                tint = if (showTypographyPanel) PastelLavender else MindTextPrimary,
+                                modifier = Modifier.size(15.dp)
                             )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = sizeLabel,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.5.sp,
+                                color = if (showTypographyPanel) PastelLavender else MindTextPrimary
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Insert Media Tray Toggle (+)
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (showMediaPanel) PastelSky.copy(alpha = 0.35f) else MindGlassButtonContainer,
+                        border = BorderStroke(1.dp, if (showMediaPanel) PastelSky else MindGlassButtonBorder),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                showMediaPanel = !showMediaPanel
+                                if (showMediaPanel) showTypographyPanel = false
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AddPhotoAlternate,
+                                contentDescription = "Attach Media",
+                                tint = if (showMediaPanel) PastelSky else MindTextPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .height(20.dp)
+                            .width(1.dp)
+                            .background(MindGlassBorderSubtle)
+                    )
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Formatting Buttons Row (Dedicated clean markup tools)
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Bold
+                        IconButton(onClick = { wrapSelection("**") }, modifier = Modifier.size(34.dp)) {
+                            Icon(Icons.Default.FormatBold, contentDescription = "Bold", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                        }
+
+                        // Italic
+                        IconButton(onClick = { wrapSelection("*") }, modifier = Modifier.size(34.dp)) {
+                            Icon(Icons.Default.FormatItalic, contentDescription = "Italic", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                        }
+
+                        // Underline
+                        IconButton(onClick = { wrapSelection("__") }, modifier = Modifier.size(34.dp)) {
+                            Icon(Icons.Default.FormatUnderlined, contentDescription = "Underline", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                        }
+
+                        // Strikethrough
+                        IconButton(onClick = { wrapSelection("~~") }, modifier = Modifier.size(34.dp)) {
+                            Icon(Icons.Default.FormatStrikethrough, contentDescription = "Strikethrough", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                        }
+
+                        // Heading H3
+                        IconButton(onClick = { insertLinePrefix("### ") }, modifier = Modifier.size(34.dp)) {
+                            Text("H3", fontWeight = FontWeight.Bold, color = MindTextPrimary, fontSize = 13.sp)
+                        }
+
+                        // Quote
+                        IconButton(onClick = { insertLinePrefix("> ") }, modifier = Modifier.size(34.dp)) {
+                            Icon(Icons.Default.FormatQuote, contentDescription = "Quote", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                        }
+
+                        // Bullet List
+                        IconButton(onClick = { insertLinePrefix("- ") }, modifier = Modifier.size(34.dp)) {
+                            Icon(Icons.Default.FormatListBulleted, contentDescription = "Bullet List", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                        }
+
+                        // + Task checklist button
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MindGlassButtonContainer,
+                            border = BorderStroke(0.8.dp, MindGlassButtonBorder),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { viewModel.addChecklistItem("") }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.TaskAlt, contentDescription = null, tint = PastelMint, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("+ Task", fontSize = 11.sp, color = PastelMint, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        // Undo
+                        IconButton(onClick = performUndo, enabled = canUndo, modifier = Modifier.size(34.dp)) {
+                            Icon(
+                                Icons.Default.Undo,
+                                contentDescription = "Undo",
+                                tint = if (canUndo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        // Redo
+                        IconButton(onClick = performRedo, enabled = canRedo, modifier = Modifier.size(34.dp)) {
+                            Icon(
+                                Icons.Default.Redo,
+                                contentDescription = "Redo",
+                                tint = if (canRedo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        // Select All
+                        IconButton(
+                            onClick = {
+                                contentValue = contentValue.copy(selection = TextRange(0, contentValue.text.length))
+                            },
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Icon(Icons.Default.SelectAll, contentDescription = "Select All", tint = MindTextSecondary, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .height(20.dp)
-                        .width(1.dp)
-                        .background(MindGlassBorderSubtle)
-                )
-
-                // Gallery Attach
-                IconButton(onClick = { imagePickerLauncher.launch("image/*") }, modifier = Modifier.size(34.dp)) {
-                    Icon(Icons.Default.PhotoLibrary, contentDescription = "Gallery", tint = PastelLavender, modifier = Modifier.size(18.dp))
-                }
-
-                // Camera Snap
-                IconButton(onClick = {
-                    val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                    if (hasPerm) launchCameraHighRes() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                }, modifier = Modifier.size(34.dp)) {
-                    Icon(Icons.Default.PhotoCamera, contentDescription = "Camera", tint = PastelSky, modifier = Modifier.size(18.dp))
-                }
-
-                // Voice Memo Recording
-                IconButton(
-                    onClick = { toggleAudioMemo() },
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(if (isRecordingAudioMemo) PastelRose.copy(alpha = 0.25f) else Color.Transparent)
-                ) {
-                    Icon(
-                        imageVector = if (isRecordingAudioMemo) Icons.Default.Stop else Icons.Default.GraphicEq,
-                        contentDescription = "Voice Memo",
-                        tint = if (isRecordingAudioMemo) PastelRose else PastelAmber,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .height(20.dp)
-                        .width(1.dp)
-                        .background(MindGlassBorderSubtle)
-                )
-
-                // Undo
-                IconButton(onClick = performUndo, enabled = canUndo, modifier = Modifier.size(34.dp)) {
-                    Icon(
-                        Icons.Default.Undo,
-                        contentDescription = "Undo",
-                        tint = if (canUndo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                // Redo
-                IconButton(onClick = performRedo, enabled = canRedo, modifier = Modifier.size(34.dp)) {
-                    Icon(
-                        Icons.Default.Redo,
-                        contentDescription = "Redo",
-                        tint = if (canRedo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .height(20.dp)
-                        .width(1.dp)
-                        .background(MindGlassBorderSubtle)
-                )
-
-                // Bold
-                IconButton(onClick = { wrapSelection("**") }, modifier = Modifier.size(34.dp)) {
-                    Icon(Icons.Default.FormatBold, contentDescription = "Bold", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
-                }
-
-                // Italic
-                IconButton(onClick = { wrapSelection("*") }, modifier = Modifier.size(34.dp)) {
-                    Icon(Icons.Default.FormatItalic, contentDescription = "Italic", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
-                }
-
-                // Underline (MS Word standard)
-                IconButton(onClick = { wrapSelection("__") }, modifier = Modifier.size(34.dp)) {
-                    Icon(Icons.Default.FormatUnderlined, contentDescription = "Underline", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
-                }
-
-                // Strikethrough
-                IconButton(onClick = { wrapSelection("~~") }, modifier = Modifier.size(34.dp)) {
-                    Icon(Icons.Default.FormatStrikethrough, contentDescription = "Strikethrough", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
-                }
-
-                // H3
-                IconButton(onClick = { insertLinePrefix("### ") }, modifier = Modifier.size(34.dp)) {
-                    Text("H3", fontWeight = FontWeight.Bold, color = MindTextPrimary, fontSize = 13.sp)
-                }
-
-                // Quote
-                IconButton(onClick = { insertLinePrefix("> ") }, modifier = Modifier.size(34.dp)) {
-                    Icon(Icons.Default.FormatQuote, contentDescription = "Quote", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
-                }
-
-                // Bullet List
-                IconButton(onClick = { insertLinePrefix("- ") }, modifier = Modifier.size(34.dp)) {
-                    Icon(Icons.Default.FormatListBulleted, contentDescription = "Bullet List", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
-                }
-
-                // Interactive Task Checkbox Button
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MindGlassButtonContainer,
-                    border = BorderStroke(0.8.dp, MindGlassButtonBorder),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { viewModel.addChecklistItem("") }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                // 2. Expandable Typography & Text Size Inspector (Proper structured editing tool)
+                AnimatedVisibility(visible = showTypographyPanel) {
+                    val activeScale = uiState.fontSizeScale
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (LocalMindLinkColors.current.isDark) Color(0xFF131826) else Color(0xFFF8FAFC),
+                        border = BorderStroke(1.dp, PastelLavender.copy(alpha = 0.4f))
                     ) {
-                        Icon(Icons.Default.TaskAlt, contentDescription = null, tint = PastelMint, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("+ Task", fontSize = 11.sp, color = PastelMint, fontWeight = FontWeight.Bold)
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // Header
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.TextFields, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Typography & Font Sizing",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MindTextPrimary
+                                    )
+                                }
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color.Transparent,
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clickable { showTypographyPanel = false }
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Close", tint = MindTextTertiary, modifier = Modifier.size(16.dp))
+                                }
+                            }
+
+                            // Section A: Font Size Segmented Control (Default, Small, Medium, Large, XL)
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "FONT SIZE",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MindTextTertiary
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    val fontSizeOptions = listOf(
+                                        Pair(null, "Default"),
+                                        Pair(0.85f, "Small"),
+                                        Pair(1.0f, "Medium"),
+                                        Pair(1.15f, "Large"),
+                                        Pair(1.30f, "XL")
+                                    )
+                                    fontSizeOptions.forEach { (scale, label) ->
+                                        val isSelected = if (scale == null) activeScale == null else activeScale != null && Math.abs(activeScale - scale) < 0.05f
+                                        Surface(
+                                            shape = RoundedCornerShape(9.dp),
+                                            color = if (isSelected) PastelLavender.copy(alpha = 0.25f) else MindGlassButtonContainer,
+                                            border = BorderStroke(
+                                                width = if (isSelected) 1.2.dp else 0.8.dp,
+                                                color = if (isSelected) PastelLavender else MindGlassButtonBorder
+                                            ),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(9.dp))
+                                                .clickable { viewModel.setFontSizeScale(scale) }
+                                        ) {
+                                            Box(
+                                                contentAlignment = Alignment.Center,
+                                                modifier = Modifier.padding(vertical = 7.dp)
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (isSelected) PastelLavender else MindTextSecondary,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Section B: Typeface / Font Family
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "TYPEFACE",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MindTextTertiary
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    NoteFontOption.entries.forEach { option ->
+                                        val isSelected = uiState.fontFamily.equals(option.key, ignoreCase = true)
+                                        Surface(
+                                            shape = RoundedCornerShape(9.dp),
+                                            color = if (isSelected) PastelSky.copy(alpha = 0.25f) else MindGlassButtonContainer,
+                                            border = BorderStroke(
+                                                width = if (isSelected) 1.2.dp else 0.8.dp,
+                                                color = if (isSelected) PastelSky else MindGlassButtonBorder
+                                            ),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(9.dp))
+                                                .clickable { viewModel.setFontFamily(option.key) }
+                                        ) {
+                                            Box(
+                                                contentAlignment = Alignment.Center,
+                                                modifier = Modifier.padding(vertical = 7.dp)
+                                            ) {
+                                                Text(
+                                                    text = option.label,
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (isSelected) PastelSky else MindTextSecondary,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Section C: Line Height Spacing
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "LINE SPACING",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MindTextTertiary
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    val lineSpacingOptions = listOf(
+                                        Pair(1.25f, "1.2x"),
+                                        Pair(1.45f, "1.5x"),
+                                        Pair(1.75f, "1.8x"),
+                                        Pair(2.0f, "2.0x")
+                                    )
+                                    lineSpacingOptions.forEach { (mult, label) ->
+                                        val isSelected = Math.abs(activeLineSpacing - mult) < 0.05f
+                                        Surface(
+                                            shape = RoundedCornerShape(9.dp),
+                                            color = if (isSelected) PastelMint.copy(alpha = 0.25f) else MindGlassButtonContainer,
+                                            border = BorderStroke(
+                                                width = if (isSelected) 1.2.dp else 0.8.dp,
+                                                color = if (isSelected) PastelMint else MindGlassButtonBorder
+                                            ),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(9.dp))
+                                                .clickable {
+                                                    activeLineSpacing = mult
+                                                    serviceLocator.updateLineSpacingMultiplier(mult)
+                                                }
+                                        ) {
+                                            Box(
+                                                contentAlignment = Alignment.Center,
+                                                modifier = Modifier.padding(vertical = 7.dp)
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (isSelected) PastelMint else MindTextSecondary,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
-                // Select All
-                IconButton(
-                    onClick = {
-                        contentValue = contentValue.copy(selection = TextRange(0, contentValue.text.length))
-                    },
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(Icons.Default.SelectAll, contentDescription = "Select All", tint = MindTextSecondary, modifier = Modifier.size(18.dp))
+                // 3. Expandable Media & Attachments Tray
+                AnimatedVisibility(visible = showMediaPanel) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (LocalMindLinkColors.current.isDark) Color(0xFF131826) else Color(0xFFF8FAFC),
+                        border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.4f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Gallery
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        imagePickerLauncher.launch("image/*")
+                                        showMediaPanel = false
+                                    }
+                                    .padding(6.dp)
+                            ) {
+                                Icon(Icons.Default.PhotoLibrary, contentDescription = "Gallery", tint = PastelLavender, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Gallery", fontSize = 11.sp, color = MindTextSecondary)
+                            }
+
+                            // Camera
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                                        if (hasPerm) launchCameraHighRes() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                        showMediaPanel = false
+                                    }
+                                    .padding(6.dp)
+                            ) {
+                                Icon(Icons.Default.PhotoCamera, contentDescription = "Camera", tint = PastelSky, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Camera", fontSize = 11.sp, color = MindTextSecondary)
+                            }
+
+                            // Voice Memo
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        toggleAudioMemo()
+                                        showMediaPanel = false
+                                    }
+                                    .padding(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isRecordingAudioMemo) Icons.Default.Stop else Icons.Default.GraphicEq,
+                                    contentDescription = "Audio Memo",
+                                    tint = if (isRecordingAudioMemo) PastelRose else PastelAmber,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(if (isRecordingAudioMemo) "Stop" else "Audio Memo", fontSize = 11.sp, color = if (isRecordingAudioMemo) PastelRose else MindTextSecondary)
+                            }
+
+                            // Scan Document OCR
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                                        if (hasPerm) launchOcrHighRes() else ocrPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                        showMediaPanel = false
+                                    }
+                                    .padding(6.dp)
+                            ) {
+                                Icon(Icons.Default.DocumentScanner, contentDescription = "Scan Document", tint = PastelViolet, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Scan OCR", fontSize = 11.sp, color = MindTextSecondary)
+                            }
+                        }
+                    }
                 }
             }
 

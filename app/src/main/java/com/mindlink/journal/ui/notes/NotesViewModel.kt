@@ -23,6 +23,7 @@ data class NotesUiState(
     val trashNotes: List<Note> = emptyList(),
     val filteredNotes: List<Note> = emptyList(),
     val selectedMood: String? = null,
+    val selectedTag: String? = null,
     val searchQuery: String = "",
     val isLoading: Boolean = true,
     val showOnboarding: Boolean = false,
@@ -61,7 +62,7 @@ class NotesViewModel(
                         NotesTab.ARCHIVE -> archived
                         NotesTab.TRASH -> trash
                     }
-                    val filtered = applyFilter(currentSource, state.selectedMood, state.searchQuery)
+                    val filtered = applyFilter(currentSource, state.selectedMood, state.selectedTag, state.searchQuery)
                     state.copy(
                         notes = active,
                         archivedNotes = archived,
@@ -81,7 +82,7 @@ class NotesViewModel(
                 NotesTab.ARCHIVE -> state.archivedNotes
                 NotesTab.TRASH -> state.trashNotes
             }
-            val filtered = applyFilter(sourceList, state.selectedMood, state.searchQuery)
+            val filtered = applyFilter(sourceList, state.selectedMood, state.selectedTag, state.searchQuery)
             state.copy(selectedTab = tab, filteredNotes = filtered)
         }
     }
@@ -94,8 +95,34 @@ class NotesViewModel(
                 NotesTab.ARCHIVE -> state.archivedNotes
                 NotesTab.TRASH -> state.trashNotes
             }
-            val filtered = applyFilter(sourceList, newMood, state.searchQuery)
+            val filtered = applyFilter(sourceList, newMood, state.selectedTag, state.searchQuery)
             state.copy(selectedMood = newMood, filteredNotes = filtered)
+        }
+    }
+
+    fun selectTagFilter(tag: String?) {
+        _uiState.update { state ->
+            val cleanTag = tag?.removePrefix("#")
+            val newTag = if (state.selectedTag.equals(cleanTag, ignoreCase = true)) null else cleanTag
+            val sourceList = when (state.selectedTab) {
+                NotesTab.JOURNAL -> state.notes
+                NotesTab.ARCHIVE -> state.archivedNotes
+                NotesTab.TRASH -> state.trashNotes
+            }
+            val filtered = applyFilter(sourceList, state.selectedMood, newTag, state.searchQuery)
+            state.copy(selectedTag = newTag, filteredNotes = filtered)
+        }
+    }
+
+    fun clearFilters() {
+        _uiState.update { state ->
+            val sourceList = when (state.selectedTab) {
+                NotesTab.JOURNAL -> state.notes
+                NotesTab.ARCHIVE -> state.archivedNotes
+                NotesTab.TRASH -> state.trashNotes
+            }
+            val filtered = applyFilter(sourceList, null, null, state.searchQuery)
+            state.copy(selectedMood = null, selectedTag = null, filteredNotes = filtered)
         }
     }
 
@@ -106,7 +133,7 @@ class NotesViewModel(
                 NotesTab.ARCHIVE -> state.archivedNotes
                 NotesTab.TRASH -> state.trashNotes
             }
-            val filtered = applyFilter(sourceList, state.selectedMood, query)
+            val filtered = applyFilter(sourceList, state.selectedMood, state.selectedTag, query)
             state.copy(searchQuery = query, filteredNotes = filtered)
         }
     }
@@ -244,15 +271,20 @@ class NotesViewModel(
         _uiState.update { it.copy(isOtaDismissed = true) }
     }
 
-    private fun applyFilter(notes: List<Note>, mood: String?, query: String): List<Note> {
+    private fun applyFilter(notes: List<Note>, mood: String?, tag: String?, query: String): List<Note> {
         return notes.filter { note ->
             val matchesMood = mood == null || note.mood?.equals(mood, ignoreCase = true) == true
+            val matchesTag = tag == null ||
+                    (note.mood?.equals(tag, ignoreCase = true) == true) ||
+                    note.tags.any {
+                        it.equals(tag, ignoreCase = true) || it.removePrefix("#").equals(tag.removePrefix("#"), ignoreCase = true)
+                    }
             val matchesQuery = query.isBlank() ||
                     note.title.contains(query, ignoreCase = true) ||
                     note.content.contains(query, ignoreCase = true) ||
                     (note.summary?.contains(query, ignoreCase = true) == true) ||
                     note.tags.any { it.contains(query, ignoreCase = true) }
-            matchesMood && matchesQuery
+            matchesMood && matchesTag && matchesQuery
         }
     }
 
