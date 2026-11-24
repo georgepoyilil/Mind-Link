@@ -1474,12 +1474,11 @@ fun NoteEditorScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (uiState.tags.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
+                        @OptIn(ExperimentalLayoutApi::class)
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             uiState.tags.forEach { tag ->
                                 Surface(
@@ -1529,7 +1528,7 @@ fun NoteEditorScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Box(modifier = Modifier.weight(1f)) {
                                 if (uiState.tagInput.isEmpty()) {
-                                    Text("Add hashtag (e.g. ideas, work, journal)...", style = MaterialTheme.typography.bodyMedium, color = MindTextTertiary)
+                                    Text("Tag multiple hashtags (e.g. #ideas, #work, #journal)...", style = MaterialTheme.typography.bodyMedium, color = MindTextTertiary)
                                 }
                                 BasicTextField(
                                     value = uiState.tagInput,

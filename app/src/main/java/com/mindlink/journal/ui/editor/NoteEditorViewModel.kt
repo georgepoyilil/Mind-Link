@@ -194,13 +194,19 @@ class NoteEditorViewModel(
     }
 
     fun addTag() {
-        val tag = _uiState.value.tagInput.trim().removePrefix("#")
-        if (tag.isNotBlank() && !_uiState.value.tags.contains(tag)) {
-            _uiState.update {
-                it.copy(
-                    tags = it.tags + tag,
-                    tagInput = ""
-                )
+        val raw = _uiState.value.tagInput.trim()
+        if (raw.isNotBlank()) {
+            val tokens = raw.split(',', ' ', ';', '\n')
+                .map { it.trim().removePrefix("#") }
+                .filter { it.isNotBlank() }
+            if (tokens.isNotEmpty()) {
+                _uiState.update { state ->
+                    val updated = (state.tags + tokens).distinct()
+                    state.copy(
+                        tags = updated,
+                        tagInput = ""
+                    )
+                }
             }
         }
     }
