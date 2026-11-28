@@ -116,6 +116,14 @@ class ServiceLocator private constructor(context: Context) {
         _appUpdateInfo.value = info
     }
 
+    val capabilityLadderManager: com.mindlink.journal.data.capability.CapabilityLadderManager by lazy {
+        com.mindlink.journal.data.capability.CapabilityLadderManager(applicationContext)
+    }
+
+    val featureRequestStore: com.mindlink.journal.data.feedback.FeatureRequestStore by lazy {
+        com.mindlink.journal.data.feedback.FeatureRequestStore(applicationContext)
+    }
+
     fun updateNoteViewMode(mode: String) {
         preferences.edit().putString(PREF_NOTE_VIEW_MODE, mode).apply()
         _noteViewMode.value = mode

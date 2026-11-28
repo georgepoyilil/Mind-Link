@@ -15,4 +15,11 @@ sealed class Screen(val route: String) {
     object SecondBrain : Screen("second_brain")
     object ThoughtGraph : Screen("thought_graph")
     object Settings : Screen("settings")
+    object TagExplorer : Screen("tag_explorer?selectedTag={selectedTag}") {
+        fun createRoute(selectedTag: String? = null): String {
+            return if (!selectedTag.isNullOrBlank()) "tag_explorer?selectedTag=$selectedTag" else "tag_explorer"
+        }
+    }
+    object ComplexityLadder : Screen("complexity_ladder")
+    object FeatureRequests : Screen("feature_requests")
 }

@@ -1,6 +1,8 @@
 package com.mindlink.journal.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -14,14 +16,18 @@ import com.mindlink.journal.ui.detail.NoteDetailScreen
 import com.mindlink.journal.ui.detail.NoteDetailViewModel
 import com.mindlink.journal.ui.editor.NoteEditorScreen
 import com.mindlink.journal.ui.editor.NoteEditorViewModel
+import com.mindlink.journal.ui.feedback.FeatureRequestScreen
 import com.mindlink.journal.ui.graph.ThoughtGraphScreen
 import com.mindlink.journal.ui.graph.ThoughtGraphViewModel
+import com.mindlink.journal.ui.ladder.ComplexityLadderScreen
 import com.mindlink.journal.ui.notes.NotesListScreen
+import com.mindlink.journal.ui.notes.NotesTab
 import com.mindlink.journal.ui.notes.NotesViewModel
 import com.mindlink.journal.ui.secondbrain.SecondBrainScreen
 import com.mindlink.journal.ui.secondbrain.SecondBrainViewModel
 import com.mindlink.journal.ui.settings.SettingsScreen
 import com.mindlink.journal.ui.settings.SettingsViewModel
+import com.mindlink.journal.ui.tags.TagExplorerScreen
 
 @Composable
 fun MindLinkNavHost(
@@ -56,6 +62,15 @@ fun MindLinkNavHost(
                 },
                 onSettingsClick = {
                     navController.navigate(Screen.Settings.route)
+                },
+                onTagExplorerClick = { tag ->
+                    navController.navigate(Screen.TagExplorer.createRoute(tag))
+                },
+                onComplexityLadderClick = {
+                    navController.navigate(Screen.ComplexityLadder.route)
+                },
+                onFeatureRequestsClick = {
+                    navController.navigate(Screen.FeatureRequests.route)
                 }
             )
         }
@@ -161,6 +176,64 @@ fun MindLinkNavHost(
             )
             SettingsScreen(
                 viewModel = settingsViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onComplexityLadderClick = { navController.navigate(Screen.ComplexityLadder.route) },
+                onFeatureRequestsClick = { navController.navigate(Screen.FeatureRequests.route) }
+            )
+        }
+
+        // Dedicated Tag Explorer
+        composable(
+            route = Screen.TagExplorer.route,
+            arguments = listOf(
+                navArgument("selectedTag") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val selectedTag = backStackEntry.arguments?.getString("selectedTag")
+            val notesViewModel: NotesViewModel = viewModel(
+                factory = NotesViewModel.Factory(repository, serviceLocator.preferences)
+            )
+            val uiState by notesViewModel.uiState.collectAsState()
+            TagExplorerScreen(
+                allNotes = uiState.notes,
+                initialSelectedTag = selectedTag,
+                onNavigateBack = { navController.popBackStack() },
+                onNoteClick = { noteId ->
+                    navController.navigate(Screen.NoteDetail.createRoute(noteId))
+                },
+                onFilterFeedByTag = { tag ->
+                    notesViewModel.selectTab(NotesTab.JOURNAL)
+                    notesViewModel.clearFilters()
+                    notesViewModel.toggleTagFilter(tag)
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        // Journal Complexity Ladder
+        composable(Screen.ComplexityLadder.route) {
+            ComplexityLadderScreen(
+                manager = serviceLocator.capabilityLadderManager,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // Creator Portal & Feature Proposals
+        composable(Screen.FeatureRequests.route) {
+            val notesViewModel: NotesViewModel = viewModel(
+                factory = NotesViewModel.Factory(repository, serviceLocator.preferences)
+            )
+            val uiState by notesViewModel.uiState.collectAsState()
+            val ladderState by serviceLocator.capabilityLadderManager.state.collectAsState()
+
+            FeatureRequestScreen(
+                store = serviceLocator.featureRequestStore,
+                activeNotesCount = uiState.notes.size,
+                currentTier = ladderState.currentTier,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

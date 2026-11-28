@@ -116,6 +116,13 @@ fun NoteEditorScreen(
     var showTaskSplitterDialog by remember { mutableStateOf(false) }
     var taskSplitterInput by remember { mutableStateOf("") }
 
+    val capabilityManager = remember { com.mindlink.journal.di.ServiceLocator.getInstance(context).capabilityLadderManager }
+    val canUseTypography = capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_TYPOGRAPHY)
+    val canUseMedia = capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_MEDIA_CAPTURE)
+    val canUseChecklists = capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_CHECKLISTS)
+    val canUseSplitter = capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_TASK_SPLITTER)
+    val canUseJester = capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_JESTER)
+
     fun addNewTask() {
         val newId = viewModel.addChecklistItem("")
         focusedTaskId = newId
@@ -635,69 +642,73 @@ fun NoteEditorScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         // Typography / Font Size Inspector Toggle (Aa)
-                        val activeScale = uiState.fontSizeScale
-                        val sizeLabel = when {
-                            activeScale == null -> "Aa"
-                            activeScale < 0.9f -> "Aa · S"
-                            activeScale < 1.1f -> "Aa · M"
-                            activeScale < 1.25f -> "Aa · L"
-                            else -> "Aa · XL"
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (showTypographyPanel) MindIndigo.copy(alpha = 0.35f) else MindGlassButtonContainer,
-                            border = BorderStroke(1.dp, if (showTypographyPanel) PastelLavender else MindGlassButtonBorder),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    showTypographyPanel = !showTypographyPanel
-                                    if (showTypographyPanel) showMediaPanel = false
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                        if (canUseTypography) {
+                            val activeScale = uiState.fontSizeScale
+                            val sizeLabel = when {
+                                activeScale == null -> "Aa"
+                                activeScale < 0.9f -> "Aa · S"
+                                activeScale < 1.1f -> "Aa · M"
+                                activeScale < 1.25f -> "Aa · L"
+                                else -> "Aa · XL"
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (showTypographyPanel) MindIndigo.copy(alpha = 0.35f) else MindGlassButtonContainer,
+                                border = BorderStroke(1.dp, if (showTypographyPanel) PastelLavender else MindGlassButtonBorder),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        showTypographyPanel = !showTypographyPanel
+                                        if (showTypographyPanel) showMediaPanel = false
+                                    }
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.TextFields,
-                                    contentDescription = "Typography",
-                                    tint = if (showTypographyPanel) PastelLavender else MindTextPrimary,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = sizeLabel,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    color = if (showTypographyPanel) PastelLavender else MindTextPrimary
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.TextFields,
+                                        contentDescription = "Typography",
+                                        tint = if (showTypographyPanel) PastelLavender else MindTextPrimary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = sizeLabel,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        color = if (showTypographyPanel) PastelLavender else MindTextPrimary
+                                    )
+                                }
                             }
                         }
 
                         // Insert Media Tray Toggle (+)
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (showMediaPanel) PastelSky.copy(alpha = 0.35f) else MindGlassButtonContainer,
-                            border = BorderStroke(1.dp, if (showMediaPanel) PastelSky else MindGlassButtonBorder),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    showMediaPanel = !showMediaPanel
-                                    if (showMediaPanel) showTypographyPanel = false
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                        if (canUseMedia) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (showMediaPanel) PastelSky.copy(alpha = 0.35f) else MindGlassButtonContainer,
+                                border = BorderStroke(1.dp, if (showMediaPanel) PastelSky else MindGlassButtonBorder),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        showMediaPanel = !showMediaPanel
+                                        if (showMediaPanel) showTypographyPanel = false
+                                    }
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.AddPhotoAlternate,
-                                    contentDescription = "Attach Media",
-                                    tint = if (showMediaPanel) PastelSky else MindTextPrimary,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Media", fontSize = 11.sp, color = if (showMediaPanel) PastelSky else MindTextPrimary, fontWeight = FontWeight.SemiBold)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AddPhotoAlternate,
+                                        contentDescription = "Attach Media",
+                                        tint = if (showMediaPanel) PastelSky else MindTextPrimary,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Media", fontSize = 11.sp, color = if (showMediaPanel) PastelSky else MindTextPrimary, fontWeight = FontWeight.SemiBold)
+                                }
                             }
                         }
 
@@ -724,60 +735,66 @@ fun NoteEditorScreen(
                         }
 
                         // + Task checklist button
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MindGlassButtonContainer,
-                            border = BorderStroke(0.8.dp, MindGlassButtonBorder),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { addNewTask() }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                        if (canUseChecklists) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MindGlassButtonContainer,
+                                border = BorderStroke(0.8.dp, MindGlassButtonBorder),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { addNewTask() }
                             ) {
-                                Icon(Icons.Default.TaskAlt, contentDescription = null, tint = PastelMint, modifier = Modifier.size(13.dp))
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text("+ Task", fontSize = 11.sp, color = PastelMint, fontWeight = FontWeight.Bold)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.TaskAlt, contentDescription = null, tint = PastelMint, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text("+ Task", fontSize = 11.sp, color = PastelMint, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
 
                         // ⚡ Dynamic Tasks Quick Splitter
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = PastelSky.copy(alpha = 0.15f),
-                            border = BorderStroke(0.8.dp, PastelSky.copy(alpha = 0.4f)),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { showTaskSplitterDialog = true }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                        if (canUseSplitter) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = PastelSky.copy(alpha = 0.15f),
+                                border = BorderStroke(0.8.dp, PastelSky.copy(alpha = 0.4f)),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { showTaskSplitterDialog = true }
                             ) {
-                                Icon(Icons.Default.Bolt, contentDescription = null, tint = PastelSky, modifier = Modifier.size(13.dp))
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text("⚡ Tasks", fontSize = 11.sp, color = PastelSky, fontWeight = FontWeight.Bold)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Bolt, contentDescription = null, tint = PastelSky, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text("⚡ Tasks", fontSize = 11.sp, color = PastelSky, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
 
                         // 🎭 Wit & Roast (Funny Tool)
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = PastelRose.copy(alpha = 0.15f),
-                            border = BorderStroke(0.8.dp, PastelRose.copy(alpha = 0.4f)),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    witText = generateMindLinkWit(uiState.title, contentValue.text, uiState.checklistItems.size, witCategory)
-                                    showWitDialog = true
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                        if (canUseJester) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = PastelRose.copy(alpha = 0.15f),
+                                border = BorderStroke(0.8.dp, PastelRose.copy(alpha = 0.4f)),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        witText = generateMindLinkWit(uiState.title, contentValue.text, uiState.checklistItems.size, witCategory)
+                                        showWitDialog = true
+                                    }
                             ) {
-                                Text("🎭 Wit & Roast", fontSize = 11.sp, color = PastelRose, fontWeight = FontWeight.Bold)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("🎭 Wit & Roast", fontSize = 11.sp, color = PastelRose, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }

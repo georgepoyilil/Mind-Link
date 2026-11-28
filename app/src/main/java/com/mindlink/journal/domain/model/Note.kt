@@ -108,14 +108,25 @@ data class Note(
             SimpleDateFormat("MMM d", Locale.getDefault())
         }
 
+        private fun sanitizeMojibake(raw: String): String {
+            return raw
+                .replace("â€”", "—")
+                .replace("â€“", "–")
+                .replace("â€˜", "‘")
+                .replace("â€™", "’")
+                .replace("â€œ", "“")
+                .replace("â€", "”")
+                .replace("Â°", "°")
+        }
+
         fun fromEntity(entity: NoteEntity): Note {
             return Note(
                 id = entity.id,
-                title = entity.title,
-                content = entity.content,
+                title = sanitizeMojibake(entity.title),
+                content = sanitizeMojibake(entity.content),
                 createdAt = entity.createdAt,
                 updatedAt = entity.updatedAt,
-                summary = entity.summary,
+                summary = entity.summary?.let { sanitizeMojibake(it) },
                 mood = entity.mood,
                 tags = entity.tags,
                 actionItems = entity.actionItems,

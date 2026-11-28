@@ -38,7 +38,9 @@ import com.mindlink.journal.ui.theme.*
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onComplexityLadderClick: () -> Unit = {},
+    onFeatureRequestsClick: () -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -142,9 +144,83 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 0. Visual Atmosphere & Themes Card
+            // 0.0 Complexity Ladder & Feature Request Shortcuts
             val isSettingsGlassy = MindIsGlassy
             val isSettingsDark = LocalMindLinkColors.current.isDark
+            val capabilityManager = remember { com.mindlink.journal.di.ServiceLocator.getInstance(context).capabilityLadderManager }
+            val ladderState by capabilityManager.state.collectAsState()
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = if (isSettingsGlassy) Color.Transparent else MindSurfaceDark),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .liquidGlass(
+                        shape = RoundedCornerShape(16.dp),
+                        cornerRadius = 16.dp,
+                        isGlassy = isSettingsGlassy,
+                        isDark = isSettingsDark,
+                        cardBackground = MindGlassCardBackground
+                    )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("🪜", fontSize = 22.sp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Complexity Ladder · Tier ${ladderState.currentTier}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MindTextPrimary
+                                )
+                                Text(
+                                    text = "Progressively unlock capabilities or toggle features",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MindTextTertiary
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = onComplexityLadderClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = MindIndigo),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.TrendingUp, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("View Ladder", fontSize = 12.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = onFeatureRequestsClick,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelSky),
+                            border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.6f)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Feature Portal", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            // 0. Visual Atmosphere & Themes Card
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = if (isSettingsGlassy) Color.Transparent else MindSurfaceDark),

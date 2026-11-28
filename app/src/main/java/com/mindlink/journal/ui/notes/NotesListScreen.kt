@@ -65,11 +65,18 @@ fun NotesListScreen(
     onCreateNoteClick: (String) -> Unit,
     onSecondBrainClick: () -> Unit,
     onThoughtGraphClick: () -> Unit,
-    onSettingsClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    onTagExplorerClick: (String?) -> Unit = {},
+    onComplexityLadderClick: () -> Unit = {},
+    onFeatureRequestsClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val serviceLocator = remember { ServiceLocator.getInstance(context) }
+    val capabilityManager = remember { serviceLocator.capabilityLadderManager }
+    val ladderState by capabilityManager.state.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
     val savedViewModeStr by serviceLocator.noteViewMode.collectAsState()
     val initialViewMode = remember(savedViewModeStr) {
         when (savedViewModeStr) {
@@ -97,6 +104,25 @@ fun NotesListScreen(
 
     LaunchedEffect(Unit) {
         viewModel.checkForOtaUpdates(context)
+    }
+
+    // Evaluate progressive capability unlocks based on thought volume
+    LaunchedEffect(uiState.notes.size) {
+        capabilityManager.evaluateProgress(uiState.notes.size)
+    }
+
+    // Non-interruptive toast when a new complexity tier unlocks
+    LaunchedEffect(Unit) {
+        capabilityManager.unlockEvents.collect { newTier ->
+            val res = snackbarHostState.showSnackbar(
+                message = "✨ Unlocked: Tier ${newTier.tier} (${newTier.title})!",
+                actionLabel = "View Ladder",
+                duration = SnackbarDuration.Short
+            )
+            if (res == SnackbarResult.ActionPerformed) {
+                onComplexityLadderClick()
+            }
+        }
     }
 
     val filterChips = listOf(
@@ -576,24 +602,50 @@ fun NotesListScreen(
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
 
+                    if (capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_SECOND_BRAIN)) {
+                        NavigationDrawerItem(
+                            icon = { Icon(Icons.Default.Psychology, contentDescription = null, tint = MindIndigo) },
+                            label = { Text("Second Brain AI Hub", fontWeight = FontWeight.Medium) },
+                            selected = false,
+                            onClick = {
+                                coroutineScope.launch { drawerState.close() }
+                                onSecondBrainClick()
+                            },
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                    }
+
+                    if (capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_SYNAPTIC_GRAPH)) {
+                        NavigationDrawerItem(
+                            icon = { Icon(Icons.Default.Hub, contentDescription = null, tint = PastelSky) },
+                            label = { Text("Thought Constellation", fontWeight = FontWeight.Medium) },
+                            selected = false,
+                            onClick = {
+                                coroutineScope.launch { drawerState.close() }
+                                onThoughtGraphClick()
+                            },
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                    }
+
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Psychology, contentDescription = null, tint = MindIndigo) },
-                        label = { Text("Second Brain AI Hub", fontWeight = FontWeight.Medium) },
+                        icon = { Icon(Icons.Default.TrendingUp, contentDescription = null, tint = PastelLavender) },
+                        label = { Text("Complexity Ladder (Tier ${ladderState.currentTier})", fontWeight = FontWeight.SemiBold) },
                         selected = false,
                         onClick = {
                             coroutineScope.launch { drawerState.close() }
-                            onSecondBrainClick()
+                            onComplexityLadderClick()
                         },
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
 
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Hub, contentDescription = null, tint = PastelSky) },
-                        label = { Text("Thought Constellation", fontWeight = FontWeight.Medium) },
+                        icon = { Icon(Icons.Default.Lightbulb, contentDescription = null, tint = PastelSky) },
+                        label = { Text("Creator Portal & Proposals", fontWeight = FontWeight.Medium) },
                         selected = false,
                         onClick = {
                             coroutineScope.launch { drawerState.close() }
-                            onThoughtGraphClick()
+                            onFeatureRequestsClick()
                         },
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
@@ -625,130 +677,154 @@ fun NotesListScreen(
                         modifier = Modifier.padding(vertical = 12.dp)
                     )
 
-                    // 5. Hashtags & Topics Section (FlowRow with multiple tags per row)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "HASHTAGS & TOPICS",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MindTextTertiary,
-                            letterSpacing = 1.sp
-                        )
-                        if (uiState.selectedTags.isNotEmpty() || uiState.selectedMood != null) {
+                    // 5. Hashtags & Topics Section (Max 7 Tags + "View All Tags" Screen)
+                    if (capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_HASHTAGS)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
-                                text = "Clear (${uiState.selectedTags.size + (if (uiState.selectedMood != null) 1 else 0)})",
+                                text = "TOP HASHTAGS (MAX 7)",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = PastelSky,
-                                modifier = Modifier
-                                    .clickable {
-                                        viewModel.clearFilters()
-                                    }
-                                    .padding(4.dp)
+                                color = MindTextTertiary,
+                                letterSpacing = 1.sp
                             )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    @OptIn(ExperimentalLayoutApi::class)
-                    FlowRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // "All" Thoughts Chip
-                        val isAllSelected = uiState.selectedTags.isEmpty() && uiState.selectedMood == null && uiState.selectedTab == NotesTab.JOURNAL
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isAllSelected) PastelLavender else MindGlassSurfaceVariant,
-                            border = BorderStroke(1.dp, if (isAllSelected) PastelLavender else MindGlassBorderSubtle),
-                            modifier = Modifier.clickable {
-                                viewModel.selectTab(NotesTab.JOURNAL)
-                                viewModel.clearFilters()
-                            }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.FilterList,
-                                    contentDescription = null,
-                                    tint = if (isAllSelected) Color.Black else MindTextSecondary,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (uiState.selectedTags.isNotEmpty() || uiState.selectedMood != null) {
+                                    Text(
+                                        text = "Clear",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PastelSky,
+                                        modifier = Modifier
+                                            .clickable { viewModel.clearFilters() }
+                                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                                    )
+                                }
                                 Text(
-                                    text = "All (${uiState.notes.size})",
+                                    text = "All Tags (${allDynamicTags.size})",
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isAllSelected) Color.Black else MindTextPrimary
+                                    fontWeight = FontWeight.Bold,
+                                    color = PastelLavender,
+                                    modifier = Modifier
+                                        .clickable {
+                                            coroutineScope.launch { drawerState.close() }
+                                            onTagExplorerClick(null)
+                                        }
+                                        .padding(horizontal = 4.dp, vertical = 4.dp)
                                 )
                             }
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                        // Dynamic Hashtags from User Notes
-                        allDynamicTags.forEach { (tagName, count) ->
-                            val isSelected = uiState.selectedTags.any { it.equals(tagName, ignoreCase = true) }
+                        @OptIn(ExperimentalLayoutApi::class)
+                        FlowRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            // "All" Thoughts Chip
+                            val isAllSelected = uiState.selectedTags.isEmpty() && uiState.selectedMood == null && uiState.selectedTab == NotesTab.JOURNAL
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) PastelLavender else MindGlassSurfaceVariant,
-                                border = BorderStroke(1.dp, if (isSelected) PastelLavender else MindGlassBorderSubtle),
+                                color = if (isAllSelected) PastelLavender else MindGlassSurfaceVariant,
+                                border = BorderStroke(1.dp, if (isAllSelected) PastelLavender else MindGlassBorderSubtle),
                                 modifier = Modifier.clickable {
                                     viewModel.selectTab(NotesTab.JOURNAL)
-                                    viewModel.toggleTagFilter(tagName)
+                                    viewModel.clearFilters()
                                 }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = "#$tagName",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.Black else MindTextPrimary
+                                    Icon(
+                                        imageVector = Icons.Default.FilterList,
+                                        contentDescription = null,
+                                        tint = if (isAllSelected) Color.Black else MindTextSecondary,
+                                        modifier = Modifier.size(13.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "$count",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) Color.Black.copy(alpha = 0.7f) else MindTextTertiary
+                                        text = "All (${uiState.notes.size})",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isAllSelected) Color.Black else MindTextPrimary
                                     )
+                                }
+                            }
+
+                            // Strictly Top 7 Dynamic Hashtags
+                            allDynamicTags.take(7).forEach { (tagName, count) ->
+                                val isSelected = uiState.selectedTags.any { it.equals(tagName, ignoreCase = true) }
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSelected) PastelLavender else MindGlassSurfaceVariant,
+                                    border = BorderStroke(1.dp, if (isSelected) PastelLavender else MindGlassBorderSubtle),
+                                    modifier = Modifier.clickable {
+                                        viewModel.selectTab(NotesTab.JOURNAL)
+                                        viewModel.toggleTagFilter(tagName)
+                                    }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "#$tagName",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) Color.Black else MindTextPrimary
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "$count",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) Color.Black.copy(alpha = 0.7f) else MindTextTertiary
+                                        )
+                                    }
                                 }
                             }
                         }
 
-                        // Preset Topic Categories
-                        val existingTagNames = allDynamicTags.map { it.first.lowercase() }.toSet()
-                        filterChips.filter { it.lowercase() !in existingTagNames }.forEach { topicName ->
-                            val isSelected = uiState.selectedTags.any { it.equals(topicName, ignoreCase = true) } ||
-                                    uiState.selectedMood.equals(topicName, ignoreCase = true)
+                        // "View All Tags" Dedicated Pill
+                        if (allDynamicTags.size > 7) {
+                            Spacer(modifier = Modifier.height(10.dp))
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) PastelLavender else MindGlassSurfaceVariant,
-                                border = BorderStroke(1.dp, if (isSelected) PastelLavender else MindGlassBorderSubtle),
-                                modifier = Modifier.clickable {
-                                    viewModel.selectTab(NotesTab.JOURNAL)
-                                    viewModel.toggleTagFilter(topicName)
-                                }
+                                color = PastelLavender.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, PastelLavender.copy(alpha = 0.35f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        coroutineScope.launch { drawerState.close() }
+                                        onTagExplorerClick(null)
+                                    }
                             ) {
-                                Text(
-                                    text = "#$topicName",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) Color.Black else MindTextPrimary,
-                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp)
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Tag, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(15.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "View All Tags (${allDynamicTags.size})",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = PastelLavender
+                                        )
+                                    }
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(16.dp))
+                                }
                             }
                         }
                     }
@@ -1007,7 +1083,7 @@ fun NotesListScreen(
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
-                                    } else {
+                                    } else if (capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_SECOND_BRAIN)) {
                                         Surface(
                                             shape = CircleShape,
                                             color = MindIndigo.copy(alpha = 0.2f),
@@ -1060,31 +1136,33 @@ fun NotesListScreen(
                             }
 
                             // 4. Brain Overview / Thought Graph Button
-                            IconButton(
-                                onClick = onThoughtGraphClick,
-                                modifier = Modifier.size(38.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .background(
-                                            color = if (isHeaderDark) Color(0x33818CF8) else Color(0x206366F1),
-                                            shape = CircleShape
-                                        )
-                                        .border(
-                                            width = 1.dp,
-                                            color = if (isHeaderDark) Color(0x55A5B4FC) else Color(0x406366F1),
-                                            shape = CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
+                            if (capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_SYNAPTIC_GRAPH)) {
+                                IconButton(
+                                    onClick = onThoughtGraphClick,
+                                    modifier = Modifier.size(38.dp)
                                 ) {
-                                    androidx.compose.foundation.Image(
-                                        painter = androidx.compose.ui.res.painterResource(com.mindlink.journal.R.drawable.ic_thought_constellation),
-                                        contentDescription = "Thought Constellation",
+                                    Box(
                                         modifier = Modifier
-                                            .size(22.dp)
-                                            .clip(CircleShape)
-                                    )
+                                            .size(32.dp)
+                                            .background(
+                                                color = if (isHeaderDark) Color(0x33818CF8) else Color(0x206366F1),
+                                                shape = CircleShape
+                                            )
+                                            .border(
+                                                width = 1.dp,
+                                                color = if (isHeaderDark) Color(0x55A5B4FC) else Color(0x406366F1),
+                                                shape = CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        androidx.compose.foundation.Image(
+                                            painter = androidx.compose.ui.res.painterResource(com.mindlink.journal.R.drawable.ic_thought_constellation),
+                                            contentDescription = "Thought Constellation",
+                                            modifier = Modifier
+                                                .size(22.dp)
+                                                .clip(CircleShape)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1377,6 +1455,7 @@ fun NotesListScreen(
                 }
             }
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = if (MindIsGlassy) Color.Transparent else MindBackgroundAmoled
     ) { paddingValues ->
         Box(
