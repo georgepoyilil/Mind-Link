@@ -40,7 +40,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 
+import com.mindlink.journal.LocalLadderState
 import com.mindlink.journal.data.ai.LocalHeuristicBrainstormingEngine
+import com.mindlink.journal.data.capability.CapabilityLadderManager
 import com.mindlink.journal.ui.detail.components.ReflectionPromptsCard
 import com.mindlink.journal.ui.detail.components.RelatedThoughtsCard
 import com.mindlink.journal.ui.editor.components.TextRecognitionHelper
@@ -82,8 +84,22 @@ fun NoteDetailScreen(
         }
     }
 
+    val ladderState = LocalLadderState.current
+    val showVersionHistory = ladderState.isEnabled(CapabilityLadderManager.FEATURE_VERSION_HISTORY)
+    val showBiometrics = ladderState.isEnabled(CapabilityLadderManager.FEATURE_BIOMETRIC_LOCK)
+    val showTypography = ladderState.isEnabled(CapabilityLadderManager.FEATURE_TYPOGRAPHY)
+    val showMood = ladderState.isEnabled(CapabilityLadderManager.FEATURE_MOOD_BADGES)
+    val showVoice = ladderState.isEnabled(CapabilityLadderManager.FEATURE_VOICE_DICTATION)
+    val showMedia = ladderState.isEnabled(CapabilityLadderManager.FEATURE_MEDIA_CAPTURE)
+    val showOcr = ladderState.isEnabled(CapabilityLadderManager.FEATURE_OCR)
+    val showHashtags = ladderState.isEnabled(CapabilityLadderManager.FEATURE_HASHTAGS)
+    val showChecklists = ladderState.isEnabled(CapabilityLadderManager.FEATURE_CHECKLISTS)
+    val showSecondBrain = ladderState.isEnabled(CapabilityLadderManager.FEATURE_SECOND_BRAIN)
+    val showEchoPrompts = ladderState.isEnabled(CapabilityLadderManager.FEATURE_REFLECTION_PROMPTS)
+    val showReminders = ladderState.isEnabled(CapabilityLadderManager.FEATURE_MINDFUL_REMINDERS)
+
     val note = uiState.note
-    val noteFont = resolveNoteFontFamily(note?.fontFamily)
+    val noteFont = if (showTypography) resolveNoteFontFamily(note?.fontFamily) else resolveNoteFontFamily(null)
     var followUpInput by remember { mutableStateOf("") }
 
     if (showDeleteDialog) {
@@ -145,41 +161,45 @@ fun NoteDetailScreen(
                                 Icon(Icons.Default.DeleteForever, contentDescription = "Delete Forever", tint = PastelRose)
                             }
                         } else {
-                            // Version History & Diff Viewer
-                            IconButton(onClick = { showVersionHistoryDialog = true }) {
-                                Icon(Icons.Default.History, contentDescription = "Version History & Diff", tint = PastelLavender)
+                            // Time Machine (Version History & Diff Viewer)
+                            if (showVersionHistory) {
+                                IconButton(onClick = { showVersionHistoryDialog = true }) {
+                                    Icon(Icons.Default.History, contentDescription = "Version History & Diff", tint = PastelLavender)
+                                }
                             }
 
-                            // Biometric Fingerprint Lock / Unlock
-                            IconButton(
-                                onClick = {
-                                    val activity = context as? androidx.fragment.app.FragmentActivity
-                                    if (note.isLocked) {
-                                        if (activity != null && com.mindlink.journal.ui.security.BiometricHelper.canAuthenticate(context)) {
-                                            com.mindlink.journal.ui.security.BiometricHelper.authenticate(
-                                                activity = activity,
-                                                title = "Unlock Thought",
-                                                subtitle = "Verify fingerprint to remove lock",
-                                                onSuccess = {
-                                                    viewModel.toggleLockStatus()
-                                                    Toast.makeText(context, "Lock removed", Toast.LENGTH_SHORT).show()
-                                                }
-                                            )
+                            // Vault Lock (Biometric Fingerprint Lock / Unlock)
+                            if (showBiometrics || note.isLocked) {
+                                IconButton(
+                                    onClick = {
+                                        val activity = context as? androidx.fragment.app.FragmentActivity
+                                        if (note.isLocked) {
+                                            if (activity != null && com.mindlink.journal.ui.security.BiometricHelper.canAuthenticate(context)) {
+                                                com.mindlink.journal.ui.security.BiometricHelper.authenticate(
+                                                    activity = activity,
+                                                    title = "Unlock Thought",
+                                                    subtitle = "Verify fingerprint to remove lock",
+                                                    onSuccess = {
+                                                        viewModel.toggleLockStatus()
+                                                        Toast.makeText(context, "Lock removed", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                )
+                                            } else {
+                                                viewModel.toggleLockStatus()
+                                                Toast.makeText(context, "Lock removed", Toast.LENGTH_SHORT).show()
+                                            }
                                         } else {
                                             viewModel.toggleLockStatus()
-                                            Toast.makeText(context, "Lock removed", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Thought locked with fingerprint", Toast.LENGTH_SHORT).show()
                                         }
-                                    } else {
-                                        viewModel.toggleLockStatus()
-                                        Toast.makeText(context, "Thought locked with fingerprint", Toast.LENGTH_SHORT).show()
                                     }
+                                ) {
+                                    Icon(
+                                        imageVector = if (note.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                        contentDescription = if (note.isLocked) "Locked (Protected)" else "Lock Note",
+                                        tint = if (note.isLocked) PastelRose else PastelLavender
+                                    )
                                 }
-                            ) {
-                                Icon(
-                                    imageVector = if (note.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                                    contentDescription = if (note.isLocked) "Locked (Protected)" else "Lock Note",
-                                    tint = if (note.isLocked) PastelRose else PastelLavender
-                                )
                             }
 
                             // Pin / Unpin Note
@@ -191,43 +211,45 @@ fun NoteDetailScreen(
                                 )
                             }
 
-                            // Font Size Override Menu
-                            var showFontSizeMenu by remember { mutableStateOf(false) }
-                            Box {
-                                IconButton(onClick = { showFontSizeMenu = true }) {
-                                    Icon(
-                                        imageVector = Icons.Default.FormatSize,
-                                        contentDescription = "Font Size",
-                                        tint = if (note.fontSizeScale != null) PastelMint else PastelLavender
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = showFontSizeMenu,
-                                    onDismissRequest = { showFontSizeMenu = false },
-                                    modifier = Modifier.background(MindSurfaceDark)
-                                ) {
-                                    val sizeChoices = listOf(
-                                        Pair(null, "Follow App Size"),
-                                        Pair(0.85f, "Small (0.85x)"),
-                                        Pair(1.0f, "Standard (1.0x)"),
-                                        Pair(1.15f, "Large (1.15x)"),
-                                        Pair(1.30f, "Huge (1.30x)")
-                                    )
-                                    sizeChoices.forEach { (scale, label) ->
-                                        val isCurrent = if (scale == null) note.fontSizeScale == null else note.fontSizeScale != null && Math.abs(note.fontSizeScale - scale) < 0.05f
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = label,
-                                                    color = if (isCurrent) PastelMint else MindTextPrimary,
-                                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
-                                                )
-                                            },
-                                            onClick = {
-                                                showFontSizeMenu = false
-                                                viewModel.updateFontSizeScale(scale)
-                                            }
+                            // Font Size Override Menu (Type Studio)
+                            if (showTypography) {
+                                var showFontSizeMenu by remember { mutableStateOf(false) }
+                                Box {
+                                    IconButton(onClick = { showFontSizeMenu = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.FormatSize,
+                                            contentDescription = "Font Size",
+                                            tint = if (note.fontSizeScale != null) PastelMint else PastelLavender
                                         )
+                                    }
+                                    DropdownMenu(
+                                        expanded = showFontSizeMenu,
+                                        onDismissRequest = { showFontSizeMenu = false },
+                                        modifier = Modifier.background(MindSurfaceDark)
+                                    ) {
+                                        val sizeChoices = listOf(
+                                            Pair(null, "Follow App Size"),
+                                            Pair(0.85f, "Small (0.85x)"),
+                                            Pair(1.0f, "Standard (1.0x)"),
+                                            Pair(1.15f, "Large (1.15x)"),
+                                            Pair(1.30f, "Huge (1.30x)")
+                                        )
+                                        sizeChoices.forEach { (scale, label) ->
+                                            val isCurrent = if (scale == null) note.fontSizeScale == null else note.fontSizeScale != null && Math.abs(note.fontSizeScale - scale) < 0.05f
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        text = label,
+                                                        color = if (isCurrent) PastelMint else MindTextPrimary,
+                                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
+                                                    )
+                                                },
+                                                onClick = {
+                                                    showFontSizeMenu = false
+                                                    viewModel.updateFontSizeScale(scale)
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -365,8 +387,10 @@ fun NoteDetailScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (note.mood != null) {
+                        if (showMood && note.mood != null) {
                             MoodBadge(mood = note.mood, emoji = note.moodEmoji)
+                        } else {
+                            Spacer(modifier = Modifier.width(1.dp))
                         }
                         Text(
                             text = note.formattedDate,
@@ -376,7 +400,7 @@ fun NoteDetailScreen(
                     }
 
                     // Title
-                    val noteScale = note.fontSizeScale ?: 1.0f
+                    val noteScale = if (showTypography) (note.fontSizeScale ?: 1.0f) else 1.0f
                     val titleFontSize = (MaterialTheme.typography.headlineMedium.fontSize.value * noteScale).sp
                     val titleLineHeight = (titleFontSize.value * 1.35f).sp
                     Text(
@@ -391,7 +415,7 @@ fun NoteDetailScreen(
                     )
 
                     // Attached Voice Audio Player Bar
-                    if (note.audioUri != null) {
+                    if (showVoice && note.audioUri != null) {
                         Surface(
                             shape = RoundedCornerShape(16.dp),
                             color = MindGlassSurfaceElevated,
@@ -510,7 +534,7 @@ fun NoteDetailScreen(
                     }
 
                     // Attached Image Card with Caption
-                    if (note.imageUri != null) {
+                    if (showMedia && note.imageUri != null) {
                         Surface(
                             shape = RoundedCornerShape(18.dp),
                             color = MindGlassSurface,
@@ -548,68 +572,70 @@ fun NoteDetailScreen(
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MindGlassButtonContainer,
-                                    border = BorderStroke(1.dp, MindGlassButtonBorder),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable(enabled = !isOcrScanning) {
-                                            coroutineScope.launch {
-                                                isOcrScanning = true
-                                                try {
-                                                    val uri = Uri.parse(note.imageUri)
-                                                    val result = ocrHelper.extractTextFromImageUri(uri)
-                                                    result.onSuccess { rawText ->
-                                                        if (rawText.isNotBlank()) {
-                                                            val (_, polishedBody) = brainstormingEngine.polishOcrText(rawText)
-                                                            viewModel.appendContent(polishedBody)
-                                                            Toast.makeText(context, "Text extracted & saved to thought", Toast.LENGTH_SHORT).show()
-                                                        } else {
-                                                            Toast.makeText(context, "No text detected in this image", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    }.onFailure { err ->
-                                                        Toast.makeText(context, "OCR failed: ${err.message}", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                } catch (e: Exception) {
-                                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                                } finally {
-                                                    isOcrScanning = false
-                                                }
-                                            }
-                                        }
-                                ) {
-                                    Row(
+                                if (showOcr) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = MindGlassButtonContainer,
+                                        border = BorderStroke(1.dp, MindGlassButtonBorder),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 11.dp),
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable(enabled = !isOcrScanning) {
+                                                coroutineScope.launch {
+                                                    isOcrScanning = true
+                                                    try {
+                                                        val uri = Uri.parse(note.imageUri)
+                                                        val result = ocrHelper.extractTextFromImageUri(uri)
+                                                        result.onSuccess { rawText ->
+                                                            if (rawText.isNotBlank()) {
+                                                                val (_, polishedBody) = brainstormingEngine.polishOcrText(rawText)
+                                                                viewModel.appendContent(polishedBody)
+                                                                Toast.makeText(context, "Text extracted & saved to thought", Toast.LENGTH_SHORT).show()
+                                                            } else {
+                                                                Toast.makeText(context, "No text detected in this image", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                        }.onFailure { err ->
+                                                            Toast.makeText(context, "OCR failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                    } finally {
+                                                        isOcrScanning = false
+                                                    }
+                                                }
+                                            }
                                     ) {
-                                        if (isOcrScanning) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(16.dp),
-                                                strokeWidth = 2.dp,
-                                                color = PastelViolet
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Extracting Text...", fontSize = 13.sp, color = PastelViolet, fontWeight = FontWeight.Bold)
-                                        } else {
-                                            Icon(
-                                                imageVector = Icons.Default.DocumentScanner,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(17.dp),
-                                                tint = PastelViolet
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = "Extract Text from Image",
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = PastelViolet
-                                            )
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 11.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (isOcrScanning) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(16.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = PastelViolet
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("Extracting Text...", fontSize = 13.sp, color = PastelViolet, fontWeight = FontWeight.Bold)
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.Default.DocumentScanner,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(17.dp),
+                                                    tint = PastelViolet
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "Extract Text from Image",
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = PastelViolet
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -618,7 +644,7 @@ fun NoteDetailScreen(
                     }
 
                     // Tags (FlowRow with no-wrap pills)
-                    if (note.tags.isNotEmpty()) {
+                    if (showHashtags && note.tags.isNotEmpty()) {
                         @OptIn(ExperimentalLayoutApi::class)
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
@@ -719,14 +745,16 @@ fun NoteDetailScreen(
                                         maxLines = 1
                                     )
                                 }
-                                Text(
-                                    text = "Auto-reprocesses AI correlations",
-                                    fontSize = 10.sp,
-                                    lineHeight = 13.sp,
-                                    fontWeight = FontWeight.Normal,
-                                    color = MindTextTertiary.copy(alpha = 0.60f),
-                                    modifier = Modifier.padding(start = 14.dp)
-                                )
+                                if (showSecondBrain || showEchoPrompts) {
+                                    Text(
+                                        text = "Auto-reprocesses AI correlations",
+                                        fontSize = 10.sp,
+                                        lineHeight = 13.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        color = MindTextTertiary.copy(alpha = 0.60f),
+                                        modifier = Modifier.padding(start = 14.dp)
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -784,125 +812,129 @@ fun NoteDetailScreen(
                         }
                     }
 
-                    // SECTION DIVIDER: DISTINCT AI INTELLIGENCE SUITE
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "AI Second Brain Analysis",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = PastelLavender
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MindGlassButtonContainer,
-                            border = BorderStroke(0.8.dp, MindGlassButtonBorder),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable {
-                                    viewModel.reprocessNote {
-                                        Toast.makeText(context, "Correlations & analysis recalculated", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, tint = PastelSky, modifier = Modifier.size(13.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Re-analyze", fontSize = 11.sp, color = PastelSky, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-
-                    // 2. AI TL;DR Summary Card (Validated - no raw JSON or code fences!)
-                    val validSummary = remember(note.summary) { note.cleanSummary }
-                    if (!validSummary.isNullOrBlank()) {
-                        Card(
+                    // SECTION DIVIDER & AI SUMMARY (Memory Oracle)
+                    if (showSecondBrain) {
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MindGlassSurfaceVariant),
-                            border = BorderStroke(1.dp, MindIndigo.copy(alpha = 0.4f))
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.Top
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Memory Oracle Analysis",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PastelLavender
+                                )
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MindGlassButtonContainer,
+                                border = BorderStroke(0.8.dp, MindGlassButtonBorder),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        viewModel.reprocessNote {
+                                            Toast.makeText(context, "Correlations & analysis recalculated", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                             ) {
-                                Icon(Icons.Default.Psychology, contentDescription = null, tint = PastelSky, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = "AI TL;DR Summary",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = PastelSky,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = validSummary,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MindTextPrimary,
-                                        lineHeight = 20.sp
-                                    )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = null, tint = PastelSky, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Re-analyze", fontSize = 11.sp, color = PastelSky, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        // 2. AI TL;DR Summary Card (Validated - no raw JSON or code fences!)
+                        val validSummary = remember(note.summary) { note.cleanSummary }
+                        if (!validSummary.isNullOrBlank()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MindGlassSurfaceVariant),
+                                border = BorderStroke(1.dp, MindIndigo.copy(alpha = 0.4f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Icon(Icons.Default.Psychology, contentDescription = null, tint = PastelSky, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "AI TL;DR Summary",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = PastelSky,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = validSummary,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MindTextPrimary,
+                                            lineHeight = 20.sp
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // Proactive Pattern & Contextual Reminder Alert (Extracted from Note Context)
-                    val contextualReminder = remember(note.title, note.content) {
-                        brainstormingEngine.extractContextualReminder(note.title, note.content)
-                    }
-                    if (contextualReminder != null) {
-                        var isReminderSet by remember { mutableStateOf(false) }
-                        var scheduledTimeText by remember { mutableStateOf("") }
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = PastelAmber.copy(alpha = 0.12f),
-                            border = BorderStroke(1.2.dp, PastelAmber.copy(alpha = 0.45f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = PastelAmber, modifier = Modifier.size(17.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(contextualReminder.triggerPattern, color = PastelAmber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(contextualReminder.question, color = MindTextPrimary, style = MaterialTheme.typography.bodyMedium, lineHeight = 20.sp)
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (isReminderSet) PastelMint.copy(alpha = 0.2f) else MindGlassButtonContainer,
-                                        border = BorderStroke(0.8.dp, if (isReminderSet) PastelMint else MindGlassButtonBorder),
-                                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
-                                            val targetMs = com.mindlink.journal.data.worker.ReminderWorker.schedule(
-                                                context = context,
-                                                title = contextualReminder.triggerPattern,
-                                                message = contextualReminder.question,
-                                                noteId = note.id,
-                                                delayMinutes = contextualReminder.suggestedDelayMinutes
-                                            )
-                                            val timeFmt = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(targetMs))
-                                            scheduledTimeText = "Scheduled for $timeFmt"
-                                            isReminderSet = true
-                                            Toast.makeText(context, "System notification scheduled for $timeFmt", Toast.LENGTH_SHORT).show()
-                                        }
-                                    ) {
-                                        Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(if (isReminderSet) Icons.Default.Check else Icons.Default.Alarm, contentDescription = null, tint = if (isReminderSet) PastelMint else PastelAmber, modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(if (isReminderSet) scheduledTimeText else "Schedule Reminder", color = if (isReminderSet) PastelMint else MindGlassButtonText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                    // Proactive Pattern & Contextual Reminder Alert (Mindful Nudges)
+                    if (showReminders) {
+                        val contextualReminder = remember(note.title, note.content) {
+                            brainstormingEngine.extractContextualReminder(note.title, note.content)
+                        }
+                        if (contextualReminder != null) {
+                            var isReminderSet by remember { mutableStateOf(false) }
+                            var scheduledTimeText by remember { mutableStateOf("") }
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = PastelAmber.copy(alpha = 0.12f),
+                                border = BorderStroke(1.2.dp, PastelAmber.copy(alpha = 0.45f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = PastelAmber, modifier = Modifier.size(17.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(contextualReminder.triggerPattern, color = PastelAmber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(contextualReminder.question, color = MindTextPrimary, style = MaterialTheme.typography.bodyMedium, lineHeight = 20.sp)
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (isReminderSet) PastelMint.copy(alpha = 0.2f) else MindGlassButtonContainer,
+                                            border = BorderStroke(0.8.dp, if (isReminderSet) PastelMint else MindGlassButtonBorder),
+                                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
+                                                val targetMs = com.mindlink.journal.data.worker.ReminderWorker.schedule(
+                                                    context = context,
+                                                    title = contextualReminder.triggerPattern,
+                                                    message = contextualReminder.question,
+                                                    noteId = note.id,
+                                                    delayMinutes = contextualReminder.suggestedDelayMinutes
+                                                )
+                                                val timeFmt = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(targetMs))
+                                                scheduledTimeText = "Scheduled for $timeFmt"
+                                                isReminderSet = true
+                                                Toast.makeText(context, "System notification scheduled for $timeFmt", Toast.LENGTH_SHORT).show()
+                                            }
+                                        ) {
+                                            Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(if (isReminderSet) Icons.Default.Check else Icons.Default.Alarm, contentDescription = null, tint = if (isReminderSet) PastelMint else PastelAmber, modifier = Modifier.size(14.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(if (isReminderSet) scheduledTimeText else "Schedule Reminder", color = if (isReminderSet) PastelMint else MindGlassButtonText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                            }
                                         }
                                     }
                                 }
@@ -910,8 +942,8 @@ fun NoteDetailScreen(
                         }
                     }
 
-                    // 3. Extracted Action Items (Real interactive Checkboxes, NO raw [] syntax!)
-                    if (note.actionItems.isNotEmpty()) {
+                    // 3. Extracted Action Items (Action Checklists)
+                    if (showChecklists && note.actionItems.isNotEmpty()) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(18.dp),
@@ -966,33 +998,35 @@ fun NoteDetailScreen(
                         }
                     }
 
-                    // 4. Brainstorming & Dynamic Evolving Socratic Reflection Prompts
-                    val livePrompts = remember(note.title, note.content, note.reflectionPrompts) {
-                        val isLegacyMismatch = note.reflectionPrompts.any { 
-                            it.contains("bottleneck") || it.contains("architectural assumption") || it.contains("hidden premise") 
-                        }
-                        if (note.reflectionPrompts.isNotEmpty() && !isLegacyMismatch && !note.content.contains("> **Reflection")) {
-                            note.reflectionPrompts
-                        } else {
-                            brainstormingEngine.generateReflectionPrompts(note.title, note.content, note.mood ?: "Reflective")
-                        }
-                    }
-
-                    ReflectionPromptsCard(
-                        prompts = livePrompts,
-                        onAnswerSubmitted = { question, answer ->
-                            viewModel.submitPromptReflection(question, answer) {
-                                Toast.makeText(context, "Reflection integrated! Context & correlations evolved.", Toast.LENGTH_SHORT).show()
+                    // 4. Echo Prompts & Related Thoughts
+                    if (showEchoPrompts) {
+                        val livePrompts = remember(note.title, note.content, note.reflectionPrompts) {
+                            val isLegacyMismatch = note.reflectionPrompts.any { 
+                                it.contains("bottleneck") || it.contains("architectural assumption") || it.contains("hidden premise") 
+                            }
+                            if (note.reflectionPrompts.isNotEmpty() && !isLegacyMismatch && !note.content.contains("> **Reflection")) {
+                                note.reflectionPrompts
+                            } else {
+                                brainstormingEngine.generateReflectionPrompts(note.title, note.content, note.mood ?: "Reflective")
                             }
                         }
-                    )
 
-                    // 5. Contextual "Related Thoughts" Card (Cosine similarity vector search)
-                    RelatedThoughtsCard(
-                        relatedThoughts = uiState.relatedThoughts,
-                        isLoading = uiState.isLoadingRelated,
-                        onThoughtClick = onThoughtClick
-                    )
+                        ReflectionPromptsCard(
+                            prompts = livePrompts,
+                            onAnswerSubmitted = { question, answer ->
+                                viewModel.submitPromptReflection(question, answer) {
+                                    Toast.makeText(context, "Reflection integrated! Context & correlations evolved.", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
+
+                        // 5. Contextual "Related Thoughts" Card (Cosine similarity vector search)
+                        RelatedThoughtsCard(
+                            relatedThoughts = uiState.relatedThoughts,
+                            isLoading = uiState.isLoadingRelated,
+                            onThoughtClick = onThoughtClick
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(96.dp))
                 }
@@ -1120,22 +1154,24 @@ fun NoteDetailScreen(
                                 }
                             }
 
-                            // Version History & Diff Shortcut
-                            Surface(
-                                shape = CircleShape,
-                                color = if (isDockDark) Color(0x25FFFFFF) else Color(0x150F172A),
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .clickable { showVersionHistoryDialog = true }
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.History,
-                                        contentDescription = "Version History",
-                                        tint = PastelMint,
-                                        modifier = Modifier.size(18.dp)
-                                    )
+                            // Time Machine (Version History & Diff Shortcut)
+                            if (showVersionHistory) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (isDockDark) Color(0x25FFFFFF) else Color(0x150F172A),
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .clickable { showVersionHistoryDialog = true }
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.History,
+                                            contentDescription = "Version History",
+                                            tint = PastelMint,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
                         }

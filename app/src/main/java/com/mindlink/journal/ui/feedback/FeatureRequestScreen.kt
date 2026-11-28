@@ -56,7 +56,7 @@ fun FeatureRequestScreen(
                             color = MindTextPrimary
                         )
                         Text(
-                            text = "Tier $currentTier Thinker · Community Driven",
+                            text = "Level $currentTier Thinker · Community Driven",
                             style = MaterialTheme.typography.labelSmall,
                             color = MindTextTertiary
                         )

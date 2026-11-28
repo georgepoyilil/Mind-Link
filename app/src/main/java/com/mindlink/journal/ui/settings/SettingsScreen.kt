@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mindlink.journal.BuildConfig
+import com.mindlink.journal.data.capability.CapabilityLadderManager
 import com.mindlink.journal.ui.components.MindLinkOnboardingDialog
 import com.mindlink.journal.ui.components.MindLinkUserGuideDialog
 import com.mindlink.journal.ui.components.liquidGlass
@@ -47,8 +48,25 @@ fun SettingsScreen(
     var isKeyVisible by remember { mutableStateOf(false) }
     var isThemeCardExpanded by rememberSaveable { mutableStateOf(false) }
     var isBackupCardExpanded by rememberSaveable { mutableStateOf(false) }
+    var isAiLabExpanded by rememberSaveable { mutableStateOf(false) }
     var showUserGuideDialog by remember { mutableStateOf(false) }
     var showOnboardingDialog by remember { mutableStateOf(false) }
+
+    val capabilityManager = remember { com.mindlink.journal.di.ServiceLocator.getInstance(context).capabilityLadderManager }
+    val ladderState by capabilityManager.state.collectAsState()
+
+    val showTypeStudio = ladderState.isEnabled(CapabilityLadderManager.FEATURE_TYPOGRAPHY)
+    val showMoodAura = ladderState.isEnabled(CapabilityLadderManager.FEATURE_MOOD_BADGES)
+    val showReminders = ladderState.isEnabled(CapabilityLadderManager.FEATURE_MINDFUL_REMINDERS)
+    val showCloudVault = ladderState.isEnabled(CapabilityLadderManager.FEATURE_CLOUD_BACKUP)
+    val showMemoryOracle = ladderState.isEnabled(CapabilityLadderManager.FEATURE_SECOND_BRAIN)
+    val showEdgeAi = ladderState.isEnabled(CapabilityLadderManager.FEATURE_ON_DEVICE_SLM)
+    val showTechMode = ladderState.isEnabled(CapabilityLadderManager.FEATURE_TECH_MODE)
+
+    val hiddenSettingsCount = listOf(
+        showTypeStudio, showMoodAura, showReminders,
+        showCloudVault, showMemoryOracle, showEdgeAi, showTechMode
+    ).count { !it }
 
     LaunchedEffect(Unit) {
         viewModel.refreshNotificationStatus()
@@ -119,12 +137,19 @@ fun SettingsScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "Settings & AI Engine",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MindTextPrimary
-                    )
+                    Column {
+                        Text(
+                            text = "Settings",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MindTextPrimary
+                        )
+                        Text(
+                            text = "Level ${ladderState.currentTier} · Tailored Workspace",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MindTextTertiary
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -144,11 +169,12 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 0.0 Complexity Ladder & Feature Request Shortcuts
+            // 0.0 App Complexity Blueprint & Creator Portal Card
             val isSettingsGlassy = MindIsGlassy
             val isSettingsDark = LocalMindLinkColors.current.isDark
-            val capabilityManager = remember { com.mindlink.journal.di.ServiceLocator.getInstance(context).capabilityLadderManager }
-            val ladderState by capabilityManager.state.collectAsState()
+            val levelInfo = CapabilityLadderManager.TIERS.firstOrNull { it.tier == ladderState.currentTier }
+            val activeModules = CapabilityLadderManager.ALL_CAPABILITIES.count { ladderState.isEnabled(it.key) }
+            val totalModules = CapabilityLadderManager.ALL_CAPABILITIES.size
 
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -169,18 +195,18 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("🪜", fontSize = 22.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Text(levelInfo?.badgeIcon ?: "🌿", fontSize = 24.sp)
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Complexity Ladder · Tier ${ladderState.currentTier}",
+                                    text = "Complexity Blueprint · Level ${ladderState.currentTier}",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MindTextPrimary
                                 )
                                 Text(
-                                    text = "Progressively unlock capabilities or toggle features",
+                                    text = "${levelInfo?.title ?: "Blank Slate"} · $activeModules/$totalModules modules ON",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MindTextTertiary
                                 )
@@ -202,25 +228,29 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.TrendingUp, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("View Ladder", fontSize = 12.sp)
+                            Text("Open Blueprint", fontSize = 12.sp)
                         }
 
-                        OutlinedButton(
-                            onClick = onFeatureRequestsClick,
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelSky),
-                            border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.6f)),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Feature Portal", fontSize = 12.sp)
+                        if (ladderState.currentTier >= 2 || ladderState.activeNotesCount >= 5) {
+                            OutlinedButton(
+                                onClick = onFeatureRequestsClick,
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelSky),
+                                border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.6f)),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Creator Portal", fontSize = 12.sp)
+                            }
                         }
                     }
                 }
             }
 
-            // 0. Visual Atmosphere & Themes Card
+            SettingsSectionLabel("ESSENTIALS · LEVEL 0")
+
+            // 0. Visual Atmosphere & Themes Card (Always Visible - Level 0 Core)
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = if (isSettingsGlassy) Color.Transparent else MindSurfaceDark),
@@ -387,8 +417,13 @@ fun SettingsScreen(
                 }
             }
 
-            // 0.2. Mood & Reaction Emojis Card
-            Card(
+            if (showMoodAura || showTypeStudio) {
+                SettingsSectionLabel("WRITING & EXPRESSION · LEVELS 1–2")
+            }
+
+            // 0.2. Mood Aura & Reaction Emojis Card (Level 2)
+            if (showMoodAura) {
+                Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
                 modifier = Modifier.fillMaxWidth()
@@ -442,9 +477,11 @@ fun SettingsScreen(
                     )
                 }
             }
+            }
 
-            // 0.3. App Typography & Font Size Card
-            Card(
+            // 0.3. Type Studio: App Typography & Font Size Card (Level 1)
+            if (showTypeStudio) {
+                Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
                 modifier = Modifier.fillMaxWidth()
@@ -600,9 +637,15 @@ fun SettingsScreen(
                     }
                 }
             }
+            }
 
-            // 0.5. Neural Inspector (Tech Mode) Toggle Card
-            Card(
+            if (showEdgeAi || showTechMode) {
+                SettingsSectionLabel("NEURAL FORGE · LEVEL 5")
+            }
+
+            // 0.5. Telemetry X-Ray (Tech Mode) Toggle Card (Level 5)
+            if (showTechMode) {
+                Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
                 modifier = Modifier.fillMaxWidth()
@@ -656,9 +699,11 @@ fun SettingsScreen(
                     )
                 }
             }
+            }
 
-            // 1. Engine Mode Switcher Card
-            Card(
+            // 1. Edge Mind AI: Engine Mode Switcher Card (Level 5)
+            if (showEdgeAi) {
+                Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
                 modifier = Modifier.fillMaxWidth()
@@ -935,109 +980,130 @@ fun SettingsScreen(
                 }
             }
 
-            // 3. Live On-Device SLM Capability Sandbox & Latency Benchmark Card
+            // 3. Live On-Device SLM Capability Sandbox & Latency Benchmark Card (Collapsible)
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Terminal,
-                            contentDescription = "Test Sandbox",
-                            tint = PastelSky,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Test On-Device SLM Prompt",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MindTextPrimary
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Benchmark the real model running locally on your phone GPU:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MindTextSecondary
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = uiState.testPrompt,
-                        onValueChange = { viewModel.updateTestPrompt(it) },
-                        label = { Text("Test Prompt") },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = MindSurfaceVariantDark,
-                            unfocusedContainerColor = MindSurfaceVariantDark,
-                            focusedBorderColor = PastelSky,
-                            unfocusedBorderColor = MindBorderDark,
-                            focusedTextColor = MindTextPrimary,
-                            unfocusedTextColor = MindTextPrimary
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Button(
-                        onClick = { viewModel.runTestPrompt() },
-                        enabled = !uiState.isTesting && uiState.isModelInstalled,
-                        colors = ButtonDefaults.buttonColors(containerColor = PastelSky),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { isAiLabExpanded = !isAiLabExpanded },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        if (uiState.isTesting) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black, strokeWidth = 2.dp)
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                imageVector = Icons.Default.Terminal,
+                                contentDescription = "Test Sandbox",
+                                tint = PastelSky,
+                                modifier = Modifier.size(22.dp)
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Generating on device...", color = Color.Black, fontWeight = FontWeight.Bold)
-                        } else {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Run Live On-Device Inference", color = Color.Black, fontWeight = FontWeight.Bold)
+                            Column {
+                                Text(
+                                    text = "On-Device GPU Sandbox",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MindTextPrimary
+                                )
+                                Text(
+                                    text = "Benchmark live edge SLM inference & latency",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MindTextTertiary
+                                )
+                            }
                         }
+                        Icon(
+                            imageVector = if (isAiLabExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            tint = MindTextSecondary
+                        )
                     }
 
-                    if (uiState.testOutput != null) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MindBackgroundDark,
-                            border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.5f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = "Generated Output (Raw SLM):",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = PastelSky
-                                    )
-                                    Text(
-                                        text = "${uiState.testLatencyMs} ms",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = PastelMint
-                                    )
+                    AnimatedVisibility(
+                        visible = isAiLabExpanded,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column {
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            OutlinedTextField(
+                                value = uiState.testPrompt,
+                                onValueChange = { viewModel.updateTestPrompt(it) },
+                                label = { Text("Test Prompt") },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = MindSurfaceVariantDark,
+                                    unfocusedContainerColor = MindSurfaceVariantDark,
+                                    focusedBorderColor = PastelSky,
+                                    unfocusedBorderColor = MindBorderDark,
+                                    focusedTextColor = MindTextPrimary,
+                                    unfocusedTextColor = MindTextPrimary
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Button(
+                                onClick = { viewModel.runTestPrompt() },
+                                enabled = !uiState.isTesting && uiState.isModelInstalled,
+                                colors = ButtonDefaults.buttonColors(containerColor = PastelSky),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (uiState.isTesting) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black, strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Generating on device...", color = Color.Black, fontWeight = FontWeight.Bold)
+                                } else {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Run Live On-Device Inference", color = Color.Black, fontWeight = FontWeight.Bold)
                                 }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = uiState.testOutput ?: "",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = MindTextPrimary,
-                                    lineHeight = 18.sp
-                                )
+                            }
+
+                            if (uiState.testOutput != null) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MindBackgroundDark,
+                                    border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.5f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "Generated Output (Raw SLM):",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = PastelSky
+                                            )
+                                            Text(
+                                                text = "${uiState.testLatencyMs} ms",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = PastelMint
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = uiState.testOutput ?: "",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = MindTextPrimary,
+                                            lineHeight = 18.sp
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -1106,9 +1172,12 @@ fun SettingsScreen(
                     )
                 }
             }
+            }
 
-            // Google Cloud SSO & Drive Backup Card (Simpler & Minimizable)
-            Card(
+            // Cloud Vault: Google Cloud SSO & Drive Backup Card (Level 3)
+            if (showCloudVault) {
+                SettingsSectionLabel("CLOUD VAULT · LEVEL 3")
+                Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = if (isSettingsGlassy) Color.Transparent else MindSurfaceDark),
                 modifier = Modifier
@@ -1698,9 +1767,12 @@ fun SettingsScreen(
                     }
                 }
             }
+            }
 
-            // 5. Memory Bank Stats Card
-            Card(
+            // 5. Memory Oracle Index Status Card (Level 4)
+            if (showMemoryOracle) {
+                SettingsSectionLabel("MEMORY ORACLE INDEX · LEVEL 4")
+                Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
                 modifier = Modifier.fillMaxWidth()
@@ -1807,8 +1879,100 @@ fun SettingsScreen(
                     }
                 }
             }
+            }
 
-            // 6. In-App OTA Updates Card
+            // 6.5. Mindful Nudges & Notifications Card (Level 3)
+            if (showReminders) {
+                SettingsSectionLabel("MINDFUL HABITS · LEVEL 3")
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.NotificationsActive,
+                                contentDescription = "Notifications",
+                                tint = PastelLavender,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Mindful Nudges & Notifications",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MindTextPrimary,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (uiState.areNotificationsEnabled) MindEmerald.copy(alpha = 0.15f) else PastelRose.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, if (uiState.areNotificationsEnabled) MindEmerald.copy(alpha = 0.4f) else PastelRose.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = if (uiState.areNotificationsEnabled) "Enabled" else "Disabled",
+                                    color = if (uiState.areNotificationsEnabled) MindEmerald else PastelRose,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "MindLink uses local background workers to deliver thoughtful contextual check-ins and reflection prompts.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MindTextSecondary
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                        putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                    }
+                                    context.startActivity(intent)
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, PastelLavender.copy(alpha = 0.5f)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelLavender),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Manage in System", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+
+                            Button(
+                                onClick = { viewModel.scheduleTestReminder() },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = PastelLavender, contentColor = MindBackgroundDark),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Send Test Reminder", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            SettingsSectionLabel("UPDATES & GUIDE · CORE")
+
+            // 6. In-App OTA Updates Card (Always Visible - Level 0 Core)
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
@@ -2025,92 +2189,6 @@ fun SettingsScreen(
                 }
             }
 
-            // 6.5. Mindful Notifications & Reminders Card
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.NotificationsActive,
-                            contentDescription = "Notifications",
-                            tint = PastelLavender,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Mindful Reminders & Notifications",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MindTextPrimary,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (uiState.areNotificationsEnabled) MindEmerald.copy(alpha = 0.15f) else PastelRose.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, if (uiState.areNotificationsEnabled) MindEmerald.copy(alpha = 0.4f) else PastelRose.copy(alpha = 0.4f))
-                        ) {
-                            Text(
-                                text = if (uiState.areNotificationsEnabled) "Enabled" else "Disabled",
-                                color = if (uiState.areNotificationsEnabled) MindEmerald else PastelRose,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "MindLink uses local background workers to deliver thoughtful contextual check-ins and reflection prompts.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MindTextSecondary
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                val intent = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                                    putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                }
-                                context.startActivity(intent)
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, PastelLavender.copy(alpha = 0.5f)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelLavender),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Manage in System", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                        }
-
-                        Button(
-                            onClick = { viewModel.scheduleTestReminder() },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = PastelLavender, contentColor = MindBackgroundDark),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Send Test Reminder", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                }
-            }
-
             // 7. About MindLink & User Guide Card
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -2136,7 +2214,7 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "• All notes and vector embeddings are stored locally in Room SQLite.\n• Full-text search runs completely offline via SQLite FTS.\n• WorkManager guarantees background note enrichment without UI freezes.\n• Embeddings run via Fallback/ONNX 384-d semantic projection.\n• SLMs run on device GPU via Google MediaPipe Tasks GenAI.",
+                        text = "• All thoughts are stored privately in local Room SQLite.\n• Full-text keyword recall runs 100% offline.\n• Progress through Levels 0–5 in Complexity Blueprint to unlock advanced AI and visual labs.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MindTextSecondary,
                         lineHeight = 22.sp
@@ -2181,6 +2259,53 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            if (hiddenSettingsCount > 0) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MindIndigo.copy(alpha = 0.12f),
+                    border = BorderStroke(0.8.dp, MindIndigo.copy(alpha = 0.35f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onComplexityLadderClick() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.VisibilityOff, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "$hiddenSettingsCount advanced setting${if (hiddenSettingsCount == 1) "" else "s"} tucked away by Complexity Blueprint",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MindTextSecondary
+                            )
+                        }
+                        Text(
+                            text = "Configure →",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = PastelSky
+                        )
+                    }
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun SettingsSectionLabel(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = MindTextTertiary,
+        letterSpacing = 1.sp,
+        fontSize = 10.5.sp,
+        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+    )
 }

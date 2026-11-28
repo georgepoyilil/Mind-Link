@@ -117,11 +117,16 @@ fun NoteEditorScreen(
     var taskSplitterInput by remember { mutableStateOf("") }
 
     val capabilityManager = remember { com.mindlink.journal.di.ServiceLocator.getInstance(context).capabilityLadderManager }
-    val canUseTypography = capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_TYPOGRAPHY)
-    val canUseMedia = capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_MEDIA_CAPTURE)
-    val canUseChecklists = capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_CHECKLISTS)
-    val canUseSplitter = capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_TASK_SPLITTER)
-    val canUseJester = capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_JESTER)
+    val ladderState by capabilityManager.state.collectAsState()
+    val canUseTypography = ladderState.isEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_TYPOGRAPHY)
+    val canUseMedia = ladderState.isEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_MEDIA_CAPTURE)
+    val canUseOcr = ladderState.isEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_OCR)
+    val canUseVoice = ladderState.isEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_VOICE_DICTATION)
+    val canUseChecklists = ladderState.isEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_CHECKLISTS)
+    val canUseSplitter = canUseChecklists && ladderState.isEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_TASK_SPLITTER)
+    val canUseJester = ladderState.isEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_JESTER)
+    val canUseHashtags = ladderState.isEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_HASHTAGS)
+    val canUseVersionHistory = ladderState.isEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_VERSION_HISTORY)
 
     fun addNewTask() {
         val newId = viewModel.addChecklistItem("")
@@ -444,7 +449,7 @@ fun NoteEditorScreen(
         }
     }
 
-    val currentFontFamily = resolveNoteFontFamily(uiState.fontFamily)
+    val currentFontFamily = if (canUseTypography) resolveNoteFontFamily(uiState.fontFamily) else resolveNoteFontFamily(null)
 
     Scaffold(
         topBar = {
@@ -463,8 +468,8 @@ fun NoteEditorScreen(
                     }
                 },
                 actions = {
-                    // Revisions & Version Diff History
-                    if (uiState.id > 0 || uiState.noteVersions.isNotEmpty()) {
+                    // Time Machine (Revisions & Version Diff History)
+                    if (canUseVersionHistory && (uiState.id > 0 || uiState.noteVersions.isNotEmpty())) {
                         IconButton(
                             onClick = { showVersionHistoryDialog = true },
                             modifier = Modifier.size(36.dp)
@@ -508,20 +513,22 @@ fun NoteEditorScreen(
 
                     Spacer(modifier = Modifier.width(2.dp))
 
-                    // Less prominent, sleek voice recording icon in top bar
-                    IconButton(
-                        onClick = { toggleSpeech(false) },
-                        modifier = Modifier
-                            .padding(end = 4.dp)
-                            .clip(CircleShape)
-                            .background(if (uiState.isVoiceRecording) PastelRose.copy(alpha = 0.25f) else Color.Transparent)
-                    ) {
-                        Icon(
-                            imageVector = if (uiState.isVoiceRecording) Icons.Default.MicOff else Icons.Default.Mic,
-                            contentDescription = "Voice Record",
-                            tint = if (uiState.isVoiceRecording) PastelRose else PastelLavender,
-                            modifier = Modifier.size(20.dp)
-                        )
+                    // Voice recording icon in top bar (Voice Studio)
+                    if (canUseVoice) {
+                        IconButton(
+                            onClick = { toggleSpeech(false) },
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .clip(CircleShape)
+                                .background(if (uiState.isVoiceRecording) PastelRose.copy(alpha = 0.25f) else Color.Transparent)
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isVoiceRecording) Icons.Default.MicOff else Icons.Default.Mic,
+                                contentDescription = "Voice Record",
+                                tint = if (uiState.isVoiceRecording) PastelRose else PastelLavender,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
 
                     // Save Button
@@ -684,7 +691,7 @@ fun NoteEditorScreen(
                         }
 
                         // Insert Media Tray Toggle (+)
-                        if (canUseMedia) {
+                        if (canUseMedia || canUseVoice || canUseOcr) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = if (showMediaPanel) PastelSky.copy(alpha = 0.35f) else MindGlassButtonContainer,
@@ -873,7 +880,7 @@ fun NoteEditorScreen(
                 }
 
                 // 2. Expandable Typography & Text Size Inspector (Proper structured editing tool)
-                AnimatedVisibility(visible = showTypographyPanel) {
+                AnimatedVisibility(visible = canUseTypography && showTypographyPanel) {
                     val activeScale = uiState.fontSizeScale
                     Surface(
                         modifier = Modifier
@@ -1066,7 +1073,7 @@ fun NoteEditorScreen(
                 }
 
                 // 3. Expandable Media & Attachments Tray
-                AnimatedVisibility(visible = showMediaPanel) {
+                AnimatedVisibility(visible = (canUseMedia || canUseVoice || canUseOcr) && showMediaPanel) {
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1082,75 +1089,80 @@ fun NoteEditorScreen(
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Gallery
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        imagePickerLauncher.launch("image/*")
-                                        showMediaPanel = false
-                                    }
-                                    .padding(6.dp)
-                            ) {
-                                Icon(Icons.Default.PhotoLibrary, contentDescription = "Gallery", tint = PastelLavender, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Gallery", fontSize = 11.sp, color = MindTextSecondary)
+                            // Gallery & Camera (Photo Moments)
+                            if (canUseMedia) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            imagePickerLauncher.launch("image/*")
+                                            showMediaPanel = false
+                                        }
+                                        .padding(6.dp)
+                                ) {
+                                    Icon(Icons.Default.PhotoLibrary, contentDescription = "Gallery", tint = PastelLavender, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Gallery", fontSize = 11.sp, color = MindTextSecondary)
+                                }
+
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                                            if (hasPerm) launchCameraHighRes() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                            showMediaPanel = false
+                                        }
+                                        .padding(6.dp)
+                                ) {
+                                    Icon(Icons.Default.PhotoCamera, contentDescription = "Camera", tint = PastelSky, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Camera", fontSize = 11.sp, color = MindTextSecondary)
+                                }
                             }
 
-                            // Camera
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                                        if (hasPerm) launchCameraHighRes() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                                        showMediaPanel = false
-                                    }
-                                    .padding(6.dp)
-                            ) {
-                                Icon(Icons.Default.PhotoCamera, contentDescription = "Camera", tint = PastelSky, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Camera", fontSize = 11.sp, color = MindTextSecondary)
+                            // Voice Memo (Voice Studio)
+                            if (canUseVoice) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            toggleAudioMemo()
+                                            showMediaPanel = false
+                                        }
+                                        .padding(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isRecordingAudioMemo) Icons.Default.Stop else Icons.Default.GraphicEq,
+                                        contentDescription = "Audio Memo",
+                                        tint = if (isRecordingAudioMemo) PastelRose else PastelAmber,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(if (isRecordingAudioMemo) "Stop" else "Audio Memo", fontSize = 11.sp, color = if (isRecordingAudioMemo) PastelRose else MindTextSecondary)
+                                }
                             }
 
-                            // Voice Memo
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        toggleAudioMemo()
-                                        showMediaPanel = false
-                                    }
-                                    .padding(6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = if (isRecordingAudioMemo) Icons.Default.Stop else Icons.Default.GraphicEq,
-                                    contentDescription = "Audio Memo",
-                                    tint = if (isRecordingAudioMemo) PastelRose else PastelAmber,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(if (isRecordingAudioMemo) "Stop" else "Audio Memo", fontSize = 11.sp, color = if (isRecordingAudioMemo) PastelRose else MindTextSecondary)
-                            }
-
-                            // Scan Document OCR
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                                        if (hasPerm) launchOcrHighRes() else ocrPermissionLauncher.launch(Manifest.permission.CAMERA)
-                                        showMediaPanel = false
-                                    }
-                                    .padding(6.dp)
-                            ) {
-                                Icon(Icons.Default.DocumentScanner, contentDescription = "Scan Document", tint = PastelViolet, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Scan OCR", fontSize = 11.sp, color = MindTextSecondary)
+                            // Scan Document OCR (Page Scanner)
+                            if (canUseOcr) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                                            if (hasPerm) launchOcrHighRes() else ocrPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                            showMediaPanel = false
+                                        }
+                                        .padding(6.dp)
+                                ) {
+                                    Icon(Icons.Default.DocumentScanner, contentDescription = "Scan Document", tint = PastelViolet, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Page Scan", fontSize = 11.sp, color = MindTextSecondary)
+                                }
                             }
                         }
                     }
@@ -1165,8 +1177,8 @@ fun NoteEditorScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Sleek, Compact Dismissible OCR Pill
-                if ((initialMode == "ocr" || uiState.imageUri == null) && !isOcrCardDismissed) {
+                // Sleek, Compact Dismissible OCR Pill (Only if Page Scanner is enabled)
+                if (canUseOcr && (initialMode == "ocr" || uiState.imageUri == null) && !isOcrCardDismissed) {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = PastelViolet.copy(alpha = 0.12f),
@@ -1270,7 +1282,7 @@ fun NoteEditorScreen(
                 }
 
                 // In-Editor Audio Player & Review Card (Listen & Decide Before Saving)
-                if (uiState.audioUri != null) {
+                if (canUseVoice && uiState.audioUri != null) {
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = MindGlassSurfaceElevated,
@@ -1432,7 +1444,7 @@ fun NoteEditorScreen(
                 }
 
                 // Attached Image & Caption Card
-                if (uiState.imageUri != null) {
+                if (canUseMedia && uiState.imageUri != null) {
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = MindGlassSurface,
@@ -1477,68 +1489,72 @@ fun NoteEditorScreen(
                                     focusedTextColor = MindTextPrimary,
                                     unfocusedTextColor = MindTextPrimary
                                 ),
-                                trailingIcon = {
-                                    IconButton(onClick = { toggleSpeech(true) }) {
-                                        Icon(Icons.Default.Mic, contentDescription = "Dictate", tint = PastelLavender, modifier = Modifier.size(18.dp))
+                                trailingIcon = if (canUseVoice) {
+                                    {
+                                        IconButton(onClick = { toggleSpeech(true) }) {
+                                            Icon(Icons.Default.Mic, contentDescription = "Dictate", tint = PastelLavender, modifier = Modifier.size(18.dp))
+                                        }
                                     }
-                                },
+                                } else null,
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                            if (canUseOcr) {
+                                Spacer(modifier = Modifier.height(8.dp))
 
-                            // Extract Text Button for image
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MindGlassButtonContainer,
-                                border = BorderStroke(1.dp, MindGlassButtonBorder),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable(enabled = !isOcrScanning) {
-                                        val uriStr = uiState.imageUri ?: return@clickable
-                                        val uri = Uri.parse(uriStr)
-                                        coroutineScope.launch {
-                                            isOcrScanning = true
-                                            val result = ocrHelper.extractTextFromImageUri(uri)
-                                            result.onSuccess { rawText ->
-                                                if (rawText.isNotBlank()) {
-                                                    val (polishedTitle, polishedBody) = brainstormingEngine.polishOcrText(rawText)
-                                                    if (uiState.title.isBlank()) viewModel.updateTitle(polishedTitle)
-                                                    val merged = if (uiState.content.isBlank()) polishedBody else "${uiState.content}\n\n$polishedBody"
-                                                    viewModel.updateContent(merged)
-                                                    Toast.makeText(context, "Text extracted and polished into note", Toast.LENGTH_SHORT).show()
-                                                } else {
-                                                    Toast.makeText(context, "No text detected in this image", Toast.LENGTH_SHORT).show()
-                                                }
-                                            }.onFailure { err ->
-                                                Toast.makeText(context, "OCR failed: ${err.message}", Toast.LENGTH_SHORT).show()
-                                            }
-                                            isOcrScanning = false
-                                        }
-                                    }
-                            ) {
-                                Row(
+                                // Extract Text Button for image
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MindGlassButtonContainer,
+                                    border = BorderStroke(1.dp, MindGlassButtonBorder),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 11.dp),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable(enabled = !isOcrScanning) {
+                                            val uriStr = uiState.imageUri ?: return@clickable
+                                            val uri = Uri.parse(uriStr)
+                                            coroutineScope.launch {
+                                                isOcrScanning = true
+                                                val result = ocrHelper.extractTextFromImageUri(uri)
+                                                result.onSuccess { rawText ->
+                                                    if (rawText.isNotBlank()) {
+                                                        val (polishedTitle, polishedBody) = brainstormingEngine.polishOcrText(rawText)
+                                                        if (uiState.title.isBlank()) viewModel.updateTitle(polishedTitle)
+                                                        val merged = if (uiState.content.isBlank()) polishedBody else "${uiState.content}\n\n$polishedBody"
+                                                        viewModel.updateContent(merged)
+                                                        Toast.makeText(context, "Text extracted and polished into note", Toast.LENGTH_SHORT).show()
+                                                    } else {
+                                                        Toast.makeText(context, "No text detected in this image", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }.onFailure { err ->
+                                                    Toast.makeText(context, "OCR failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                                                }
+                                                isOcrScanning = false
+                                            }
+                                        }
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.DocumentScanner,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(17.dp),
-                                        tint = PastelViolet
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Extract Text from Image",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = PastelViolet
-                                    )
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 11.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.DocumentScanner,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(17.dp),
+                                            tint = PastelViolet
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Extract Text from Image",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = PastelViolet
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1546,7 +1562,7 @@ fun NoteEditorScreen(
                 }
 
                 // Title Field
-                val editorNoteScale = uiState.fontSizeScale ?: 1.0f
+                val editorNoteScale = if (canUseTypography) (uiState.fontSizeScale ?: 1.0f) else 1.0f
                 val titleFontSize = (MaterialTheme.typography.headlineSmall.fontSize.value * editorNoteScale).sp
                 val titleLineHeight = (titleFontSize.value * 1.35f).sp
                 TextField(
@@ -1581,124 +1597,128 @@ fun NoteEditorScreen(
                 )
 
                 // Hashtags Section
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 2.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (uiState.tags.isNotEmpty()) {
-                        @OptIn(ExperimentalLayoutApi::class)
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            uiState.tags.forEach { tag ->
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MindGlassButtonContainer,
-                                    border = BorderStroke(0.8.dp, MindGlassButtonBorder)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                if (canUseHashtags) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (uiState.tags.isNotEmpty()) {
+                            @OptIn(ExperimentalLayoutApi::class)
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                uiState.tags.forEach { tag ->
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = MindGlassButtonContainer,
+                                        border = BorderStroke(0.8.dp, MindGlassButtonBorder)
                                     ) {
-                                        Text(
-                                            text = "#$tag",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = PastelLavender
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Remove tag",
-                                            tint = PastelRose,
-                                            modifier = Modifier
-                                                .size(14.dp)
-                                                .clickable { viewModel.removeTag(tag) }
-                                        )
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "#$tag",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = PastelLavender
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Remove tag",
+                                                tint = PastelRose,
+                                                modifier = Modifier
+                                                    .size(14.dp)
+                                                    .clickable { viewModel.removeTag(tag) }
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    // Hashtag Input Bar
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MindGlassSurfaceVariant,
-                        border = BorderStroke(1.dp, MindGlassBorderSubtle),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        // Hashtag Input Bar
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MindGlassSurfaceVariant,
+                            border = BorderStroke(1.dp, MindGlassBorderSubtle),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.Tag, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Box(modifier = Modifier.weight(1f)) {
-                                if (uiState.tagInput.isEmpty()) {
-                                    Text("Tag multiple hashtags (e.g. #ideas, #work, #journal)...", style = MaterialTheme.typography.bodyMedium, color = MindTextTertiary)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Tag, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Box(modifier = Modifier.weight(1f)) {
+                                    if (uiState.tagInput.isEmpty()) {
+                                        Text("Tag multiple hashtags (e.g. #ideas, #work, #journal)...", style = MaterialTheme.typography.bodyMedium, color = MindTextTertiary)
+                                    }
+                                    BasicTextField(
+                                        value = uiState.tagInput,
+                                        onValueChange = { viewModel.updateTagInput(it) },
+                                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MindTextPrimary),
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                        keyboardActions = KeyboardActions(onDone = { viewModel.addTag() }),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
                                 }
-                                BasicTextField(
-                                    value = uiState.tagInput,
-                                    onValueChange = { viewModel.updateTagInput(it) },
-                                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MindTextPrimary),
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                                    keyboardActions = KeyboardActions(onDone = { viewModel.addTag() }),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                            if (uiState.tagInput.isNotBlank()) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MindGlassButtonContainer,
-                                    border = BorderStroke(0.8.dp, MindGlassButtonBorder),
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { viewModel.addTag() }
-                                ) {
-                                    Text("Add", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PastelLavender, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
+                                if (uiState.tagInput.isNotBlank()) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MindGlassButtonContainer,
+                                        border = BorderStroke(0.8.dp, MindGlassButtonBorder),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { viewModel.addTag() }
+                                    ) {
+                                        Text("Add", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PastelLavender, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // Interactive Action Items & Checklists Card (NO raw [] syntax!)
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MindGlassSurface,
-                    border = BorderStroke(1.dp, PastelMint.copy(alpha = 0.35f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        // Dynamic Task Candidate Detector from Note Content
-                        val detectedTaskCandidates = remember(contentValue.text, uiState.checklistItems) {
-                            contentValue.text.lines().mapNotNull { line ->
-                                val trimmed = line.trim()
-                                val clean = when {
-                                    trimmed.startsWith("- [ ]") -> trimmed.removePrefix("- [ ]").trim()
-                                    trimmed.startsWith("[ ]") -> trimmed.removePrefix("[ ]").trim()
-                                    trimmed.startsWith("TODO:", ignoreCase = true) -> trimmed.substring(5).trim()
-                                    trimmed.startsWith("TASK:", ignoreCase = true) -> trimmed.substring(5).trim()
-                                    trimmed.startsWith("DO:", ignoreCase = true) -> trimmed.substring(3).trim()
-                                    trimmed.startsWith("- ") && trimmed.length > 3 -> trimmed.removePrefix("- ").trim()
-                                    trimmed.startsWith("* ") && trimmed.length > 3 -> trimmed.removePrefix("* ").trim()
-                                    trimmed.matches(Regex("""^\d+\.\s+.+""")) -> trimmed.replace(Regex("""^\d+\.\s+"""), "").trim()
-                                    else -> null
+                // Interactive Action Items & Checklists Card (Action Checklists)
+                if (canUseChecklists) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MindGlassSurface,
+                        border = BorderStroke(1.dp, PastelMint.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            // Dynamic Task Candidate Detector from Note Content
+                            val detectedTaskCandidates = remember(contentValue.text, uiState.checklistItems, canUseSplitter) {
+                                if (!canUseSplitter) emptyList() else
+                                contentValue.text.lines().mapNotNull { line ->
+                                    val trimmed = line.trim()
+                                    val clean = when {
+                                        trimmed.startsWith("- [ ]") -> trimmed.removePrefix("- [ ]").trim()
+                                        trimmed.startsWith("[ ]") -> trimmed.removePrefix("[ ]").trim()
+                                        trimmed.startsWith("TODO:", ignoreCase = true) -> trimmed.substring(5).trim()
+                                        trimmed.startsWith("TASK:", ignoreCase = true) -> trimmed.substring(5).trim()
+                                        trimmed.startsWith("DO:", ignoreCase = true) -> trimmed.substring(3).trim()
+                                        trimmed.startsWith("- ") && trimmed.length > 3 -> trimmed.removePrefix("- ").trim()
+                                        trimmed.startsWith("* ") && trimmed.length > 3 -> trimmed.removePrefix("* ").trim()
+                                        trimmed.matches(Regex("""^\d+\.\s+.+""")) -> trimmed.replace(Regex("""^\d+\.\s+"""), "").trim()
+                                        else -> null
+                                    }
+                                    if (!clean.isNullOrBlank() && uiState.checklistItems.none { it.text.equals(clean, ignoreCase = true) }) clean else null
                                 }
-                                if (!clean.isNullOrBlank() && uiState.checklistItems.none { it.text.equals(clean, ignoreCase = true) }) clean else null
                             }
-                        }
 
-                        if (detectedTaskCandidates.isNotEmpty()) {
+                            if (canUseSplitter && detectedTaskCandidates.isNotEmpty()) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = PastelMint.copy(alpha = 0.12f),
@@ -1826,6 +1846,7 @@ fun NoteEditorScreen(
                             }
                         }
                     }
+                    }
                 }
 
                 HorizontalDivider(color = MindBorderDark.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 2.dp))
@@ -1914,7 +1935,11 @@ fun NoteEditorScreen(
                         },
                         placeholder = {
                             Text(
-                                text = "Write your thoughts freely. Dictate with the mic, snap photos, or scan documents with OCR...",
+                                text = if (canUseVoice || canUseMedia || canUseOcr) {
+                                    "Write your thoughts freely. Dictate with the mic, snap photos, or scan pages..."
+                                } else {
+                                    "Write your thoughts freely..."
+                                },
                                 style = MaterialTheme.typography.bodyLarge.copy(
                                     fontSize = bodyFontSize,
                                     lineHeight = bodyLineHeight,

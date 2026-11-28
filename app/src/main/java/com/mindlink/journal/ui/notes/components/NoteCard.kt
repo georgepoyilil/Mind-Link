@@ -26,6 +26,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.mindlink.journal.LocalLadderState
+import com.mindlink.journal.data.capability.CapabilityLadderManager
 import com.mindlink.journal.domain.model.Note
 import com.mindlink.journal.ui.components.liquidGlass
 import com.mindlink.journal.ui.theme.*
@@ -88,7 +90,13 @@ fun NoteStandardCard(
     isInSelectionMode: Boolean = false,
     onLongClick: (() -> Unit)? = null
 ) {
-    val cardFont = resolveNoteFontFamily(note.fontFamily)
+    val ladderState = LocalLadderState.current
+    val showTags = ladderState.isEnabled(CapabilityLadderManager.FEATURE_HASHTAGS)
+    val showChecklists = ladderState.isEnabled(CapabilityLadderManager.FEATURE_CHECKLISTS)
+    val showMood = ladderState.isEnabled(CapabilityLadderManager.FEATURE_MOOD_BADGES)
+    val showSecondBrain = ladderState.isEnabled(CapabilityLadderManager.FEATURE_SECOND_BRAIN)
+    val showTypography = ladderState.isEnabled(CapabilityLadderManager.FEATURE_TYPOGRAPHY)
+    val cardFont = if (showTypography) resolveNoteFontFamily(note.fontFamily) else resolveNoteFontFamily(null)
     val isGlassy = MindIsGlassy
     val isDark = LocalMindLinkColors.current.isDark
     val cardShape = RoundedCornerShape(14.dp)
@@ -179,7 +187,7 @@ fun NoteStandardCard(
                                     )
                                 }
                             }
-                        } else if (note.mood != null) {
+                        } else if (showMood && note.mood != null) {
                             MoodBadge(mood = note.mood, emoji = note.moodEmoji)
                         } else {
                             Box(modifier = Modifier.width(1.dp))
@@ -265,14 +273,14 @@ fun NoteStandardCard(
 
                     // AI TL;DR or Body Preview (Staggered natural text wrap)
                     Text(
-                        text = note.previewText,
+                        text = if (showSecondBrain) note.previewText else note.content,
                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = cardFont),
-                        color = if (note.summary != null) MindTextSecondary else MindTextTertiary,
+                        color = if (showSecondBrain && note.summary != null) MindTextSecondary else MindTextTertiary,
                         maxLines = 4,
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    if (note.tags.isNotEmpty() || note.actionItems.isNotEmpty()) {
+                    if ((showTags && note.tags.isNotEmpty()) || (showChecklists && note.actionItems.isNotEmpty())) {
                         Spacer(modifier = Modifier.height(8.dp))
 
                         // Footer: Action items count + Tags
@@ -286,46 +294,48 @@ fun NoteStandardCard(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                note.tags.take(2).forEach { tag ->
-                                    val displayTag = if (tag.startsWith("#")) tag else "#$tag"
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = MindGlassSurfaceVariant,
-                                        border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
-                                    ) {
-                                        Text(
-                                            text = displayTag,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MindTextSecondary,
-                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                            fontSize = 10.sp,
-                                            maxLines = 1,
-                                            softWrap = false,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
+                                if (showTags && note.tags.isNotEmpty()) {
+                                    note.tags.take(2).forEach { tag ->
+                                        val displayTag = if (tag.startsWith("#")) tag else "#$tag"
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = MindGlassSurfaceVariant,
+                                            border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
+                                        ) {
+                                            Text(
+                                                text = displayTag,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MindTextSecondary,
+                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                                fontSize = 10.sp,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
                                     }
-                                }
-                                if (note.tags.size > 2) {
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = MindGlassSurfaceVariant.copy(alpha = 0.6f),
-                                        border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
-                                    ) {
-                                        Text(
-                                            text = "+${note.tags.size - 2}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MindTextTertiary,
-                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
+                                    if (note.tags.size > 2) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = MindGlassSurfaceVariant.copy(alpha = 0.6f),
+                                            border = BorderStroke(0.5.dp, MindGlassBorderSubtle)
+                                        ) {
+                                            Text(
+                                                text = "+${note.tags.size - 2}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MindTextTertiary,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                softWrap = false
+                                            )
+                                        }
                                     }
                                 }
                             }
 
-                            if (note.actionItems.isNotEmpty()) {
+                            if (showChecklists && note.actionItems.isNotEmpty()) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier
@@ -372,6 +382,10 @@ fun NoteCompactItem(
     isInSelectionMode: Boolean = false,
     onLongClick: (() -> Unit)? = null
 ) {
+    val ladderState = LocalLadderState.current
+    val showTags = ladderState.isEnabled(CapabilityLadderManager.FEATURE_HASHTAGS)
+    val showChecklists = ladderState.isEnabled(CapabilityLadderManager.FEATURE_CHECKLISTS)
+    val showMood = ladderState.isEnabled(CapabilityLadderManager.FEATURE_MOOD_BADGES)
     val isGlassy = MindIsGlassy
     val isDark = LocalMindLinkColors.current.isDark
     val compactShape = RoundedCornerShape(10.dp)
@@ -439,7 +453,7 @@ fun NoteCompactItem(
                     Box(
                         modifier = Modifier
                             .size(8.dp)
-                            .background(getMoodColor(note.mood), CircleShape)
+                            .background(if (showMood) getMoodColor(note.mood) else PastelLavender.copy(alpha = 0.6f), CircleShape)
                     )
                 }
                 Spacer(modifier = Modifier.width(10.dp))
@@ -459,7 +473,7 @@ fun NoteCompactItem(
                             color = MindTextTertiary
                         )
                         if (!note.isLocked) {
-                            if (note.tags.isNotEmpty()) {
+                            if (showTags && note.tags.isNotEmpty()) {
                                 val firstTag = note.tags.first()
                                 val displayTag = if (firstTag.startsWith("#")) firstTag else "#$firstTag"
                                 Text(
@@ -472,7 +486,7 @@ fun NoteCompactItem(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            if (note.actionItems.isNotEmpty()) {
+                            if (showChecklists && note.actionItems.isNotEmpty()) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(text = " · ", style = MaterialTheme.typography.labelSmall, color = MindTextTertiary)
                                     Icon(
@@ -518,6 +532,11 @@ fun NoteFullWidthCard(
     isInSelectionMode: Boolean = false,
     onLongClick: (() -> Unit)? = null
 ) {
+    val ladderState = LocalLadderState.current
+    val showTags = ladderState.isEnabled(CapabilityLadderManager.FEATURE_HASHTAGS)
+    val showChecklists = ladderState.isEnabled(CapabilityLadderManager.FEATURE_CHECKLISTS)
+    val showMood = ladderState.isEnabled(CapabilityLadderManager.FEATURE_MOOD_BADGES)
+    val showSecondBrain = ladderState.isEnabled(CapabilityLadderManager.FEATURE_SECOND_BRAIN)
     val isGlassy = MindIsGlassy
     val isDark = LocalMindLinkColors.current.isDark
     val fullShape = RoundedCornerShape(16.dp)
@@ -603,7 +622,7 @@ fun NoteFullWidthCard(
                                     )
                                 }
                             }
-                        } else if (note.mood != null) {
+                        } else if (showMood && note.mood != null) {
                             MoodBadge(mood = note.mood, emoji = note.moodEmoji)
                         }
                     }
@@ -717,14 +736,14 @@ fun NoteFullWidthCard(
 
                     // Full Preview or Summary
                     Text(
-                        text = note.previewText,
+                        text = if (showSecondBrain) note.previewText else note.content,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MindTextSecondary,
                         lineHeight = 22.sp
                     )
 
                     // Action items teaser
-                    if (note.actionItems.isNotEmpty()) {
+                    if (showChecklists && note.actionItems.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Surface(
                             shape = RoundedCornerShape(10.dp),
@@ -799,7 +818,7 @@ fun NoteFullWidthCard(
                 }
 
                 // Tags (FlowRow with no-wrap pills)
-                if (note.tags.isNotEmpty()) {
+                if (showTags && note.tags.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(10.dp))
                     @OptIn(ExperimentalLayoutApi::class)
                     FlowRow(

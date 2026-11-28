@@ -38,7 +38,9 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import com.mindlink.journal.LocalLadderState
 import com.mindlink.journal.data.ai.ModelRegistry
+import com.mindlink.journal.data.capability.CapabilityLadderManager
 import com.mindlink.journal.data.worker.ModelDownloadWorker
 import com.mindlink.journal.di.ServiceLocator
 import com.mindlink.journal.ui.editor.components.SpeechRecognitionHelper
@@ -57,6 +59,9 @@ fun SecondBrainScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    val ladderState = LocalLadderState.current
+    val showVoice = ladderState.isEnabled(CapabilityLadderManager.FEATURE_VOICE_DICTATION)
+    val showEdgeAi = ladderState.isEnabled(CapabilityLadderManager.FEATURE_ON_DEVICE_SLM)
 
     // Speech helper for voice queries
     val speechHelper = remember { SpeechRecognitionHelper(context) }
@@ -144,7 +149,7 @@ fun SecondBrainScreen(
         }
     }
 
-    if (showSlmDownloadDialog) {
+    if (showEdgeAi && showSlmDownloadDialog) {
         AlertDialog(
             onDismissRequest = { showSlmDownloadDialog = false },
             icon = {
@@ -256,7 +261,7 @@ fun SecondBrainScreen(
                         Icon(Icons.Default.Psychology, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(22.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Second Brain",
+                            text = "Memory Oracle",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MindTextPrimary
@@ -276,8 +281,8 @@ fun SecondBrainScreen(
                             )
                         }
 
-                        // SLM download visibility right next to Associative Q&A
-                        if (isDownloading) {
+                        // SLM download visibility right next to Associative Q&A (if Edge Mind AI active)
+                        if (showEdgeAi && isDownloading) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
@@ -304,7 +309,7 @@ fun SecondBrainScreen(
                                     )
                                 }
                             }
-                        } else if (!isSlmInstalled) {
+                        } else if (showEdgeAi && !isSlmInstalled) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
@@ -403,7 +408,7 @@ fun SecondBrainScreen(
                     )
                 }
 
-                if (memoryLinkStatus.isBroken) {
+                if (showEdgeAi && memoryLinkStatus.isBroken) {
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = Color(0x22F43F5E),
@@ -696,15 +701,17 @@ fun SecondBrainScreen(
                                 focusedTextColor = MindTextPrimary,
                                 unfocusedTextColor = MindTextPrimary
                             ),
-                            trailingIcon = {
-                                IconButton(onClick = toggleVoiceQuery) {
-                                    Icon(
-                                        imageVector = if (isRecordingQuery) Icons.Default.MicOff else Icons.Default.Mic,
-                                        contentDescription = "Voice Query",
-                                        tint = if (isRecordingQuery) MindRose else MindIndigo
-                                    )
+                            trailingIcon = if (showVoice) {
+                                {
+                                    IconButton(onClick = toggleVoiceQuery) {
+                                        Icon(
+                                            imageVector = if (isRecordingQuery) Icons.Default.MicOff else Icons.Default.Mic,
+                                            contentDescription = "Voice Query",
+                                            tint = if (isRecordingQuery) MindRose else MindIndigo
+                                        )
+                                    }
                                 }
-                            },
+                            } else null,
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )

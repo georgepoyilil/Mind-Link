@@ -47,7 +47,7 @@ class FeatureRequestStore(private val context: Context) {
         if (activeNotesCount < MIN_NOTES_REQUIRED || currentTier < MIN_TIER_REQUIRED) {
             return Pair(
                 false,
-                "Creator Portal Locked: Write at least $MIN_NOTES_REQUIRED thoughts (Currently: $activeNotesCount/$MIN_NOTES_REQUIRED) and reach Tier $MIN_TIER_REQUIRED to unlock feature requests. We prioritize feedback from committed thinkers."
+                "Creator Portal Locked: Write at least $MIN_NOTES_REQUIRED thoughts (Currently: $activeNotesCount/$MIN_NOTES_REQUIRED) and reach Level $MIN_TIER_REQUIRED to unlock feature requests. We prioritize feedback from committed thinkers."
             )
         }
 
@@ -148,7 +148,7 @@ class FeatureRequestStore(private val context: Context) {
             ---
             User Context:
             - MindLink Version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})
-            - Progression Tier: Tier $currentTier
+            - Progression Level: Level $currentTier
             - Active Thoughts: $activeNotesCount
             - Proposal ID: #${proposal.id}
         """.trimIndent()

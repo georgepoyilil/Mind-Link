@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import com.mindlink.journal.data.capability.CapabilityLadderManager
 import com.mindlink.journal.di.ServiceLocator
 import com.mindlink.journal.domain.model.Note
 import com.mindlink.journal.ui.components.MindLinkOnboardingDialog
@@ -76,6 +77,16 @@ fun NotesListScreen(
     val capabilityManager = remember { serviceLocator.capabilityLadderManager }
     val ladderState by capabilityManager.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val showVoice = ladderState.isEnabled(CapabilityLadderManager.FEATURE_VOICE_DICTATION)
+    val showOcr = ladderState.isEnabled(CapabilityLadderManager.FEATURE_OCR)
+    val showMedia = ladderState.isEnabled(CapabilityLadderManager.FEATURE_MEDIA_CAPTURE)
+    val showHashtags = ladderState.isEnabled(CapabilityLadderManager.FEATURE_HASHTAGS)
+    val showLayoutSwitch = ladderState.isEnabled(CapabilityLadderManager.FEATURE_LAYOUT_SWITCH)
+    val showSecondBrain = ladderState.isEnabled(CapabilityLadderManager.FEATURE_SECOND_BRAIN)
+    val showGraph = ladderState.isEnabled(CapabilityLadderManager.FEATURE_SYNAPTIC_GRAPH)
+    val showCloudBackup = ladderState.isEnabled(CapabilityLadderManager.FEATURE_CLOUD_BACKUP)
+    val showEdgeAi = ladderState.isEnabled(CapabilityLadderManager.FEATURE_ON_DEVICE_SLM)
 
     val savedViewModeStr by serviceLocator.noteViewMode.collectAsState()
     val initialViewMode = remember(savedViewModeStr) {
@@ -111,12 +122,12 @@ fun NotesListScreen(
         capabilityManager.evaluateProgress(uiState.notes.size)
     }
 
-    // Non-interruptive toast when a new complexity tier unlocks
+    // Non-interruptive toast when a new complexity level unlocks
     LaunchedEffect(Unit) {
         capabilityManager.unlockEvents.collect { newTier ->
             val res = snackbarHostState.showSnackbar(
-                message = "✨ Unlocked: Tier ${newTier.tier} (${newTier.title})!",
-                actionLabel = "View Ladder",
+                message = "✨ Unlocked Level ${newTier.tier}: ${newTier.title}!",
+                actionLabel = "Open Blueprint",
                 duration = SnackbarDuration.Short
             )
             if (res == SnackbarResult.ActionPerformed) {
@@ -204,11 +215,11 @@ fun NotesListScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Method 1: Unified Journal Thought (Text + Camera + Photo + Caption)
+                // Method 1: Unified Journal Thought (Text + optional Media)
                 JournalMethodItem(
                     icon = Icons.Default.EditNote,
                     title = "Journal Thought",
-                    subtitle = "Write freely, snap camera photos, or attach images with captions",
+                    subtitle = if (showMedia) "Write freely, snap camera photos, or attach images with captions" else "Write freely in a distraction-free markdown stream",
                     accentColor = PastelLavender,
                     onClick = {
                         showJournalingMethodsSheet = false
@@ -216,29 +227,33 @@ fun NotesListScreen(
                     }
                 )
 
-                // Method 2: Voice Audio Journal
-                JournalMethodItem(
-                    icon = Icons.Default.Mic,
-                    title = "Voice Audio Note",
-                    subtitle = "Stream speech-to-text + record high-efficiency audio locally",
-                    accentColor = PastelRose,
-                    onClick = {
-                        showJournalingMethodsSheet = false
-                        onCreateNoteClick("voice")
-                    }
-                )
+                // Method 2: Voice Audio Journal (Voice Studio)
+                if (showVoice) {
+                    JournalMethodItem(
+                        icon = Icons.Default.Mic,
+                        title = "Voice Audio Note",
+                        subtitle = "Stream speech-to-text + record high-efficiency audio locally",
+                        accentColor = PastelRose,
+                        onClick = {
+                            showJournalingMethodsSheet = false
+                            onCreateNoteClick("voice")
+                        }
+                    )
+                }
 
-                // Method 3: Camera OCR Scan & Polish
-                JournalMethodItem(
-                    icon = Icons.Default.DocumentScanner,
-                    title = "Scan Document & OCR",
-                    subtitle = "Snap books, whiteboards or papers -> AI polishes into structured notes",
-                    accentColor = PastelViolet,
-                    onClick = {
-                        showJournalingMethodsSheet = false
-                        onCreateNoteClick("ocr")
-                    }
-                )
+                // Method 3: Camera OCR Scan & Polish (Page Scanner)
+                if (showOcr) {
+                    JournalMethodItem(
+                        icon = Icons.Default.DocumentScanner,
+                        title = "Page Scanner (OCR)",
+                        subtitle = "Snap books, whiteboards or papers -> polish into structured notes",
+                        accentColor = PastelViolet,
+                        onClick = {
+                            showJournalingMethodsSheet = false
+                            onCreateNoteClick("ocr")
+                        }
+                    )
+                }
             }
         }
     }
@@ -437,156 +452,158 @@ fun NotesListScreen(
 
                     Spacer(modifier = Modifier.height(18.dp))
 
-                    // 2. Google Account Status Card
-                    if (googleUser != null) {
-                        val initial = (googleUser!!.displayName.firstOrNull() ?: googleUser!!.email.firstOrNull() ?: 'G').uppercaseChar()
+                    // 2. Google Account Status Card (Only if Cloud Vault is active)
+                    if (showCloudBackup) {
+                        if (googleUser != null) {
+                            val initial = (googleUser!!.displayName.firstOrNull() ?: googleUser!!.email.firstOrNull() ?: 'G').uppercaseChar()
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MindGlassSurfaceVariant,
+                                border = BorderStroke(0.8.dp, MindGlassBorderSubtle),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        coroutineScope.launch { drawerState.close() }
+                                        onSettingsClick()
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .background(
+                                                brush = Brush.linearGradient(
+                                                    listOf(Color(0xFF4285F4), Color(0xFF34A853))
+                                                ),
+                                                shape = CircleShape
+                                            )
+                                            .border(1.2.dp, Color.White.copy(alpha = 0.8f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = initial.toString(),
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = googleUser!!.displayName.ifBlank { "Google User" },
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MindTextPrimary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = googleUser!!.email,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MindTextTertiary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.CloudDone,
+                                        contentDescription = "Synced",
+                                        tint = MindEmerald,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        } else {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MindGlassSurfaceVariant,
+                                border = BorderStroke(0.8.dp, MindGlassBorderSubtle),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        coroutineScope.launch { drawerState.close() }
+                                        onSettingsClick()
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AccountCircle,
+                                        contentDescription = null,
+                                        tint = PastelSky,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Cloud Vault",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MindTextPrimary
+                                        )
+                                        Text(
+                                            text = "Sign in to enable Drive snapshots",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MindTextTertiary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+
+                    // 3. AI Status Badge inside Drawer (Only when Memory Oracle or Edge Mind AI is active)
+                    if (showSecondBrain || showEdgeAi) {
                         Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = MindGlassSurfaceVariant,
-                            border = BorderStroke(0.8.dp, MindGlassBorderSubtle),
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (memoryLinkStatus.isBroken) Color(0x22F43F5E) else Color(0x2210B981),
+                            border = BorderStroke(0.8.dp, if (memoryLinkStatus.isBroken) Color(0x66F43F5E) else Color(0x6610B981)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
                                     coroutineScope.launch { drawerState.close() }
-                                    onSettingsClick()
+                                    if (memoryLinkStatus.isBroken) {
+                                        showMemoryLinkInfoDialog = true
+                                    } else {
+                                        onSettingsClick()
+                                    }
                                 }
                         ) {
                             Row(
-                                modifier = Modifier.padding(12.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .background(
-                                            brush = Brush.linearGradient(
-                                                listOf(Color(0xFF4285F4), Color(0xFF34A853))
-                                            ),
-                                            shape = CircleShape
-                                        )
-                                        .border(1.2.dp, Color.White.copy(alpha = 0.8f), CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = initial.toString(),
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Icon(
+                                    imageVector = if (memoryLinkStatus.isBroken) Icons.Default.FlashOff else Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = if (memoryLinkStatus.isBroken) Color(0xFFFB7185) else MindEmerald,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = googleUser!!.displayName.ifBlank { "Google User" },
-                                        style = MaterialTheme.typography.titleSmall,
+                                        text = memoryLinkStatus.title,
+                                        style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = MindTextPrimary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        color = if (memoryLinkStatus.isBroken) Color(0xFFFB7185) else MindEmerald
                                     )
                                     Text(
-                                        text = googleUser!!.email,
+                                        text = memoryLinkStatus.subtitle,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MindTextTertiary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                Icon(
-                                    imageVector = Icons.Default.CloudDone,
-                                    contentDescription = "Synced",
-                                    tint = MindEmerald,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = MindGlassSurfaceVariant,
-                            border = BorderStroke(0.8.dp, MindGlassBorderSubtle),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    coroutineScope.launch { drawerState.close() }
-                                    onSettingsClick()
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AccountCircle,
-                                    contentDescription = null,
-                                    tint = PastelSky,
-                                    modifier = Modifier.size(32.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Google Account",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MindTextPrimary
-                                    )
-                                    Text(
-                                        text = "Tap to sign in & enable backups",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MindTextTertiary
+                                        fontSize = 10.sp
                                     )
                                 }
                             }
                         }
+                        Spacer(modifier = Modifier.height(14.dp))
                     }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // 3. AI Status Badge inside Drawer
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (memoryLinkStatus.isBroken) Color(0x22F43F5E) else Color(0x2210B981),
-                        border = BorderStroke(0.8.dp, if (memoryLinkStatus.isBroken) Color(0x66F43F5E) else Color(0x6610B981)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                coroutineScope.launch { drawerState.close() }
-                                if (memoryLinkStatus.isBroken) {
-                                    showMemoryLinkInfoDialog = true
-                                } else {
-                                    onSettingsClick()
-                                }
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = if (memoryLinkStatus.isBroken) Icons.Default.FlashOff else Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = if (memoryLinkStatus.isBroken) Color(0xFFFB7185) else MindEmerald,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = memoryLinkStatus.title,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (memoryLinkStatus.isBroken) Color(0xFFFB7185) else MindEmerald
-                                )
-                                Text(
-                                    text = memoryLinkStatus.subtitle,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MindTextTertiary,
-                                    fontSize = 10.sp
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
                     HorizontalDivider(color = MindBorderDark.copy(alpha = 0.3f))
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -602,10 +619,10 @@ fun NotesListScreen(
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
 
-                    if (capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_SECOND_BRAIN)) {
+                    if (showSecondBrain) {
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Default.Psychology, contentDescription = null, tint = MindIndigo) },
-                            label = { Text("Second Brain AI Hub", fontWeight = FontWeight.Medium) },
+                            label = { Text("Memory Oracle (Q&A)", fontWeight = FontWeight.Medium) },
                             selected = false,
                             onClick = {
                                 coroutineScope.launch { drawerState.close() }
@@ -615,7 +632,7 @@ fun NotesListScreen(
                         )
                     }
 
-                    if (capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_SYNAPTIC_GRAPH)) {
+                    if (showGraph) {
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Default.Hub, contentDescription = null, tint = PastelSky) },
                             label = { Text("Thought Constellation", fontWeight = FontWeight.Medium) },
@@ -630,7 +647,7 @@ fun NotesListScreen(
 
                     NavigationDrawerItem(
                         icon = { Icon(Icons.Default.TrendingUp, contentDescription = null, tint = PastelLavender) },
-                        label = { Text("Complexity Ladder (Tier ${ladderState.currentTier})", fontWeight = FontWeight.SemiBold) },
+                        label = { Text("Complexity Blueprint (L${ladderState.currentTier})", fontWeight = FontWeight.SemiBold) },
                         selected = false,
                         onClick = {
                             coroutineScope.launch { drawerState.close() }
@@ -639,16 +656,18 @@ fun NotesListScreen(
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
 
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Lightbulb, contentDescription = null, tint = PastelSky) },
-                        label = { Text("Creator Portal & Proposals", fontWeight = FontWeight.Medium) },
-                        selected = false,
-                        onClick = {
-                            coroutineScope.launch { drawerState.close() }
-                            onFeatureRequestsClick()
-                        },
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    )
+                    if (ladderState.currentTier >= 2 || ladderState.activeNotesCount >= 5) {
+                        NavigationDrawerItem(
+                            icon = { Icon(Icons.Default.Lightbulb, contentDescription = null, tint = PastelSky) },
+                            label = { Text("Creator Portal & Proposals", fontWeight = FontWeight.Medium) },
+                            selected = false,
+                            onClick = {
+                                coroutineScope.launch { drawerState.close() }
+                                onFeatureRequestsClick()
+                            },
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                    }
 
                     NavigationDrawerItem(
                         icon = { Icon(Icons.Default.Archive, contentDescription = null, tint = if (uiState.selectedTab == NotesTab.ARCHIVE) PastelAmber else MindTextSecondary) },
@@ -672,13 +691,12 @@ fun NotesListScreen(
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
 
-                    HorizontalDivider(
-                        color = MindBorderDark.copy(alpha = 0.3f),
-                        modifier = Modifier.padding(vertical = 12.dp)
-                    )
-
                     // 5. Hashtags & Topics Section (Max 7 Tags + "View All Tags" Screen)
-                    if (capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_HASHTAGS)) {
+                    if (showHashtags) {
+                        HorizontalDivider(
+                            color = MindBorderDark.copy(alpha = 0.3f),
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1052,7 +1070,7 @@ fun NotesListScreen(
                                     ) {
                                         if (uiState.searchQuery.isEmpty()) {
                                             Text(
-                                                text = "Search thoughts, tags...",
+                                                text = if (showHashtags) "Search thoughts, tags..." else "Search thoughts...",
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 color = MindTextTertiary,
                                                 maxLines = 1,
@@ -1083,7 +1101,7 @@ fun NotesListScreen(
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
-                                    } else if (capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_SECOND_BRAIN)) {
+                                    } else if (showSecondBrain) {
                                         Surface(
                                             shape = CircleShape,
                                             color = MindIndigo.copy(alpha = 0.2f),
@@ -1096,7 +1114,7 @@ fun NotesListScreen(
                                             Box(contentAlignment = Alignment.Center) {
                                                 Icon(
                                                     imageVector = Icons.Default.Psychology,
-                                                    contentDescription = "Second Brain",
+                                                    contentDescription = "Memory Oracle",
                                                     tint = MindIndigo,
                                                     modifier = Modifier.size(16.dp)
                                                 )
@@ -1106,37 +1124,39 @@ fun NotesListScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.width(4.dp))
-
-                            // 3. Layout Switching Button
-                            IconButton(
-                                onClick = {
-                                    val nextMode = when (viewMode) {
-                                        NoteViewMode.GRID -> NoteViewMode.CARDS
-                                        NoteViewMode.CARDS -> NoteViewMode.COMPACT_LIST
-                                        NoteViewMode.COMPACT_LIST -> NoteViewMode.GRID
-                                    }
-                                    viewMode = nextMode
-                                    serviceLocator.updateNoteViewMode(
-                                        when (nextMode) {
-                                            NoteViewMode.GRID -> "grid"
-                                            NoteViewMode.CARDS -> "cards"
-                                            NoteViewMode.COMPACT_LIST -> "compact"
+                            // 3. Feed Lenses (Layout Switching Button)
+                            if (showLayoutSwitch) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                IconButton(
+                                    onClick = {
+                                        val nextMode = when (viewMode) {
+                                            NoteViewMode.GRID -> NoteViewMode.CARDS
+                                            NoteViewMode.CARDS -> NoteViewMode.COMPACT_LIST
+                                            NoteViewMode.COMPACT_LIST -> NoteViewMode.GRID
                                         }
+                                        viewMode = nextMode
+                                        serviceLocator.updateNoteViewMode(
+                                            when (nextMode) {
+                                                NoteViewMode.GRID -> "grid"
+                                                NoteViewMode.CARDS -> "cards"
+                                                NoteViewMode.COMPACT_LIST -> "compact"
+                                            }
+                                        )
+                                    },
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = viewMode.icon,
+                                        contentDescription = viewMode.label,
+                                        tint = MindTextPrimary,
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                },
-                                modifier = Modifier.size(38.dp)
-                            ) {
-                                Icon(
-                                    imageVector = viewMode.icon,
-                                    contentDescription = viewMode.label,
-                                    tint = MindTextPrimary,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                }
                             }
 
-                            // 4. Brain Overview / Thought Graph Button
-                            if (capabilityManager.isFeatureEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_SYNAPTIC_GRAPH)) {
+                            // 4. Thought Constellation Button
+                            if (showGraph) {
+                                Spacer(modifier = Modifier.width(2.dp))
                                 IconButton(
                                     onClick = onThoughtGraphClick,
                                     modifier = Modifier.size(38.dp)
@@ -1168,8 +1188,8 @@ fun NotesListScreen(
                         }
                     }
 
-                    // Prominent "Memory Link Broken" Warning Banner (if running on local heuristics)
-                    if (memoryLinkStatus.isBroken) {
+                    // Prominent "Memory Link Broken" Warning Banner (Only if Edge AI or Memory Oracle is active)
+                    if ((showSecondBrain || showEdgeAi) && memoryLinkStatus.isBroken) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = Color(0x22F43F5E),
@@ -1404,7 +1424,13 @@ fun NotesListScreen(
                 val isFabDark = LocalMindLinkColors.current.isDark
                 val fabShape = CircleShape
                 FloatingActionButton(
-                    onClick = { showJournalingMethodsSheet = true },
+                    onClick = {
+                        if (showVoice || showOcr) {
+                            showJournalingMethodsSheet = true
+                        } else {
+                            onCreateNoteClick("text")
+                        }
+                    },
                     containerColor = if (MindIsGlassy) {
                         if (isFabDark) Color(0xEB1E2738) else Color(0xF2FFFFFF)
                     } else PastelLavender,
@@ -1517,10 +1543,10 @@ fun NotesListScreen(
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = when {
-                                uiState.searchQuery.isNotEmpty() -> "Try broader keywords or ask the Second Brain."
+                                uiState.searchQuery.isNotEmpty() -> if (showSecondBrain) "Try broader keywords or ask Memory Oracle." else "Try broader keywords in your search."
                                 uiState.selectedTab == NotesTab.TRASH -> "Deleted notes will appear here and auto-purge after 30 days."
                                 uiState.selectedTab == NotesTab.ARCHIVE -> "Archive notes you want to keep without cluttering your main stream."
-                                else -> "Tap the add button below to capture a new thought, voice note, photo, or document."
+                                else -> if (showVoice || showMedia || showOcr) "Tap the add button below to capture a thought, voice note, photo, or page scan." else "Tap + below to capture a clear, distraction-free thought."
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MindTextSecondary,
@@ -1548,7 +1574,8 @@ fun NotesListScreen(
                     }
                 }
             } else {
-                val isGrid = viewMode == NoteViewMode.GRID
+                val effectiveViewMode = if (showLayoutSwitch) viewMode else NoteViewMode.GRID
+                val isGrid = effectiveViewMode == NoteViewMode.GRID
                 LazyVerticalStaggeredGrid(
                     columns = if (isGrid) StaggeredGridCells.Fixed(2) else StaggeredGridCells.Fixed(1),
                     modifier = Modifier.fillMaxSize(),
@@ -1563,7 +1590,7 @@ fun NotesListScreen(
                         Column(modifier = Modifier.fillMaxWidth()) {
                             NoteCard(
                                 note = note,
-                                viewMode = viewMode,
+                                viewMode = effectiveViewMode,
                                 isSelected = uiState.selectedNoteIds.contains(note.id),
                                 isInSelectionMode = uiState.isSelectionMode,
                                 onClick = {

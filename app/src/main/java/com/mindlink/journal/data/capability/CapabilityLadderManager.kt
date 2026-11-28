@@ -12,251 +12,337 @@ import kotlinx.coroutines.flow.update
 
 data class CapabilityItem(
     val key: String,
-    val tier: Int,
+    val tier: Int, // Level 0..5
     val title: String,
     val iconSymbol: String,
     val shortDescription: String,
     val whyUse: String,
     val whyNot: String,
-    val isCore: Boolean = false // If true, cannot be turned off (e.g. basic editor)
+    val settingsLocation: String? = null,
+    val isCore: Boolean = false
 )
 
 data class TierInfo(
-    val tier: Int,
+    val tier: Int, // Level 0..5
     val title: String,
     val subtitle: String,
     val requiredNotes: Int,
-    val badgeIcon: String
+    val badgeIcon: String,
+    val accentHex: Long
 )
 
 data class LadderState(
-    val currentTier: Int = 1,
+    val currentTier: Int = 0, // Level 0..5
     val activeNotesCount: Int = 0,
     val isGodMode: Boolean = false,
-    val unlockedTiers: Set<Int> = setOf(1),
+    val unlockedTiers: Set<Int> = setOf(0),
     val enabledFeatures: Map<String, Boolean> = emptyMap(),
     val justUnlockedTier: TierInfo? = null
-)
+) {
+    fun isLevelUnlocked(level: Int): Boolean = isGodMode || unlockedTiers.contains(level)
 
-class CapabilityLadderManager(private val context: Context) {
+    fun isEnabled(key: String): Boolean {
+        val item = CapabilityLadderManager.ALL_CAPABILITIES.firstOrNull { it.key == key } ?: return true
+        if (item.isCore) return true
+        if (!isLevelUnlocked(item.tier)) return false
+        return enabledFeatures[key] ?: true
+    }
 
-    private val prefs: SharedPreferences = context.getSharedPreferences("mindlink_capability_ladder", Context.MODE_PRIVATE)
+    fun activeCountForLevel(level: Int): Pair<Int, Int> {
+        val items = CapabilityLadderManager.ALL_CAPABILITIES.filter { it.tier == level }
+        val active = items.count { isEnabled(it.key) }
+        return active to items.size
+    }
+}
+
+class CapabilityLadderManager(context: Context) {
+
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("mindlink_capability_ladder", Context.MODE_PRIVATE)
 
     companion object {
         const val PREF_GOD_MODE = "pref_god_mode"
         const val PREF_UNLOCKED_TIERS = "pref_unlocked_tiers"
         const val PREF_LAST_NOTIFIED_TIER = "pref_last_notified_tier"
+        private const val PREF_MIGRATED_LEVEL_ZERO = "pref_migrated_level_zero_v2"
 
-        // Feature Keys
+        // Level 0 · Blank Slate (Core Essentials)
         const val FEATURE_BASIC_JOURNAL = "feature_basic_journal"
         const val FEATURE_KEYWORD_SEARCH = "feature_keyword_search"
         const val FEATURE_THEMES = "feature_themes"
 
+        // Level 1 · Field Notes (Organization & Style)
         const val FEATURE_CHECKLISTS = "feature_checklists"
         const val FEATURE_TYPOGRAPHY = "feature_typography"
         const val FEATURE_HASHTAGS = "feature_hashtags"
+        const val FEATURE_LAYOUT_SWITCH = "feature_layout_switch"
 
+        // Level 2 · Living Canvas (Multimodal Capture)
         const val FEATURE_MEDIA_CAPTURE = "feature_media_capture"
         const val FEATURE_OCR = "feature_ocr"
         const val FEATURE_VOICE_DICTATION = "feature_voice_dictation"
+        const val FEATURE_MOOD_BADGES = "feature_mood_badges"
 
-        const val FEATURE_JESTER = "feature_jester"
+        // Level 3 · Mirror & Spark (Depth, Privacy & Habits)
+        const val FEATURE_VERSION_HISTORY = "feature_version_history"
         const val FEATURE_TASK_SPLITTER = "feature_task_splitter"
+        const val FEATURE_JESTER = "feature_jester"
         const val FEATURE_MINDFUL_REMINDERS = "feature_mindful_reminders"
-
-        const val FEATURE_SECOND_BRAIN = "feature_second_brain"
-        const val FEATURE_SYNAPTIC_GRAPH = "feature_synaptic_graph"
-        const val FEATURE_CONTRARIAN = "feature_contrarian"
-
-        const val FEATURE_ON_DEVICE_SLM = "feature_on_device_slm"
-        const val FEATURE_TECH_MODE = "feature_tech_mode"
+        const val FEATURE_BIOMETRIC_LOCK = "feature_biometric_lock"
         const val FEATURE_CLOUD_BACKUP = "feature_cloud_backup"
 
+        // Level 4 · Mind Atlas (Synthesis & Graph)
+        const val FEATURE_SECOND_BRAIN = "feature_second_brain"
+        const val FEATURE_REFLECTION_PROMPTS = "feature_reflection_prompts"
+        const val FEATURE_SYNAPTIC_GRAPH = "feature_synaptic_graph"
+
+        // Level 5 · Neural Forge (Edge AI & Diagnostics)
+        const val FEATURE_ON_DEVICE_SLM = "feature_on_device_slm"
+        const val FEATURE_TECH_MODE = "feature_tech_mode"
+
         val TIERS = listOf(
-            TierInfo(1, "Minimalist Sanctuary", "Distraction-free clarity & pure prose", 0, "🌿"),
-            TierInfo(2, "Structured Thinker", "Checklists, typography & topic tags", 2, "📐"),
-            TierInfo(3, "Sensory Capture", "Camera photos, real-world OCR & voice notes", 5, "📸"),
-            TierInfo(4, "Dynamic Cognition", "MindLink Jester, smart splitter & habits", 10, "⚡"),
-            TierInfo(5, "Associative Second Brain", "Knowledge graph, Q&A & contrarian tests", 15, "🧠"),
-            TierInfo(6, "Edge AI Pioneer", "On-Device SLM neural engine & cloud sync", 25, "🚀")
+            TierInfo(0, "Blank Slate", "Pure, distraction-free sanctuary", 0, "🌿", 0xFF34D399),
+            TierInfo(1, "Field Notes", "Shape, tag & structure thoughts", 2, "📐", 0xFF38BDF8),
+            TierInfo(2, "Living Canvas", "Photos, voice memos & page scans", 5, "🎨", 0xFFC084FC),
+            TierInfo(3, "Mirror & Spark", "Revisions, locks, backups & wit", 10, "⚡", 0xFFFBBF24),
+            TierInfo(4, "Mind Atlas", "Ask past notes & map constellations", 15, "🧭", 0xFFA78BFA),
+            TierInfo(5, "Neural Forge", "Local edge AI & vector telemetry", 25, "🔮", 0xFF818CF8)
         )
 
         val ALL_CAPABILITIES = listOf(
-            // Tier 1
+            // Level 0 · Blank Slate
             CapabilityItem(
                 key = FEATURE_BASIC_JOURNAL,
-                tier = 1,
-                title = "Minimalist Thought Editor",
+                tier = 0,
+                title = "Stream Editor",
                 iconSymbol = "✍️",
-                shortDescription = "Distraction-free markdown writing and instant thought capture.",
-                whyUse = "Zero mental friction. Pure blank canvas for genuine stream-of-consciousness.",
-                whyNot = "No rich media or advanced AI features.",
+                shortDescription = "Clean markdown canvas with bold, italic, headings & undo.",
+                whyUse = "Zero cognitive load — open the app and immediately pour out raw thoughts.",
+                whyNot = "Minimal styling only; no embedded checklists or media attachments.",
+                settingsLocation = "Core (Always Active)",
                 isCore = true
             ),
             CapabilityItem(
                 key = FEATURE_KEYWORD_SEARCH,
-                tier = 1,
-                title = "Instant Keyword Search",
+                tier = 0,
+                title = "Instant Recall",
                 iconSymbol = "🔍",
-                shortDescription = "Real-time search across titles and notes.",
-                whyUse = "Blazing fast exact string lookup across your entire journal.",
-                whyNot = "Does not understand semantic intent or synonyms.",
+                shortDescription = "Real-time SQLite full-text search across titles and notes.",
+                whyUse = "Finds exact words and phrases instantaneously offline.",
+                whyNot = "Matches literal words rather than conceptual synonyms.",
+                settingsLocation = "Core (Always Active)",
                 isCore = true
             ),
             CapabilityItem(
                 key = FEATURE_THEMES,
-                tier = 1,
-                title = "Visual Atmospheres",
-                iconSymbol = "🎨",
-                shortDescription = "Frosted Dark, Light, and Amethyst color palettes.",
-                whyUse = "Reduces eye strain with customized OLED and paper-like themes.",
-                whyNot = "Pure aesthetic preference.",
+                tier = 0,
+                title = "Atmospheres",
+                iconSymbol = "🌌",
+                shortDescription = "Frosted Glass, AMOLED Pitch Black, Paper Light & Pixel palettes.",
+                whyUse = "Match your environment with low-strain dark or crisp daylight visuals.",
+                whyNot = "Purely visual preference.",
+                settingsLocation = "Settings → Essentials",
                 isCore = true
             ),
 
-            // Tier 2
+            // Level 1 · Field Notes
             CapabilityItem(
                 key = FEATURE_CHECKLISTS,
-                tier = 2,
-                title = "Interactive Checklists (+ Task)",
+                tier = 1,
+                title = "Action Checklists",
                 iconSymbol = "☑️",
-                shortDescription = "Add actionable checklist items directly inside notes.",
-                whyUse = "Keep commitments, todos, and routines organized alongside your reflections.",
-                whyNot = "May introduce task anxiety if you want pure unburdened reflection."
+                shortDescription = "Interactive checkboxes tucked cleanly inside any note.",
+                whyUse = "Turn intentions into trackable action items right where insights happen.",
+                whyNot = "Hide if you strictly want pure prose without to-do pressure.",
+                settingsLocation = "Note Editor & Cards"
             ),
             CapabilityItem(
                 key = FEATURE_TYPOGRAPHY,
-                tier = 2,
-                title = "Aa Typography Sheet",
+                tier = 1,
+                title = "Type Studio",
                 iconSymbol = "Aa",
-                shortDescription = "Sliders for font size, family (Sans/Serif/Mono/Elegant) & spacing.",
-                whyUse = "Fine-tune reading comfort and line height tailored to your eyes.",
-                whyNot = "Default typography is already carefully calibrated."
+                shortDescription = "Customize font families (Sans, Serif, Mono, Script), scale & line spacing.",
+                whyUse = "Tailor reading rhythm, font size, and editorial warmth to your eyes.",
+                whyNot = "Default Sans typography is already calibrated for fast reading.",
+                settingsLocation = "Settings → Writing & Editor"
             ),
             CapabilityItem(
                 key = FEATURE_HASHTAGS,
-                tier = 2,
-                title = "Hashtags & Tag Explorer",
+                tier = 1,
+                title = "Topic Tags & Explorer",
                 iconSymbol = "#",
-                shortDescription = "Categorize thoughts with hashtags and explore them in a dedicated screen.",
-                whyUse = "Filter and track life chapters (#Career, #Fitness, #Reflection) effortlessly.",
-                whyNot = "If you prefer AI semantic retrieval over manual tagging."
+                shortDescription = "Pin top 7 tags in the drawer and browse all tags in Tag Explorer.",
+                whyUse = "Group life chapters (#Career, #Fitness) cleanly without drawer bloat.",
+                whyNot = "Turn off if you rely purely on search or folders/archive.",
+                settingsLocation = "Drawer, Editor & Detail"
+            ),
+            CapabilityItem(
+                key = FEATURE_LAYOUT_SWITCH,
+                tier = 1,
+                title = "Feed Lenses",
+                iconSymbol = "🪟",
+                shortDescription = "Toggle between Staggered Grid, Story Cards, and Compact List.",
+                whyUse = "Dense skimming in Compact List or visual browsing in Grid.",
+                whyNot = "Removes the layout switcher button for a quieter top bar.",
+                settingsLocation = "Top Bar Switcher"
             ),
 
-            // Tier 3
+            // Level 2 · Living Canvas
             CapabilityItem(
                 key = FEATURE_MEDIA_CAPTURE,
-                tier = 3,
-                title = "Photo & Camera Attachments",
+                tier = 2,
+                title = "Photo Moments",
                 iconSymbol = "📷",
-                shortDescription = "Attach moments, whiteboards, and notebook photos to thoughts.",
-                whyUse = "Preserve visual memories and real-world whiteboard inspiration.",
-                whyNot = "Increases local phone storage and backup archive sizes."
+                shortDescription = "Snap camera photos or attach gallery images with captions.",
+                whyUse = "Anchor feelings to real-world moments, sketches, and whiteboards.",
+                whyNot = "Keeps journal strictly text-only and saves local storage space.",
+                settingsLocation = "Editor Media Tray"
             ),
             CapabilityItem(
                 key = FEATURE_OCR,
-                tier = 3,
-                title = "On-Device OCR Scanner",
-                iconSymbol = "🔎",
-                shortDescription = "Extract editable text from camera snapshots and book excerpts.",
-                whyUse = "Instantly digitize physical book highlights without manual typing.",
-                whyNot = "Takes 1-2 seconds of on-device processing."
+                tier = 2,
+                title = "Page Scanner",
+                iconSymbol = "📄",
+                shortDescription = "Extract editable text from physical books and handwritten pages.",
+                whyUse = "Digitize paper quotes and notebooks in seconds offline.",
+                whyNot = "Hides camera scan prompts when you only type directly.",
+                settingsLocation = "Capture Sheet & Editor"
             ),
             CapabilityItem(
                 key = FEATURE_VOICE_DICTATION,
-                tier = 3,
-                title = "Voice Notes & Queries",
+                tier = 2,
+                title = "Voice Studio",
                 iconSymbol = "🎙️",
-                shortDescription = "Dictate thoughts and speak natural-language queries.",
-                whyUse = "Capture spontaneous insights while walking or commuting hands-free.",
-                whyNot = "Requires microphone permission and a reasonably quiet space."
+                shortDescription = "Hands-free live dictation, AAC audio memos & transcription.",
+                whyUse = "Capture fast thoughts while walking without touching the keyboard.",
+                whyNot = "Removes mic buttons from top bars and search boxes.",
+                settingsLocation = "Capture Sheet & Top Bars"
+            ),
+            CapabilityItem(
+                key = FEATURE_MOOD_BADGES,
+                tier = 2,
+                title = "Mood Aura",
+                iconSymbol = "🎭",
+                shortDescription = "Color-coded emotional badges and optional emoji accents on cards.",
+                whyUse = "Spot emotional patterns across weeks at a single glance.",
+                whyNot = "Turn off for a monochrome, clinical notepad aesthetic.",
+                settingsLocation = "Settings → Writing"
             ),
 
-            // Tier 4
+            // Level 3 · Mirror & Spark
             CapabilityItem(
-                key = FEATURE_JESTER,
-                tier = 4,
-                title = "🎭 MindLink Jester (Wit & Roast)",
-                iconSymbol = "🎭",
-                shortDescription = "Playful AI roasts, movie trailers, and fortune cookies.",
-                whyUse = "Breaks perfectionism and writer's block with humor and alternative perspectives.",
-                whyNot = "If you treat journaling strictly as solemn meditation or serious logging."
+                key = FEATURE_VERSION_HISTORY,
+                tier = 3,
+                title = "Time Machine",
+                iconSymbol = "🕰️",
+                shortDescription = "Browse previous revisions, compare diffs, and restore older drafts.",
+                whyUse = "Edit fearlessly knowing every saved state can be recovered.",
+                whyNot = "Hides the clock/history button in editor and detail screens.",
+                settingsLocation = "Editor & Detail Top Bar"
             ),
             CapabilityItem(
                 key = FEATURE_TASK_SPLITTER,
-                tier = 4,
-                title = "⚡ Dynamic Task Splitter",
+                tier = 3,
+                title = "Task Distiller",
                 iconSymbol = "⚡",
-                shortDescription = "1-tap conversion of paragraphs and raw text into checklists.",
-                whyUse = "Instantly transforms messy brain dumps into actionable bullet points.",
-                whyNot = "Unnecessary if you don't embed checklists in thoughts."
+                shortDescription = "Auto-detect & convert raw brain-dump lines into checklist tasks.",
+                whyUse = "Turns messy paragraphs into clean action steps with one tap.",
+                whyNot = "Only needed if you actively turn prose into checklists.",
+                settingsLocation = "Editor Toolbar"
+            ),
+            CapabilityItem(
+                key = FEATURE_JESTER,
+                tier = 3,
+                title = "Perspective Jester",
+                iconSymbol = "🃏",
+                shortDescription = "Playful roasts, movie-trailer reframes & fortune cookies.",
+                whyUse = "Cuts through writer's block and perfectionism with light humor.",
+                whyNot = "Hide if you keep your journal strictly solemn and serious.",
+                settingsLocation = "Editor Toolbar"
             ),
             CapabilityItem(
                 key = FEATURE_MINDFUL_REMINDERS,
-                tier = 4,
-                title = "Mindful Reflection Notifications",
+                tier = 3,
+                title = "Mindful Nudges",
                 iconSymbol = "🔔",
-                shortDescription = "Gentle lockscreen reminders for daily journaling cadence.",
-                whyUse = "Builds a consistent, lasting daily reflection habit.",
-                whyNot = "If you dislike notification interruptions and prefer spontaneous writing."
-            ),
-
-            // Tier 5
-            CapabilityItem(
-                key = FEATURE_SECOND_BRAIN,
-                tier = 5,
-                title = "Associative Q&A Hub",
-                iconSymbol = "🧠",
-                shortDescription = "Ask questions to past notes using 384-dimensional vector links.",
-                whyUse = "Synthesizes recurring bottlenecks and life insights across months.",
-                whyNot = "Adds extra cognitive navigation if you just want a chronological list."
+                shortDescription = "Gentle contextual reminders and lockscreen check-in scheduling.",
+                whyUse = "Follows up automatically when notes mention lingering blockers.",
+                whyNot = "Zero notifications — journal strictly on your own terms.",
+                settingsLocation = "Settings → Growth & Detail"
             ),
             CapabilityItem(
-                key = FEATURE_SYNAPTIC_GRAPH,
-                tier = 5,
-                title = "Thought Constellation Graph",
-                iconSymbol = "🌐",
-                shortDescription = "Interactive 2D solar system mapping connections between notes.",
-                whyUse = "Visualizes how ideas, people, and themes cluster in your mind.",
-                whyNot = "Purely exploratory visualization; text list is faster for search."
-            ),
-            CapabilityItem(
-                key = FEATURE_CONTRARIAN,
-                tier = 5,
-                title = "Contrarian Challenge & Experiments",
-                iconSymbol = "🔄",
-                shortDescription = "Devil's advocate inquiries and 15-minute micro-experiments.",
-                whyUse = "Pushes back on your blind spots and converts insights into immediate action.",
-                whyNot = "Can feel intellectually provocative when you just want a comforting diary."
-            ),
-
-            // Tier 6
-            CapabilityItem(
-                key = FEATURE_ON_DEVICE_SLM,
-                tier = 6,
-                title = "On-Device SLM (Edge LLM)",
-                iconSymbol = "🤖",
-                shortDescription = "Private local language model (Qwen 2.5 0.5B / SmolLM2).",
-                whyUse = "Zero cloud dependency. Deep neural reasoning with complete privacy.",
-                whyNot = "Requires ~350MB-520MB storage download and phone GPU compute."
-            ),
-            CapabilityItem(
-                key = FEATURE_TECH_MODE,
-                tier = 6,
-                title = "Neural Inspector (Tech Mode)",
-                iconSymbol = "🔬",
-                shortDescription = "Expose raw 384-d vector embeddings, cosine scores, and latency.",
-                whyUse = "Full technical transparency into on-device AI algorithms.",
-                whyNot = "Adds developer jargon that is irrelevant to normal journaling."
+                key = FEATURE_BIOMETRIC_LOCK,
+                tier = 3,
+                title = "Vault Lock",
+                iconSymbol = "🔐",
+                shortDescription = "Protect sensitive entries behind device fingerprint authentication.",
+                whyUse = "Conceals previews in feeds so private entries stay private.",
+                whyNot = "Skip if only you ever hold your unlocked phone.",
+                settingsLocation = "Detail Screen Top Bar"
             ),
             CapabilityItem(
                 key = FEATURE_CLOUD_BACKUP,
-                tier = 6,
-                title = "Encrypted Google Drive 3-Slot Backup",
+                tier = 3,
+                title = "Cloud Vault",
                 iconSymbol = "☁️",
-                shortDescription = "Automatic multi-slot backup and disaster recovery.",
-                whyUse = "Guarantees you never lose your journal even if your phone is lost.",
-                whyNot = "Requires connecting a Google account."
+                shortDescription = "3-slot Google Drive snapshots and portable ZIP archive backups.",
+                whyUse = "Never lose years of reflections if your phone is lost or wiped.",
+                whyNot = "Turn off for strict 100% air-gapped local-only storage.",
+                settingsLocation = "Settings → Vault & Drawer"
+            ),
+
+            // Level 4 · Mind Atlas
+            CapabilityItem(
+                key = FEATURE_SECOND_BRAIN,
+                tier = 4,
+                title = "Memory Oracle",
+                iconSymbol = "🧠",
+                shortDescription = "Ask natural questions to your notes + auto AI TL;DR summaries.",
+                whyUse = "Synthesizes hidden patterns across months of entries.",
+                whyNot = "Turns the app back into a manual archive without AI synthesis.",
+                settingsLocation = "Search Bar, Drawer & Detail"
+            ),
+            CapabilityItem(
+                key = FEATURE_REFLECTION_PROMPTS,
+                tier = 4,
+                title = "Echo Prompts",
+                iconSymbol = "💭",
+                shortDescription = "Socratic reflection questions & related memory cross-links.",
+                whyUse = "Deepens self-inquiry and surfaces forgotten relevant entries.",
+                whyNot = "Keeps note reading view uncluttered by reflection cards.",
+                settingsLocation = "Detail Screen Cards"
+            ),
+            CapabilityItem(
+                key = FEATURE_SYNAPTIC_GRAPH,
+                tier = 4,
+                title = "Thought Constellation",
+                iconSymbol = "🌐",
+                shortDescription = "Interactive 2D star-map showing semantic clusters and links.",
+                whyUse = "See the big picture of how themes orbit each other in your mind.",
+                whyNot = "Hides the Constellation button for a leaner home screen.",
+                settingsLocation = "Top Bar & Drawer"
+            ),
+
+            // Level 5 · Neural Forge
+            CapabilityItem(
+                key = FEATURE_ON_DEVICE_SLM,
+                tier = 5,
+                title = "Edge Mind AI",
+                iconSymbol = "🤖",
+                shortDescription = "Local Qwen 2.5 GPU inference, Gemini Flash key & Engine switcher.",
+                whyUse = "Full private neural reasoning directly on your phone silicon.",
+                whyNot = "Uses 350–520 MB storage for local model weights and GPU compute.",
+                settingsLocation = "Settings → Neural Forge"
+            ),
+            CapabilityItem(
+                key = FEATURE_TECH_MODE,
+                tier = 5,
+                title = "Telemetry X-Ray",
+                iconSymbol = "🔬",
+                shortDescription = "Reveal 384-d vector embeddings, cosine scores & latency metrics.",
+                whyUse = "Full transparency into how the semantic ranking engine thinks.",
+                whyNot = "Strips away developer metrics in favor of serene human copy.",
+                settingsLocation = "Settings → Neural Forge"
             )
         )
     }
@@ -268,45 +354,45 @@ class CapabilityLadderManager(private val context: Context) {
     val unlockEvents: SharedFlow<TierInfo> = _unlockEvents.asSharedFlow()
 
     private fun loadInitialState(): LadderState {
+        // Migrate legacy 1-based Tier schema cleanly to 0-based Level 0..5 schema
+        if (!prefs.getBoolean(PREF_MIGRATED_LEVEL_ZERO, false)) {
+            prefs.edit()
+                .putString(PREF_UNLOCKED_TIERS, "0")
+                .putInt(PREF_LAST_NOTIFIED_TIER, 0)
+                .putBoolean(PREF_MIGRATED_LEVEL_ZERO, true)
+                .apply()
+        }
+
         val isGod = prefs.getBoolean(PREF_GOD_MODE, false)
-        val unlockedString = prefs.getString(PREF_UNLOCKED_TIERS, "1") ?: "1"
-        val unlocked = unlockedString.split(",").mapNotNull { it.toIntOrNull() }.toSet().ifEmpty { setOf(1) }
+        val unlockedString = prefs.getString(PREF_UNLOCKED_TIERS, "0") ?: "0"
+        val unlocked = unlockedString.split(",")
+            .mapNotNull { it.toIntOrNull() }
+            .filter { it in 0..5 }
+            .toSet()
+            .ifEmpty { setOf(0) } + setOf(0)
 
         val enabledMap = mutableMapOf<String, Boolean>()
         ALL_CAPABILITIES.forEach { item ->
-            // Core items are always true, otherwise check pref (default to true)
             val isEnabled = if (item.isCore) true else prefs.getBoolean("feat_${item.key}", true)
             enabledMap[item.key] = isEnabled
         }
 
-        val highestTier = if (isGod) 6 else (unlocked.maxOrNull() ?: 1)
+        val highestLevel = if (isGod) 5 else (unlocked.maxOrNull() ?: 0)
         return LadderState(
-            currentTier = highestTier,
+            currentTier = highestLevel,
             isGodMode = isGod,
-            unlockedTiers = if (isGod) (1..6).toSet() else unlocked,
+            unlockedTiers = if (isGod) (0..5).toSet() else unlocked,
             enabledFeatures = enabledMap
         )
     }
 
-    fun isFeatureEnabled(key: String): Boolean {
-        val s = _state.value
-        val item = ALL_CAPABILITIES.firstOrNull { it.key == key } ?: return true
-        if (item.isCore) return true
-        if (s.isGodMode) return s.enabledFeatures[key] ?: true
+    fun isFeatureEnabled(key: String): Boolean = _state.value.isEnabled(key)
 
-        // Must be in an unlocked tier AND toggled on
-        val isTierUnlocked = s.unlockedTiers.contains(item.tier)
-        return isTierUnlocked && (s.enabledFeatures[key] ?: true)
-    }
-
-    fun isTierUnlocked(tier: Int): Boolean {
-        val s = _state.value
-        return s.isGodMode || s.unlockedTiers.contains(tier)
-    }
+    fun isTierUnlocked(tier: Int): Boolean = _state.value.isLevelUnlocked(tier)
 
     fun toggleFeature(key: String, enabled: Boolean) {
         val item = ALL_CAPABILITIES.firstOrNull { it.key == key }
-        if (item?.isCore == true) return // Cannot disable core
+        if (item?.isCore == true) return
 
         prefs.edit().putBoolean("feat_$key", enabled).apply()
         _state.update { current ->
@@ -316,44 +402,65 @@ class CapabilityLadderManager(private val context: Context) {
         }
     }
 
+    fun toggleAllInLevel(level: Int, enabled: Boolean) {
+        val levelItems = ALL_CAPABILITIES.filter { it.tier == level && !it.isCore }
+        if (levelItems.isEmpty()) return
+        val editor = prefs.edit()
+        levelItems.forEach { editor.putBoolean("feat_${it.key}", enabled) }
+        editor.apply()
+
+        _state.update { current ->
+            val updated = current.enabledFeatures.toMutableMap()
+            levelItems.forEach { updated[it.key] = enabled }
+            current.copy(enabledFeatures = updated)
+        }
+    }
+
     fun setGodMode(enabled: Boolean) {
         prefs.edit().putBoolean(PREF_GOD_MODE, enabled).apply()
+        val storedUnlocked = (prefs.getString(PREF_UNLOCKED_TIERS, "0") ?: "0")
+            .split(",").mapNotNull { it.toIntOrNull() }.filter { it in 0..5 }.toSet() + setOf(0)
         _state.update { current ->
-            val highestTier = if (enabled) 6 else (current.unlockedTiers.maxOrNull() ?: 1)
+            val highestLevel = if (enabled) 5 else (storedUnlocked.maxOrNull() ?: 0)
             current.copy(
                 isGodMode = enabled,
-                currentTier = highestTier,
-                unlockedTiers = if (enabled) (1..6).toSet() else current.unlockedTiers
+                currentTier = highestLevel,
+                unlockedTiers = if (enabled) (0..5).toSet() else storedUnlocked
             )
         }
     }
 
     fun evaluateProgress(activeNotesCount: Int) {
-        val currentUnlocked = _state.value.unlockedTiers.toMutableSet()
-        var newlyUnlockedTier: TierInfo? = null
+        val storedString = prefs.getString(PREF_UNLOCKED_TIERS, "0") ?: "0"
+        val currentUnlocked = storedString.split(",")
+            .mapNotNull { it.toIntOrNull() }
+            .filter { it in 0..5 }
+            .toMutableSet()
+        currentUnlocked.add(0)
 
-        TIERS.forEach { tier ->
-            if (activeNotesCount >= tier.requiredNotes && !currentUnlocked.contains(tier.tier)) {
-                currentUnlocked.add(tier.tier)
-                newlyUnlockedTier = tier
+        var newlyUnlockedLevel: TierInfo? = null
+        TIERS.forEach { level ->
+            if (activeNotesCount >= level.requiredNotes && !currentUnlocked.contains(level.tier)) {
+                currentUnlocked.add(level.tier)
+                newlyUnlockedLevel = level
             }
         }
 
-        val lastNotified = prefs.getInt(PREF_LAST_NOTIFIED_TIER, 1)
-        if (newlyUnlockedTier != null && newlyUnlockedTier!!.tier > lastNotified) {
-            prefs.edit().putInt(PREF_LAST_NOTIFIED_TIER, newlyUnlockedTier!!.tier).apply()
-            _unlockEvents.tryEmit(newlyUnlockedTier!!)
+        val lastNotified = prefs.getInt(PREF_LAST_NOTIFIED_TIER, 0)
+        if (newlyUnlockedLevel != null && newlyUnlockedLevel!!.tier > lastNotified) {
+            prefs.edit().putInt(PREF_LAST_NOTIFIED_TIER, newlyUnlockedLevel!!.tier).apply()
+            _unlockEvents.tryEmit(newlyUnlockedLevel!!)
         }
 
-        prefs.edit().putString(PREF_UNLOCKED_TIERS, currentUnlocked.joinToString(",")).apply()
+        prefs.edit().putString(PREF_UNLOCKED_TIERS, currentUnlocked.sorted().joinToString(",")).apply()
         _state.update { current ->
             val isGod = current.isGodMode
-            val highest = if (isGod) 6 else (currentUnlocked.maxOrNull() ?: 1)
+            val highest = if (isGod) 5 else (currentUnlocked.maxOrNull() ?: 0)
             current.copy(
                 activeNotesCount = activeNotesCount,
                 currentTier = highest,
-                unlockedTiers = if (isGod) (1..6).toSet() else currentUnlocked,
-                justUnlockedTier = newlyUnlockedTier
+                unlockedTiers = if (isGod) (0..5).toSet() else currentUnlocked.toSet(),
+                justUnlockedTier = newlyUnlockedLevel
             )
         }
     }
@@ -364,8 +471,8 @@ class CapabilityLadderManager(private val context: Context) {
 
     fun getNextTierInfo(): Pair<TierInfo?, Int> {
         val s = _state.value
-        val highest = s.unlockedTiers.maxOrNull() ?: 1
-        if (highest >= 6) return Pair(null, 0)
+        val highest = s.unlockedTiers.maxOrNull() ?: 0
+        if (highest >= 5) return Pair(null, 0)
         val next = TIERS.firstOrNull { it.tier == highest + 1 } ?: return Pair(null, 0)
         val remaining = maxOf(0, next.requiredNotes - s.activeNotesCount)
         return Pair(next, remaining)

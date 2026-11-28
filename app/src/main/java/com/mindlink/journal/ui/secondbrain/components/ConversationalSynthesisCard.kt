@@ -17,7 +17,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mindlink.journal.LocalLadderState
 import com.mindlink.journal.LocalTechMode
+import com.mindlink.journal.data.capability.CapabilityLadderManager
 import com.mindlink.journal.domain.model.SynthesisResponse
 import com.mindlink.journal.ui.theme.*
 
@@ -28,6 +30,8 @@ fun ConversationalSynthesisCard(
     modifier: Modifier = Modifier
 ) {
     val isTechMode = LocalTechMode.current
+    val ladderState = LocalLadderState.current
+    val showReminders = ladderState.isEnabled(CapabilityLadderManager.FEATURE_MINDFUL_REMINDERS)
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -137,8 +141,8 @@ fun ConversationalSynthesisCard(
                 )
             }
 
-            // Proactive Wellness & Pattern Reminder Card
-            if (synthesis.suggestedReminder != null) {
+            // Proactive Wellness & Pattern Reminder Card (Mindful Nudges)
+            if (showReminders && synthesis.suggestedReminder != null) {
                 val context = androidx.compose.ui.platform.LocalContext.current
                 var isReminderScheduled by remember { mutableStateOf(false) }
                 var scheduledLabel by remember { mutableStateOf("") }
