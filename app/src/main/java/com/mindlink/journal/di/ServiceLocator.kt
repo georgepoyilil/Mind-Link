@@ -109,6 +109,13 @@ class ServiceLocator private constructor(context: Context) {
     }
     val noteViewMode: StateFlow<String> by lazy { _noteViewMode.asStateFlow() }
 
+    private val _appUpdateInfo = MutableStateFlow<com.mindlink.journal.data.ota.AppReleaseInfo?>(null)
+    val appUpdateInfo: StateFlow<com.mindlink.journal.data.ota.AppReleaseInfo?> = _appUpdateInfo.asStateFlow()
+
+    fun updateAppReleaseInfo(info: com.mindlink.journal.data.ota.AppReleaseInfo?) {
+        _appUpdateInfo.value = info
+    }
+
     fun updateNoteViewMode(mode: String) {
         preferences.edit().putString(PREF_NOTE_VIEW_MODE, mode).apply()
         _noteViewMode.value = mode

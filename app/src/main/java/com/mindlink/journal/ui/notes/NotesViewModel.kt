@@ -274,8 +274,15 @@ class NotesViewModel(
                 val result = otaManager.checkForUpdates()
                 result.onSuccess { info ->
                     if (info != null && info.isNewer) {
+                        com.mindlink.journal.di.ServiceLocator.getInstance(context).updateAppReleaseInfo(info)
                         _uiState.update { it.copy(availableUpdate = info) }
+                    } else {
+                        com.mindlink.journal.di.ServiceLocator.getInstance(context).updateAppReleaseInfo(null)
+                        _uiState.update { it.copy(availableUpdate = null) }
                     }
+                }.onFailure {
+                    com.mindlink.journal.di.ServiceLocator.getInstance(context).updateAppReleaseInfo(null)
+                    _uiState.update { it.copy(availableUpdate = null) }
                 }
             } catch (_: Exception) {}
         }

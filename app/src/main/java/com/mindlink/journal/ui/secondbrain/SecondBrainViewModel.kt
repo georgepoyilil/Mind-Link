@@ -64,6 +64,26 @@ class SecondBrainViewModel(
             .groupingBy { it.lowercase(Locale.ROOT) }
             .eachCount()
 
+        // 0. Top User Hashtags - Contrarian & Micro-Experiment Brainstorming
+        val topTags = tagFrequency.entries.sortedByDescending { it.value }.take(2).map { it.key }
+        topTags.forEach { tag ->
+            val formattedTag = tag.replaceFirstChar { it.uppercase() }
+            inquiries.add(
+                DynamicInquiry(
+                    display = "🔄 Contrarian: #$formattedTag",
+                    query = "What if my core assumptions regarding #$formattedTag are backward? What counter-intuitive angle am I missing?",
+                    category = "Contrarian"
+                )
+            )
+            inquiries.add(
+                DynamicInquiry(
+                    display = "⚡ 15-Min Test: #$formattedTag",
+                    query = "What is a 15-minute low-risk experiment I can run to test my latest thoughts on #$formattedTag?",
+                    category = "Experiment"
+                )
+            )
+        }
+
         // 1. Relational Context (Elena, Family, Loved Ones)
         if (corpus.contains("elena") || tagFrequency.containsKey("love") || tagFrequency.containsKey("relationship")) {
             inquiries.add(

@@ -58,7 +58,8 @@ data class SettingsUiState(
     val lastBackupTimestamp: Long = 0L,
     val lastBackupSizeFormatted: String = "",
     val backupSlots: List<com.mindlink.journal.data.sync.BackupSlotInfo> = emptyList(),
-    val backupFrequency: String = "Daily"
+    val backupFrequency: String = "Daily",
+    val areNotificationsEnabled: Boolean = true
 )
 
 class SettingsViewModel(
@@ -171,11 +172,50 @@ class SettingsViewModel(
                     _uiState.update { it.copy(backupFrequency = freq) }
                 }
             }
+
+            val notifEnabled = androidx.core.app.NotificationManagerCompat.from(appContext).areNotificationsEnabled()
+            _uiState.update { it.copy(areNotificationsEnabled = notifEnabled) }
+
+            viewModelScope.launch {
+                ServiceLocator.getInstance(appContext).appUpdateInfo.collect { info ->
+                    _uiState.update { state ->
+                        state.copy(
+                            appUpdateInfo = if (info?.isNewer == true) info else null,
+                            appUpdateMessage = if (info?.isNewer == true) {
+                                "New version ${info.tagName} is available!"
+                            } else if (state.appUpdateMessage != null) {
+                                state.appUpdateMessage
+                            } else {
+                                "You're up to date! (v${com.mindlink.journal.BuildConfig.VERSION_NAME} is the latest release)"
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 
     val userConsentIntent: SharedFlow<android.content.Intent>?
         get() = appContext?.let { ServiceLocator.getInstance(it).googleSyncManager.userConsentIntent }
+
+    fun refreshNotificationStatus() {
+        appContext?.let {
+            val notifEnabled = androidx.core.app.NotificationManagerCompat.from(it).areNotificationsEnabled()
+            _uiState.update { state -> state.copy(areNotificationsEnabled = notifEnabled) }
+        }
+    }
+
+    fun scheduleTestReminder() {
+        appContext?.let {
+            com.mindlink.journal.data.worker.ReminderWorker.schedule(
+                context = it,
+                title = "MindLink Mindful Check-in",
+                message = "Take a mindful pause and capture what is alive for you right now.",
+                noteId = -1L,
+                delayMinutes = 1
+            )
+        }
+    }
 
 
     fun refreshEngineStatus() {
@@ -344,6 +384,7 @@ class SettingsViewModel(
             val result = otaManager.checkForUpdates()
             result.onSuccess { info ->
                 if (info != null && info.isNewer) {
+                    ServiceLocator.getInstance(context).updateAppReleaseInfo(info)
                     _uiState.update {
                         it.copy(
                             isCheckingAppUpdate = false,
@@ -352,17 +393,20 @@ class SettingsViewModel(
                         )
                     }
                 } else if (info != null) {
+                    ServiceLocator.getInstance(context).updateAppReleaseInfo(null)
                     _uiState.update {
                         it.copy(
                             isCheckingAppUpdate = false,
-                            appUpdateInfo = info,
+                            appUpdateInfo = null,
                             appUpdateMessage = "You're up to date! (v${com.mindlink.journal.BuildConfig.VERSION_NAME} is the latest release)"
                         )
                     }
                 } else {
+                    ServiceLocator.getInstance(context).updateAppReleaseInfo(null)
                     _uiState.update {
                         it.copy(
                             isCheckingAppUpdate = false,
+                            appUpdateInfo = null,
                             appUpdateMessage = "No APK releases found on GitHub."
                         )
                     }

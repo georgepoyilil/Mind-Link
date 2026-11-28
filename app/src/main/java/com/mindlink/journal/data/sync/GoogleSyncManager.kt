@@ -1064,11 +1064,11 @@ class GoogleSyncManager(
 
         val err = when {
             lastAuthError?.contains("UnregisteredOnApiConsole", ignoreCase = true) == true ->
-                "Google Drive API requires an OAuth Client ID in Google Cloud Console. Tap 'Restore File' below to restore from Downloads/MindLink/."
+                "Google Drive API requires an OAuth Client ID in Google Cloud Console. Tap 'Restore File' or 'Save to Drive' above to backup & restore directly via device storage."
             user != null ->
-                "No backup found on Google Drive for ${user.email} or on device storage. Tap 'Restore File' to load from Downloads/MindLink/."
+                "No backup found on Google Drive for ${user.email} or on device storage. Tap 'Restore File' above to load a backup file."
             else ->
-                "No local or cloud backup found. Please sign in or backup first."
+                "No local or cloud backup found. Tap 'Download to Device' or 'Backup Now' to create one."
         }
         _syncState.value = SyncState.Error(err)
         Result.failure(Exception(err))

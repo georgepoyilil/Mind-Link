@@ -40,12 +40,17 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     onNavigateBack: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     var isKeyVisible by remember { mutableStateOf(false) }
     var isThemeCardExpanded by rememberSaveable { mutableStateOf(false) }
     var isBackupCardExpanded by rememberSaveable { mutableStateOf(false) }
     var showUserGuideDialog by remember { mutableStateOf(false) }
     var showOnboardingDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshNotificationStatus()
+    }
 
     val accountChooserLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
@@ -1584,12 +1589,33 @@ fun SettingsScreen(
                         }
                         is com.mindlink.journal.data.sync.SyncState.Error -> {
                             Spacer(modifier = Modifier.height(10.dp))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = PastelRose.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.4f)),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = PastelRose, modifier = Modifier.size(16.dp))
-                                Text(text = sync.error, style = MaterialTheme.typography.bodySmall, color = PastelRose)
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.Top,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = PastelRose, modifier = Modifier.size(18.dp))
+                                        Text(text = sync.error, style = MaterialTheme.typography.bodySmall, color = PastelRose)
+                                    }
+                                    if (sync.error.contains("Restore File", ignoreCase = true) || sync.error.contains("OAuth", ignoreCase = true)) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        FilledTonalButton(
+                                            onClick = { restoreFromPickerLauncher.launch(arrayOf("application/zip", "application/json", "*/*")) },
+                                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = PastelLavender.copy(alpha = 0.25f), contentColor = PastelLavender),
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(30.dp)
+                                        ) {
+                                            Text("Open 'Restore File' Picker", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                        }
+                                    }
+                                }
                             }
                         }
                         com.mindlink.journal.data.sync.SyncState.Idle -> {}
@@ -1918,6 +1944,92 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Check for MindLink Updates", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+
+            // 6.5. Mindful Notifications & Reminders Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MindSurfaceDark),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.NotificationsActive,
+                            contentDescription = "Notifications",
+                            tint = PastelLavender,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Mindful Reminders & Notifications",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MindTextPrimary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (uiState.areNotificationsEnabled) MindEmerald.copy(alpha = 0.15f) else PastelRose.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, if (uiState.areNotificationsEnabled) MindEmerald.copy(alpha = 0.4f) else PastelRose.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = if (uiState.areNotificationsEnabled) "Enabled" else "Disabled",
+                                color = if (uiState.areNotificationsEnabled) MindEmerald else PastelRose,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "MindLink uses local background workers to deliver thoughtful contextual check-ins and reflection prompts.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MindTextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val intent = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                    putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                }
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, PastelLavender.copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelLavender),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Manage in System", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        Button(
+                            onClick = { viewModel.scheduleTestReminder() },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = PastelLavender, contentColor = MindBackgroundDark),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Send Test Reminder", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }

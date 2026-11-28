@@ -611,7 +611,7 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
         val salientTerms = extractSalientConcepts(title, content)
         val primaryConcept = salientTerms.firstOrNull() ?: title.ifBlank { "this realization" }.removePrefix("Untitled Entry").trim()
         val secondaryConcept = salientTerms.getOrNull(1) ?: primaryConcept
-        val noteSeed = (title.hashCode() xor (content.take(80).hashCode()) xor mood.hashCode()).let { if (it < 0) -it else it }
+        val noteSeed = (title.hashCode() * 31 + content.hashCode() * 17 + content.length * 13 + mood.hashCode()).let { if (it < 0) -it else it }
 
         // 3. DYNAMIC SOCRATIC QUESTION 1: Core Dilemma & Sphere-Specific Tension
         when (classification.primarySphere) {
@@ -659,45 +659,58 @@ class LocalHeuristicBrainstormingEngine : BrainstormingEngine {
             }
         }
 
-        // 4. DYNAMIC SOCRATIC QUESTION 2: Perspective Shift & Emotional Valence (Always dynamic, never static)
+        // 4. DYNAMIC SOCRATIC QUESTION 2: Perspective Shift & Contrarian Challenge
         val normalizedMood = mood.lowercase().trim()
         val q2Pool = when {
             normalizedMood.contains("stress") || normalizedMood.contains("anxious") || normalizedMood.contains("overwhelm") -> listOf(
                 "Given the tension around '$secondaryConcept', what is one non-essential demand you can give yourself permission to drop today?",
                 "If you treated this anxiety as information rather than a crisis, what boundary is your mind asking for regarding '$secondaryConcept'?",
                 "What is the simplest subtraction you can make in your schedule to create breathing room around $secondaryConcept?",
-                "What would you tell a trusted friend who came to you carrying this exact worry about $secondaryConcept?"
+                "What would you tell a trusted friend who came to you carrying this exact worry about $secondaryConcept?",
+                "Contrarian View: If this stressful situation with '$secondaryConcept' is actually preparing you for a bigger leap, what strength is it forging in you?",
+                "What is the absolute worst that happens if you let '$secondaryConcept' sit untouched until tomorrow morning?"
             )
             normalizedMood.contains("creative") || normalizedMood.contains("energ") || normalizedMood.contains("excit") -> listOf(
                 "Where does '$secondaryConcept' intersect with an unconventional idea or passion you've kept on the back burner?",
                 "What bold, low-friction experiment around '$secondaryConcept' could leverage the momentum you feel right now?",
                 "If you had total freedom to pursue '$secondaryConcept' without risk of judgment, what would the first prototype look like?",
-                "How can you capture and codify the energy behind '$secondaryConcept' so it sustains you on slower days?"
+                "How can you capture and codify the energy behind '$secondaryConcept' so it sustains you on slower days?",
+                "Contrarian Test: What if you stripped '$secondaryConcept' of all polish and shared the rawest prototype within 24 hours?",
+                "What if the most counter-intuitive opposite to '$secondaryConcept' turns out to be the real breakthrough?"
             )
             normalizedMood.contains("analytical") || normalizedMood.contains("focus") -> listOf(
                 "If an external expert audited your approach to '$secondaryConcept', which hidden inefficiency would they flag first?",
                 "What would an 80/20 simplification of '$secondaryConcept' look like if you were forced to deliver in under an hour?",
                 "What counter-intuitive metric will prove whether your trajectory on '$secondaryConcept' was truly the right one?",
-                "What second-order consequences of this decision on '$secondaryConcept' might emerge three months from now?"
+                "What second-order consequences of this decision on '$secondaryConcept' might emerge three months from now?",
+                "Contrarian Challenge: What if the foundational hypothesis behind '$secondaryConcept' is completely reversed?",
+                "If you were legally forbidden from writing more code or specs for '$secondaryConcept', how would you validate it today?"
             )
             else -> listOf(
                 "Looking at '$secondaryConcept', what old habit or mental model are you quietly outgrowing through this experience?",
                 "If future-you from five years ahead could comment on '$secondaryConcept', what perspective would they offer?",
                 "What unspoken value or standard of yours is being tested most strongly by '$secondaryConcept' right now?",
-                "What part of this thought around '$secondaryConcept' feels most vulnerable or challenging to fully accept?"
+                "What part of this thought around '$secondaryConcept' feels most vulnerable or challenging to fully accept?",
+                "Devil's Advocate: What if your biggest concern about '$secondaryConcept' is actually an illusion created by fatigue?",
+                "What if doing nothing about '$secondaryConcept' for 48 hours is strategically superior to acting right now?"
             )
         }
-        prompts.add(q2Pool[(noteSeed + 1) % q2Pool.size])
+        prompts.add(q2Pool[(noteSeed / 3 + 1) % q2Pool.size])
 
-        // 5. DYNAMIC SOCRATIC QUESTION 3: Actionable Micro-Experiment / Future-Proofing (Always dynamic)
+        // 5. DYNAMIC SOCRATIC QUESTION 3: Actionable Micro-Experiment & Future-Proofing
         val q3Pool = listOf(
-            "What is a single 10-minute micro-action within the next 24 hours that moves \"$primaryConcept\" from contemplation into tangible progress?",
-            "What is the quietest obstacle or friction point that might derail you tomorrow, and what is your plan to bypass it?",
-            "Who is one person whose perspective or feedback on \"$primaryConcept\" could save you weeks of second-guessing?",
+            "What is a single 15-minute micro-experiment you can run right now to test the riskiest part of \"$primaryConcept\"?",
+            "What is the quietest obstacle or friction point that might derail you tomorrow regarding \"$primaryConcept\", and how will you bypass it?",
+            "Who is one person whose perspective or critique on \"$primaryConcept\" could save you weeks of second-guessing?",
             "How will your daily routine look one month from now if you remain consistent with the insight behind \"$primaryConcept\"?",
-            "What is the single most decisive 'no' you must say this week to protect your focus on \"$primaryConcept\"?"
+            "What is the single most decisive 'no' you must say this week to protect your focus on \"$primaryConcept\"?",
+            "If you were forced to complete the next step of \"$primaryConcept\" before lunch today, what exact sub-step would you finish?",
+            "What low-stakes simulation can you run today to test \"$primaryConcept\" without any real downside?",
+            "Pre-Mortem: Imagine it is 6 months from now and \"$primaryConcept\" didn't work out. What was the quiet blind spot that caused it?",
+            "If you outsourced the hardest 20% of \"$primaryConcept\" to an AI or a collaborator, what would you ask them to solve?",
+            "What tiny checkpoint or milestone can you reach by tomorrow sunset that definitively proves \"$primaryConcept\" is moving forward?"
         )
-        prompts.add(q3Pool[(noteSeed + 2) % q3Pool.size])
+        prompts.add(q3Pool[(noteSeed / 7 + 2) % q3Pool.size])
 
         return prompts.distinct().take(3)
     }

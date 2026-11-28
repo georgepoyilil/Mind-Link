@@ -154,9 +154,17 @@ class NoteEditorViewModel(
 
     // --- Interactive Checklist Item Management ---
 
-    fun addChecklistItem(text: String = "") {
+    fun addChecklistItem(text: String = ""): String {
         val newItem = ChecklistItem(text = text, isChecked = false)
         _uiState.update { it.copy(checklistItems = it.checklistItems + newItem) }
+        return newItem.id
+    }
+
+    fun addChecklistItems(texts: List<String>) {
+        val newItems = texts.filter { it.isNotBlank() }.map { ChecklistItem(text = it.trim(), isChecked = false) }
+        if (newItems.isNotEmpty()) {
+            _uiState.update { it.copy(checklistItems = it.checklistItems + newItems) }
+        }
     }
 
     fun updateChecklistItem(id: String, newText: String) {

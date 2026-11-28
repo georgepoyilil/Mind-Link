@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.media.MediaPlayer
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -28,11 +29,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -97,6 +103,42 @@ fun NoteEditorScreen(
     var canRedo by remember { mutableStateOf(false) }
     var showVersionHistoryDialog by remember { mutableStateOf(false) }
     var isWordPreviewMode by remember { mutableStateOf(false) }
+
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val clipboardManager = LocalClipboardManager.current
+    var focusedTaskId by remember { mutableStateOf<String?>(null) }
+    var isOcrCardDismissed by remember { mutableStateOf(false) }
+
+    var showWitDialog by remember { mutableStateOf(false) }
+    var witCategory by remember { mutableStateOf("Roast") }
+    var witText by remember { mutableStateOf("") }
+
+    var showTaskSplitterDialog by remember { mutableStateOf(false) }
+    var taskSplitterInput by remember { mutableStateOf("") }
+
+    fun addNewTask() {
+        val newId = viewModel.addChecklistItem("")
+        focusedTaskId = newId
+    }
+
+    val saveAndExit = {
+        val hasContent = uiState.title.isNotBlank() ||
+                contentValue.text.isNotBlank() ||
+                uiState.checklistItems.any { it.text.isNotBlank() } ||
+                uiState.imageUri != null ||
+                uiState.audioUri != null
+
+        if (hasContent) {
+            viewModel.updateContent(contentValue.text)
+            viewModel.saveNote { _ ->
+                onNavigateBack()
+            }
+        } else {
+            onNavigateBack()
+        }
+    }
+
+    BackHandler(onBack = saveAndExit)
 
     val performUndo: () -> Unit = {
         undoRedoManager.undo(contentValue)?.let { prev ->
@@ -409,7 +451,7 @@ fun NoteEditorScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = saveAndExit) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MindTextPrimary)
                     }
                 },
@@ -577,132 +619,108 @@ fun NoteEditorScreen(
                     .fillMaxWidth()
                     .background(MindGlassSurfaceVariant)
             ) {
-                // 1. Primary Action Row
-                Row(
+                // 1. Two-Row Categorized Toolbar (Grouped by Tool Type)
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Typography / Font Size Inspector Toggle (Aa)
-                    val activeScale = uiState.fontSizeScale
-                    val sizeLabel = when {
-                        activeScale == null -> "Aa"
-                        activeScale < 0.9f -> "Aa · S"
-                        activeScale < 1.1f -> "Aa · M"
-                        activeScale < 1.25f -> "Aa · L"
-                        else -> "Aa · XL"
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (showTypographyPanel) MindIndigo.copy(alpha = 0.35f) else MindGlassButtonContainer,
-                        border = BorderStroke(1.dp, if (showTypographyPanel) PastelLavender else MindGlassButtonBorder),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                showTypographyPanel = !showTypographyPanel
-                                if (showTypographyPanel) showMediaPanel = false
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.TextFields,
-                                contentDescription = "Typography",
-                                tint = if (showTypographyPanel) PastelLavender else MindTextPrimary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = sizeLabel,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.5.sp,
-                                color = if (showTypographyPanel) PastelLavender else MindTextPrimary
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    // Insert Media Tray Toggle (+)
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (showMediaPanel) PastelSky.copy(alpha = 0.35f) else MindGlassButtonContainer,
-                        border = BorderStroke(1.dp, if (showMediaPanel) PastelSky else MindGlassButtonBorder),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                showMediaPanel = !showMediaPanel
-                                if (showMediaPanel) showTypographyPanel = false
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AddPhotoAlternate,
-                                contentDescription = "Attach Media",
-                                tint = if (showMediaPanel) PastelSky else MindTextPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    Box(
-                        modifier = Modifier
-                            .height(20.dp)
-                            .width(1.dp)
-                            .background(MindGlassBorderSubtle)
-                    )
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    // Formatting Buttons Row (Dedicated clean markup tools)
+                    // ROW 1: Structural & Block Tools (Aa Typography, Attach Media, H3, Quote, List, + Task, ⚡ Tasks, 🎭 Wit & Roast)
                     Row(
                         modifier = Modifier
-                            .weight(1f)
+                            .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // Bold
-                        IconButton(onClick = { wrapSelection("**") }, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Default.FormatBold, contentDescription = "Bold", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                        // Typography / Font Size Inspector Toggle (Aa)
+                        val activeScale = uiState.fontSizeScale
+                        val sizeLabel = when {
+                            activeScale == null -> "Aa"
+                            activeScale < 0.9f -> "Aa · S"
+                            activeScale < 1.1f -> "Aa · M"
+                            activeScale < 1.25f -> "Aa · L"
+                            else -> "Aa · XL"
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (showTypographyPanel) MindIndigo.copy(alpha = 0.35f) else MindGlassButtonContainer,
+                            border = BorderStroke(1.dp, if (showTypographyPanel) PastelLavender else MindGlassButtonBorder),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    showTypographyPanel = !showTypographyPanel
+                                    if (showTypographyPanel) showMediaPanel = false
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.TextFields,
+                                    contentDescription = "Typography",
+                                    tint = if (showTypographyPanel) PastelLavender else MindTextPrimary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = sizeLabel,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    color = if (showTypographyPanel) PastelLavender else MindTextPrimary
+                                )
+                            }
                         }
 
-                        // Italic
-                        IconButton(onClick = { wrapSelection("*") }, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Default.FormatItalic, contentDescription = "Italic", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                        // Insert Media Tray Toggle (+)
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (showMediaPanel) PastelSky.copy(alpha = 0.35f) else MindGlassButtonContainer,
+                            border = BorderStroke(1.dp, if (showMediaPanel) PastelSky else MindGlassButtonBorder),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    showMediaPanel = !showMediaPanel
+                                    if (showMediaPanel) showTypographyPanel = false
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AddPhotoAlternate,
+                                    contentDescription = "Attach Media",
+                                    tint = if (showMediaPanel) PastelSky else MindTextPrimary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Media", fontSize = 11.sp, color = if (showMediaPanel) PastelSky else MindTextPrimary, fontWeight = FontWeight.SemiBold)
+                            }
                         }
 
-                        // Underline
-                        IconButton(onClick = { wrapSelection("__") }, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Default.FormatUnderlined, contentDescription = "Underline", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
-                        }
-
-                        // Strikethrough
-                        IconButton(onClick = { wrapSelection("~~") }, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Default.FormatStrikethrough, contentDescription = "Strikethrough", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
-                        }
+                        Box(
+                            modifier = Modifier
+                                .height(16.dp)
+                                .width(1.dp)
+                                .background(MindGlassBorderSubtle)
+                        )
 
                         // Heading H3
-                        IconButton(onClick = { insertLinePrefix("### ") }, modifier = Modifier.size(34.dp)) {
-                            Text("H3", fontWeight = FontWeight.Bold, color = MindTextPrimary, fontSize = 13.sp)
+                        IconButton(onClick = { insertLinePrefix("### ") }, modifier = Modifier.size(30.dp)) {
+                            Text("H3", fontWeight = FontWeight.Bold, color = MindTextPrimary, fontSize = 12.sp)
                         }
 
                         // Quote
-                        IconButton(onClick = { insertLinePrefix("> ") }, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Default.FormatQuote, contentDescription = "Quote", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                        IconButton(onClick = { insertLinePrefix("> ") }, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.FormatQuote, contentDescription = "Quote", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
                         }
 
                         // Bullet List
-                        IconButton(onClick = { insertLinePrefix("- ") }, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Default.FormatListBulleted, contentDescription = "Bullet List", tint = MindTextPrimary, modifier = Modifier.size(18.dp))
+                        IconButton(onClick = { insertLinePrefix("- ") }, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.FormatListBulleted, contentDescription = "Bullet List", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
                         }
 
                         // + Task checklist button
@@ -712,46 +730,127 @@ fun NoteEditorScreen(
                             border = BorderStroke(0.8.dp, MindGlassButtonBorder),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable { viewModel.addChecklistItem("") }
+                                .clickable { addNewTask() }
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.TaskAlt, contentDescription = null, tint = PastelMint, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(Icons.Default.TaskAlt, contentDescription = null, tint = PastelMint, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
                                 Text("+ Task", fontSize = 11.sp, color = PastelMint, fontWeight = FontWeight.Bold)
                             }
                         }
 
-                        // Undo
-                        IconButton(onClick = performUndo, enabled = canUndo, modifier = Modifier.size(34.dp)) {
-                            Icon(
-                                Icons.Default.Undo,
-                                contentDescription = "Undo",
-                                tint = if (canUndo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
-                                modifier = Modifier.size(18.dp)
-                            )
+                        // ⚡ Dynamic Tasks Quick Splitter
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = PastelSky.copy(alpha = 0.15f),
+                            border = BorderStroke(0.8.dp, PastelSky.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showTaskSplitterDialog = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Bolt, contentDescription = null, tint = PastelSky, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("⚡ Tasks", fontSize = 11.sp, color = PastelSky, fontWeight = FontWeight.Bold)
+                            }
                         }
 
-                        // Redo
-                        IconButton(onClick = performRedo, enabled = canRedo, modifier = Modifier.size(34.dp)) {
-                            Icon(
-                                Icons.Default.Redo,
-                                contentDescription = "Redo",
-                                tint = if (canRedo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
-                                modifier = Modifier.size(18.dp)
-                            )
+                        // 🎭 Wit & Roast (Funny Tool)
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = PastelRose.copy(alpha = 0.15f),
+                            border = BorderStroke(0.8.dp, PastelRose.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    witText = generateMindLinkWit(uiState.title, contentValue.text, uiState.checklistItems.size, witCategory)
+                                    showWitDialog = true
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("🎭 Wit & Roast", fontSize = 11.sp, color = PastelRose, fontWeight = FontWeight.Bold)
+                            }
                         }
+                    }
+
+                    // Subtle Row Divider
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MindBorderDark.copy(alpha = 0.35f)
+                    )
+
+                    // ROW 2: Inline Text Styling & Action History (Bold, Italic, Underline, Strikethrough, Select All, Undo, Redo)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        // Bold
+                        IconButton(onClick = { wrapSelection("**") }, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.FormatBold, contentDescription = "Bold", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
+                        }
+
+                        // Italic
+                        IconButton(onClick = { wrapSelection("*") }, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.FormatItalic, contentDescription = "Italic", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
+                        }
+
+                        // Underline
+                        IconButton(onClick = { wrapSelection("__") }, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.FormatUnderlined, contentDescription = "Underline", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
+                        }
+
+                        // Strikethrough
+                        IconButton(onClick = { wrapSelection("~~") }, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.FormatStrikethrough, contentDescription = "Strikethrough", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .height(16.dp)
+                                .width(1.dp)
+                                .background(MindGlassBorderSubtle)
+                        )
 
                         // Select All
                         IconButton(
                             onClick = {
                                 contentValue = contentValue.copy(selection = TextRange(0, contentValue.text.length))
                             },
-                            modifier = Modifier.size(34.dp)
+                            modifier = Modifier.size(30.dp)
                         ) {
-                            Icon(Icons.Default.SelectAll, contentDescription = "Select All", tint = MindTextSecondary, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.SelectAll, contentDescription = "Select All", tint = MindTextSecondary, modifier = Modifier.size(16.dp))
+                        }
+
+                        // Undo
+                        IconButton(onClick = performUndo, enabled = canUndo, modifier = Modifier.size(30.dp)) {
+                            Icon(
+                                Icons.Default.Undo,
+                                contentDescription = "Undo",
+                                tint = if (canUndo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        // Redo
+                        IconButton(onClick = performRedo, enabled = canRedo, modifier = Modifier.size(30.dp)) {
+                            Icon(
+                                Icons.Default.Redo,
+                                contentDescription = "Redo",
+                                tint = if (canRedo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
                 }
@@ -1049,15 +1148,15 @@ fun NoteEditorScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // OCR Hero Card (Prominent and directly accessible when in OCR mode or opened for scanning)
-                if (initialMode == "ocr" || uiState.imageUri == null) {
+                // Sleek, Compact Dismissible OCR Pill
+                if ((initialMode == "ocr" || uiState.imageUri == null) && !isOcrCardDismissed) {
                     Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MindGlassSurfaceElevated,
-                        border = BorderStroke(1.2.dp, PastelViolet.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(10.dp),
+                        color = PastelViolet.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, PastelViolet.copy(alpha = 0.45f)),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(10.dp))
                             .clickable {
                                 val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
                                 if (hasPerm) launchOcrHighRes() else ocrPermissionLauncher.launch(Manifest.permission.CAMERA)
@@ -1066,43 +1165,41 @@ fun NoteEditorScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                                .padding(horizontal = 12.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = PastelViolet.copy(alpha = 0.2f),
-                                modifier = Modifier.size(38.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.DocumentScanner,
-                                        contentDescription = "Scan Document",
-                                        tint = PastelViolet,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Scan Document / Whiteboard",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MindTextPrimary
-                                )
-                                Text(
-                                    text = "Snap photo to extract printed or handwritten text with OCR",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MindTextSecondary
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Default.DocumentScanner,
+                                contentDescription = "Scan Document",
+                                tint = PastelViolet,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Scan Document / Whiteboard (OCR)",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MindTextPrimary,
+                                modifier = Modifier.weight(1f)
+                            )
                             Icon(
                                 imageVector = Icons.Default.PhotoCamera,
                                 contentDescription = null,
                                 tint = PastelViolet,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(15.dp)
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(
+                                onClick = { isOcrCardDismissed = true },
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Dismiss",
+                                    tint = MindTextTertiary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -1565,6 +1662,55 @@ fun NoteEditorScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
+                        // Dynamic Task Candidate Detector from Note Content
+                        val detectedTaskCandidates = remember(contentValue.text, uiState.checklistItems) {
+                            contentValue.text.lines().mapNotNull { line ->
+                                val trimmed = line.trim()
+                                val clean = when {
+                                    trimmed.startsWith("- [ ]") -> trimmed.removePrefix("- [ ]").trim()
+                                    trimmed.startsWith("[ ]") -> trimmed.removePrefix("[ ]").trim()
+                                    trimmed.startsWith("TODO:", ignoreCase = true) -> trimmed.substring(5).trim()
+                                    trimmed.startsWith("TASK:", ignoreCase = true) -> trimmed.substring(5).trim()
+                                    trimmed.startsWith("DO:", ignoreCase = true) -> trimmed.substring(3).trim()
+                                    trimmed.startsWith("- ") && trimmed.length > 3 -> trimmed.removePrefix("- ").trim()
+                                    trimmed.startsWith("* ") && trimmed.length > 3 -> trimmed.removePrefix("* ").trim()
+                                    trimmed.matches(Regex("""^\d+\.\s+.+""")) -> trimmed.replace(Regex("""^\d+\.\s+"""), "").trim()
+                                    else -> null
+                                }
+                                if (!clean.isNullOrBlank() && uiState.checklistItems.none { it.text.equals(clean, ignoreCase = true) }) clean else null
+                            }
+                        }
+
+                        if (detectedTaskCandidates.isNotEmpty()) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = PastelMint.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, PastelMint.copy(alpha = 0.4f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        viewModel.addChecklistItems(detectedTaskCandidates)
+                                        Toast.makeText(context, "Added ${detectedTaskCandidates.size} task(s) to checklist!", Toast.LENGTH_SHORT).show()
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Bolt, contentDescription = null, tint = PastelMint, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "⚡ Found ${detectedTaskCandidates.size} task(s) in note · Tap to add to Checklist",
+                                        color = PastelMint,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1588,7 +1734,7 @@ fun NoteEditorScreen(
                                 border = BorderStroke(0.8.dp, MindGlassButtonBorder),
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
-                                    .clickable { viewModel.addChecklistItem("") }
+                                    .clickable { addNewTask() }
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -1605,6 +1751,16 @@ fun NoteEditorScreen(
                             Spacer(modifier = Modifier.height(10.dp))
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 uiState.checklistItems.forEach { item ->
+                                    val itemFocusRequester = remember { FocusRequester() }
+
+                                    LaunchedEffect(focusedTaskId) {
+                                        if (focusedTaskId == item.id) {
+                                            itemFocusRequester.requestFocus()
+                                            keyboardController?.show()
+                                            focusedTaskId = null
+                                        }
+                                    }
+
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -1636,8 +1792,10 @@ fun NoteEditorScreen(
                                                 ),
                                                 cursorBrush = SolidColor(PastelMint),
                                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                                                keyboardActions = KeyboardActions(onNext = { viewModel.addChecklistItem("") }),
-                                                modifier = Modifier.fillMaxWidth()
+                                                keyboardActions = KeyboardActions(onNext = { addNewTask() }),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .focusRequester(itemFocusRequester)
                                             )
                                         }
                                         IconButton(
@@ -1815,5 +1973,228 @@ fun NoteEditorScreen(
             },
             containerColor = MindBackgroundAmoled
         )
+    }
+
+    // 🎭 Wit & Roast (MindLink Jester Dialog)
+    if (showWitDialog) {
+        AlertDialog(
+            onDismissRequest = { showWitDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🎭 MindLink Jester", fontWeight = FontWeight.Bold, color = MindTextPrimary, fontSize = 18.sp)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Style selection pills
+                    val styles = listOf("Roast" to "🔥 Roast", "Trailer" to "🎬 Trailer", "Cookie" to "🥠 Fortune", "Pirate" to "🏴‍☠️ Pirate")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        styles.forEach { (key, label) ->
+                            val isSelected = witCategory == key
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) PastelRose.copy(alpha = 0.25f) else MindGlassSurfaceVariant,
+                                border = BorderStroke(1.dp, if (isSelected) PastelRose else MindBorderDark.copy(alpha = 0.4f)),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        witCategory = key
+                                        witText = generateMindLinkWit(uiState.title, contentValue.text, uiState.checklistItems.size, key)
+                                    }
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) PastelRose else MindTextSecondary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // The Witty Output Card
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MindGlassSurface,
+                        border = BorderStroke(1.dp, PastelRose.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = witText.ifBlank { "Tap Reroll to summon a witty remark!" },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MindTextPrimary,
+                            lineHeight = 20.sp,
+                            modifier = Modifier.padding(14.dp)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                witText = generateMindLinkWit(uiState.title, contentValue.text, uiState.checklistItems.size, witCategory)
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                            border = BorderStroke(1.dp, PastelSky.copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelSky)
+                        ) {
+                            Text("🎲 Reroll", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(witText))
+                                Toast.makeText(context, "Copied to clipboard!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                            border = BorderStroke(1.dp, MindBorderDark),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MindTextSecondary)
+                        ) {
+                            Text("📋 Copy", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                val footnote = "\n\n> 🎭 **MindLink Jester:** \"$witText\""
+                                val updated = contentValue.text + footnote
+                                contentValue = TextFieldValue(updated, TextRange(updated.length))
+                                viewModel.updateContent(updated)
+                                Toast.makeText(context, "Inserted as footnote!", Toast.LENGTH_SHORT).show()
+                                showWitDialog = false
+                            },
+                            modifier = Modifier.weight(1.3f),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = PastelRose, contentColor = MindBackgroundDark)
+                        ) {
+                            Text("Insert Note", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWitDialog = false }) {
+                    Text("Close", color = MindTextSecondary)
+                }
+            },
+            containerColor = MindBackgroundAmoled
+        )
+    }
+
+    // ⚡ Quick Task Splitter Dialog
+    if (showTaskSplitterDialog) {
+        AlertDialog(
+            onDismissRequest = { showTaskSplitterDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Bolt, contentDescription = null, tint = PastelSky, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("⚡ Quick Task Splitter", fontWeight = FontWeight.Bold, color = MindTextPrimary, fontSize = 16.sp)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Paste or type a list of items (one per line) to convert them into interactive checklist items in one tap:",
+                        fontSize = 12.5.sp,
+                        color = MindTextSecondary
+                    )
+                    OutlinedTextField(
+                        value = taskSplitterInput,
+                        onValueChange = { taskSplitterInput = it },
+                        placeholder = { Text("Buy almond milk\nCall doctor\nReview pull request\nShip v1.1.9 release", fontSize = 12.sp, color = MindTextTertiary) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(130.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PastelSky,
+                            unfocusedBorderColor = MindBorderDark
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val lines = taskSplitterInput.lines()
+                            .map { it.trim().removePrefix("- [ ]").removePrefix("- ").removePrefix("* ").trim() }
+                            .filter { it.isNotBlank() }
+                        if (lines.isNotEmpty()) {
+                            viewModel.addChecklistItems(lines)
+                            Toast.makeText(context, "Added ${lines.size} tasks!", Toast.LENGTH_SHORT).show()
+                        }
+                        taskSplitterInput = ""
+                        showTaskSplitterDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PastelSky, contentColor = MindBackgroundDark),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Convert to Tasks", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTaskSplitterDialog = false }) {
+                    Text("Cancel", color = MindTextSecondary)
+                }
+            },
+            containerColor = MindBackgroundAmoled
+        )
+    }
+}
+
+fun generateMindLinkWit(title: String, content: String, tasksCount: Int, category: String): String {
+    val wordCount = content.split(Regex("\\s+")).filter { it.isNotBlank() }.size
+    val cleanTitle = title.ifBlank { "Untitled Thought" }
+    return when (category) {
+        "Roast" -> {
+            val list = listOf(
+                "A majestic to-do list of $tasksCount tasks. We all know you'll do task #1, feel proud, and reward yourself with a 2-hour YouTube spiral.",
+                "Look at these profound thoughts. If overthinking burned calories, you'd be an Olympic decathlete by now.",
+                "Writing '$cleanTitle' down definitely counts as productive work... right up until you actually have to do it.",
+                "Deep reflections captured with $wordCount words. Groundbreaking philosophy, yet your coffee mug from Tuesday is still sitting there.",
+                "Your ambitious plan looks brilliant on screen. Let's see if tomorrow's you agrees, or quietly ignores it.",
+                "Ah yes, the sacred art of organizing thoughts into bullet points so they look organized while you procrastinate."
+            )
+            list.random()
+        }
+        "Trailer" -> {
+            val list = listOf(
+                "IN A WORLD where tasks were meant to be done... One visionary wrote '$cleanTitle'. Coming this summer to an app near you.",
+                "He had the ambition. He had the markdown editor. What he didn't have... was any intention of waking up early tomorrow.",
+                "From the creator of 'I will do it later' comes the epic sequel: '$cleanTitle'. Rated PG-13 for intense procrastination.",
+                "One man. One journal. Zero completed action items. This fall... the deadline strikes back."
+            )
+            list.random()
+        }
+        "Cookie" -> {
+            val list = listOf(
+                "Ancient MindLink proverb: A thought written down is halfway to being forgotten until next year. Breathe deeply and take a nap.",
+                "The stars align for your great breakthrough on '$cleanTitle'. Unfortunately, your phone battery is at 12%.",
+                "Great wisdom lies within your words. Greater wisdom lies in closing your laptop and getting 8 hours of sleep.",
+                "Your future self will thank you for this note. Or your future self will stare at it wondering what you were drinking."
+            )
+            list.random()
+        }
+        else -> { // Pirate
+            val list = listOf(
+                "Ahoy matey! Yer logbook says ye got work to do, but dead men tell no tales and procrastinators find no buried doubloons!",
+                "Shiver me timbers! That's a mighty fine captain's log for '$cleanTitle'. Now hoist the sails and get to it!",
+                "Avast ye! Ye charted the course, now stop staring at the compass and steer the ship!",
+                "By Blackbeard's ghost! $tasksCount quests on yer pirate scroll! Which treasure chest are ye plunderin' first?"
+            )
+            list.random()
+        }
     }
 }
