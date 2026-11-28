@@ -24,12 +24,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import androidx.work.workDataOf
+import com.mindlink.journal.data.ai.ModelRegistry
+import com.mindlink.journal.data.worker.ModelDownloadWorker
+import com.mindlink.journal.di.ServiceLocator
 import com.mindlink.journal.ui.editor.components.SpeechRecognitionHelper
 import com.mindlink.journal.ui.editor.components.SpeechState
 import com.mindlink.journal.ui.secondbrain.components.ConversationalSynthesisCard
@@ -99,11 +110,149 @@ fun SecondBrainScreen(
         }
     }
 
+    // On-Device SLM status tracking
+    val mediaPipeEngine = remember { ServiceLocator.getInstance(context).brainstormingEngine.mediaPipeEngine }
+    var isSlmInstalled by remember { mutableStateOf(mediaPipeEngine.isModelAvailable()) }
+    var showSlmDownloadDialog by remember { mutableStateOf(false) }
+
+    val workManager = remember { WorkManager.getInstance(context) }
+    val downloadWorkInfos by workManager
+        .getWorkInfosForUniqueWorkFlow(ModelDownloadWorker.UNIQUE_WORK_NAME)
+        .collectAsState(initial = emptyList())
+
+    val activeDownloadWork = downloadWorkInfos.firstOrNull()
+    val isDownloading = activeDownloadWork?.state == WorkInfo.State.RUNNING || activeDownloadWork?.state == WorkInfo.State.ENQUEUED
+    val downloadProgress = activeDownloadWork?.progress?.getFloat(ModelDownloadWorker.KEY_PROGRESS, 0f) ?: 0f
+
+    LaunchedEffect(activeDownloadWork?.state) {
+        if (activeDownloadWork?.state == WorkInfo.State.SUCCEEDED) {
+            mediaPipeEngine.reloadModel()
+        }
+        isSlmInstalled = mediaPipeEngine.isModelAvailable()
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isSlmInstalled = mediaPipeEngine.isModelAvailable()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    if (showSlmDownloadDialog) {
+        AlertDialog(
+            onDismissRequest = { showSlmDownloadDialog = false },
+            icon = {
+                Icon(
+                    imageVector = if (isDownloading) Icons.Default.CloudSync else Icons.Default.CloudDownload,
+                    contentDescription = null,
+                    tint = if (isDownloading) PastelSky else Color(0xFFFB7185),
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = if (isDownloading) "Downloading On-Device SLM" else "On-Device SLM Not Downloaded",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (isDownloading) {
+                        val pct = (downloadProgress * 100).toInt()
+                        Text(
+                            text = "Downloading Qwen 2.5 0.5B in the background ($pct%). You can continue using MindLink while it installs.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MindTextPrimary
+                        )
+                        LinearProgressIndicator(
+                            progress = { downloadProgress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = PastelSky,
+                            trackColor = MindGlassBorder
+                        )
+                    } else {
+                        Text(
+                            text = "MindLink is currently running in local heuristic mode because the On-Device Small Language Model (SLM) is not installed.\n\n" +
+                                "Downloading the SLM (~350 MB) unlocks 100% private, on-device neural synthesis and deep associative intelligence with zero cloud dependency.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MindTextPrimary
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                if (!isDownloading) {
+                    Button(
+                        onClick = {
+                            showSlmDownloadDialog = false
+                            val modelToDownload = ModelRegistry.DEFAULT_MODELS.first()
+                            val workRequest = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
+                                .setInputData(
+                                    workDataOf(
+                                        ModelDownloadWorker.KEY_MODEL_ID to modelToDownload.id,
+                                        ModelDownloadWorker.KEY_MODEL_NAME to modelToDownload.name,
+                                        ModelDownloadWorker.KEY_DOWNLOAD_URL to modelToDownload.downloadUrl
+                                    )
+                                )
+                                .build()
+                            WorkManager.getInstance(context).enqueueUniqueWork(
+                                ModelDownloadWorker.UNIQUE_WORK_NAME,
+                                ExistingWorkPolicy.REPLACE,
+                                workRequest
+                            )
+                            Toast.makeText(context, "Background download started for ${modelToDownload.name}", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MindIndigo)
+                    ) {
+                        Text("Download SLM Now")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            showSlmDownloadDialog = false
+                            onSettingsClick()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MindIndigo)
+                    ) {
+                        Text("View in Settings")
+                    }
+                }
+            },
+            dismissButton = {
+                Row {
+                    if (!isDownloading) {
+                        TextButton(onClick = {
+                            showSlmDownloadDialog = false
+                            onSettingsClick()
+                        }) {
+                            Text("Open Settings")
+                        }
+                    }
+                    TextButton(onClick = { showSlmDownloadDialog = false }) {
+                        Text("Dismiss")
+                    }
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    ) {
                         Icon(Icons.Default.Psychology, contentDescription = null, tint = PastelLavender, modifier = Modifier.size(22.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -112,7 +261,7 @@ fun SecondBrainScreen(
                             fontWeight = FontWeight.Bold,
                             color = MindTextPrimary
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MindGlassButtonContainer,
@@ -125,6 +274,63 @@ fun SecondBrainScreen(
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
+                        }
+
+                        // SLM download visibility right next to Associative Q&A
+                        if (isDownloading) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = PastelSky.copy(alpha = 0.15f),
+                                border = BorderStroke(0.5.dp, PastelSky.copy(alpha = 0.5f)),
+                                modifier = Modifier.clickable { showSlmDownloadDialog = true }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(10.dp),
+                                        strokeWidth = 1.5.dp,
+                                        color = PastelSky
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    val pct = (downloadProgress * 100).toInt()
+                                    Text(
+                                        text = if (pct > 0) "SLM $pct%" else "Downloading SLM...",
+                                        color = PastelSky,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        } else if (!isSlmInstalled) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0x28F43F5E),
+                                border = BorderStroke(0.5.dp, Color(0x66F43F5E)),
+                                modifier = Modifier.clickable { showSlmDownloadDialog = true }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudDownload,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFB7185),
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "SLM Not Downloaded",
+                                        color = Color(0xFFFB7185),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
                         }
                     }
                 },
