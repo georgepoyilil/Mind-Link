@@ -87,29 +87,37 @@ fun ComplexityLadderScreen(
                 actions = {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = if (state.isGodMode) MindIndigo.copy(alpha = 0.25f) else MindGlassSurfaceVariant,
-                        border = BorderStroke(1.dp, if (state.isGodMode) MindIndigo else MindGlassBorderSubtle),
+                        color = if (state.currentTier == 0) MindIndigo.copy(alpha = 0.25f) else PastelMint.copy(alpha = 0.18f),
+                        border = BorderStroke(1.dp, if (state.currentTier == 0) MindIndigo else PastelMint.copy(alpha = 0.6f)),
                         modifier = Modifier
                             .padding(end = 10.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .clickable { manager.setGodMode(!state.isGodMode) }
+                            .clickable {
+                                if (state.currentTier == 0) {
+                                    manager.selectActiveLevel(5)
+                                    focusedLevel = 5
+                                } else {
+                                    manager.selectActiveLevel(0)
+                                    focusedLevel = 0
+                                }
+                            }
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = if (state.isGodMode) Icons.Default.AutoAwesome else Icons.Default.LockOpen,
-                                contentDescription = "Unlock All",
-                                tint = if (state.isGodMode) PastelSky else MindTextSecondary,
+                                imageVector = if (state.currentTier == 0) Icons.Default.AutoAwesome else Icons.Default.Spa,
+                                contentDescription = "Quick Mode Switch",
+                                tint = if (state.currentTier == 0) PastelSky else PastelMint,
                                 modifier = Modifier.size(13.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (state.isGodMode) "All Unlocked" else "Unlock All",
+                                text = if (state.currentTier == 0) "Unlock L5" else "Simple L0",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (state.isGodMode) PastelSky else MindTextSecondary
+                                color = if (state.currentTier == 0) PastelSky else PastelMint
                             )
                         }
                     }
@@ -201,8 +209,57 @@ fun ComplexityLadderScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Next Level Unlock Progress Bar
-                        if (nextLevel != null && !state.isGodMode) {
+                        // 1-Tap Selectable Complexity Level Pill Switcher (L0..L5)
+                        Text(
+                            text = "SWITCH ACTIVE LEVEL (TAP TO TOGGLE)",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MindTextTertiary,
+                            letterSpacing = 0.8.sp,
+                            fontSize = 9.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            CapabilityLadderManager.TIERS.forEach { lvl ->
+                                val isCurrent = state.currentTier == lvl.tier
+                                val lvlAccent = Color(lvl.accentHex)
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isCurrent) lvlAccent.copy(alpha = 0.25f) else MindGlassSurfaceVariant,
+                                    border = BorderStroke(
+                                        width = if (isCurrent) 1.5.dp else 0.8.dp,
+                                        color = if (isCurrent) lvlAccent else MindGlassBorderSubtle
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            manager.selectActiveLevel(lvl.tier)
+                                            focusedLevel = lvl.tier
+                                        }
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 7.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = "L${lvl.tier}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = if (isCurrent) lvlAccent else MindTextSecondary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Next Level Milestone Info
+                        if (nextLevel != null) {
                             val prevReq = activeLevelInfo?.requiredNotes ?: 0
                             val delta = (nextLevel.requiredNotes - prevReq).coerceAtLeast(1)
                             val prog = (state.activeNotesCount - prevReq).coerceAtLeast(0)
@@ -215,13 +272,13 @@ fun ComplexityLadderScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Next Block: ${nextLevel.badgeIcon} Level ${nextLevel.tier} (${nextLevel.title})",
+                                    text = "Smart Milestone: ${nextLevel.badgeIcon} Level ${nextLevel.tier} (${nextLevel.title})",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MindTextSecondary,
                                     fontSize = 11.sp
                                 )
                                 Text(
-                                    text = if (thoughtsNeeded > 0) "$thoughtsNeeded thoughts away" else "Ready!",
+                                    text = if (thoughtsNeeded > 0) "$thoughtsNeeded notes to milestone" else "Ready to activate",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = nextAccent,
                                     fontWeight = FontWeight.Bold,
@@ -246,11 +303,7 @@ fun ComplexityLadderScreen(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
-                                    text = if (state.isGodMode) {
-                                        "👑 All-Access Mode Active · Flip any block below to shape your exact app."
-                                    } else {
-                                        "👑 Level 5 Reached · Toggle any module off to hide it completely from the app."
-                                    },
+                                    text = "👑 Peak Level 5 Active · Toggle any module off below, or drop back to L0 anytime.",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = PastelLavender,
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
@@ -350,7 +403,7 @@ fun ComplexityLadderScreen(
                                             )
                                         }
                                     }
-                                    if (isCapUnlocked && !cap.isCore) {
+                                    if (!cap.isCore) {
                                         Switch(
                                             checked = isCapOn,
                                             onCheckedChange = { manager.toggleFeature(cap.key, it) },
@@ -431,7 +484,11 @@ fun ComplexityLadderScreen(
                             inspectedCapability = if (inspectedCapability?.key == cap.key) null else cap
                         },
                         onToggleFeature = { key, enabled -> manager.toggleFeature(key, enabled) },
-                        onToggleAllInLevel = { enabled -> manager.toggleAllInLevel(levelInfo.tier, enabled) }
+                        onToggleAllInLevel = { enabled -> manager.toggleAllInLevel(levelInfo.tier, enabled) },
+                        onActivateLevel = {
+                            manager.selectActiveLevel(levelInfo.tier)
+                            focusedLevel = levelInfo.tier
+                        }
                     )
                 }
             }
@@ -626,9 +683,11 @@ private fun LevelModuleBlockSection(
     inspectedKey: String?,
     onInspect: (CapabilityItem) -> Unit,
     onToggleFeature: (String, Boolean) -> Unit,
-    onToggleAllInLevel: (Boolean) -> Unit
+    onToggleAllInLevel: (Boolean) -> Unit,
+    onActivateLevel: () -> Unit
 ) {
     val isUnlocked = state.isLevelUnlocked(level.tier)
+    val isCurrentPreset = state.currentTier == level.tier
     val accent = Color(level.accentHex)
     val (activeCount, totalCount) = state.activeCountForLevel(level.tier)
     val hasOptional = capabilities.any { !it.isCore }
@@ -638,8 +697,8 @@ private fun LevelModuleBlockSection(
         // Level Header Banner
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = if (isUnlocked) accent.copy(alpha = 0.12f) else Color(0x161E293B),
-            border = BorderStroke(1.dp, if (isUnlocked) accent.copy(alpha = 0.45f) else Color(0x28334155)),
+            color = if (isUnlocked || activeCount > 0) accent.copy(alpha = 0.12f) else Color(0x161E293B),
+            border = BorderStroke(1.dp, if (isUnlocked || activeCount > 0) accent.copy(alpha = 0.45f) else Color(0x28334155)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -656,18 +715,18 @@ private fun LevelModuleBlockSection(
                                 text = "Level ${level.tier} · ${level.title}",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isUnlocked) MindTextPrimary else MindTextTertiary
+                                color = MindTextPrimary
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = if (isUnlocked) accent.copy(alpha = 0.2f) else Color(0x22F43F5E)
+                                color = accent.copy(alpha = 0.2f)
                             ) {
                                 Text(
-                                    text = if (isUnlocked) "$activeCount/$totalCount" else "LOCKED · ${level.requiredNotes}n",
+                                    text = "$activeCount/$totalCount",
                                     fontSize = 9.5.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isUnlocked) accent else Color(0xFFFB7185),
+                                    color = accent,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
@@ -681,22 +740,41 @@ private fun LevelModuleBlockSection(
                     }
                 }
 
-                if (isUnlocked && hasOptional) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MindGlassButtonContainer,
-                        border = BorderStroke(0.8.dp, accent.copy(alpha = 0.5f)),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onToggleAllInLevel(!allOptionalOn) }
-                    ) {
-                        Text(
-                            text = if (allOptionalOn) "Turn Off" else "Enable All",
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = accent,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                        )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (!isCurrentPreset) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = accent.copy(alpha = 0.22f),
+                            border = BorderStroke(0.8.dp, accent),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onActivateLevel() }
+                        ) {
+                            Text(
+                                text = "Use L${level.tier}",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = accent,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                            )
+                        }
+                    } else if (hasOptional) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MindGlassButtonContainer,
+                            border = BorderStroke(0.8.dp, accent.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onToggleAllInLevel(!allOptionalOn) }
+                        ) {
+                            Text(
+                                text = if (allOptionalOn) "Turn Off" else "Enable All",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = accent,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -744,21 +822,20 @@ private fun CapabilityTileBlock(
     onToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val activeAndUnlocked = isLevelUnlocked && isEnabled
-    val cardAlpha = if (isLevelUnlocked) 1f else 0.58f
+    val isTileActive = isEnabled
+    val cardAlpha = if (isLevelUnlocked || isEnabled) 1f else 0.78f
 
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = when {
-            activeAndUnlocked -> MindGlassSurfaceVariant
-            isLevelUnlocked -> Color(0x160F172A)
-            else -> Color(0x0C0F172A)
+            isTileActive -> MindGlassSurfaceVariant
+            else -> Color(0x160F172A)
         },
         border = BorderStroke(
             width = if (isInspected) 1.5.dp else 1.dp,
             color = when {
                 isInspected -> Color.White
-                activeAndUnlocked -> accent.copy(alpha = 0.55f)
+                isTileActive -> accent.copy(alpha = 0.55f)
                 else -> MindGlassBorderSubtle.copy(alpha = 0.5f)
             }
         ),
@@ -774,7 +851,7 @@ private fun CapabilityTileBlock(
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                // Top Row: Emoji Badge + Toggle/Core/Lock Pill
+                // Top Row: Emoji Badge + Switch / Core Pill
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -782,7 +859,7 @@ private fun CapabilityTileBlock(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = if (activeAndUnlocked) accent.copy(alpha = 0.18f) else MindGlassSurface,
+                        color = if (isTileActive) accent.copy(alpha = 0.18f) else MindGlassSurface,
                         modifier = Modifier.size(34.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -790,42 +867,31 @@ private fun CapabilityTileBlock(
                         }
                     }
 
-                    when {
-                        !isLevelUnlocked -> {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "Locked",
-                                tint = MindTextTertiary,
-                                modifier = Modifier.size(16.dp)
+                    if (item.isCore) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = accent.copy(alpha = 0.16f)
+                        ) {
+                            Text(
+                                text = "CORE",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = accent,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
-                        item.isCore -> {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = accent.copy(alpha = 0.16f)
-                            ) {
-                                Text(
-                                    text = "CORE",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = accent,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                        else -> {
-                            Switch(
-                                checked = isEnabled,
-                                onCheckedChange = onToggle,
-                                modifier = Modifier.height(26.dp),
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = accent,
-                                    uncheckedThumbColor = MindTextTertiary,
-                                    uncheckedTrackColor = Color(0x33475569)
-                                )
+                    } else {
+                        Switch(
+                            checked = isEnabled,
+                            onCheckedChange = onToggle,
+                            modifier = Modifier.height(26.dp),
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = accent,
+                                uncheckedThumbColor = MindTextTertiary,
+                                uncheckedTrackColor = Color(0x33475569)
                             )
-                        }
+                        )
                     }
                 }
 
@@ -835,7 +901,7 @@ private fun CapabilityTileBlock(
                     text = item.title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (activeAndUnlocked) MindTextPrimary else MindTextSecondary,
+                    color = if (isTileActive) MindTextPrimary else MindTextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -861,13 +927,13 @@ private fun CapabilityTileBlock(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (!isLevelUnlocked) "Locked" else if (isEnabled) "Active" else "Removed",
+                        text = if (isEnabled) "Active" else if (isLevelUnlocked) "Removed" else "Available",
                         fontSize = 9.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = when {
-                            !isLevelUnlocked -> MindTextTertiary
                             isEnabled -> accent
-                            else -> PastelRose.copy(alpha = 0.85f)
+                            isLevelUnlocked -> PastelRose.copy(alpha = 0.85f)
+                            else -> MindTextTertiary
                         }
                     )
                     Text(

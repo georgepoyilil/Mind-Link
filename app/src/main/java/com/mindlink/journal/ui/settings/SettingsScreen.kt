@@ -129,6 +129,10 @@ fun SettingsScreen(
     if (showOnboardingDialog) {
         MindLinkOnboardingDialog(
             onDismiss = { showOnboardingDialog = false },
+            onOpenBlueprint = {
+                showOnboardingDialog = false
+                onComplexityLadderClick()
+            },
             googleUser = uiState.googleUser
         )
     }
@@ -214,7 +218,44 @@ fun SettingsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Instant Level Selector Row (L0..L5)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        CapabilityLadderManager.TIERS.forEach { lvl ->
+                            val isSelected = ladderState.currentTier == lvl.tier
+                            val accent = Color(lvl.accentHex)
+                            Surface(
+                                shape = RoundedCornerShape(9.dp),
+                                color = if (isSelected) accent.copy(alpha = 0.25f) else MindGlassSurfaceVariant,
+                                border = BorderStroke(
+                                    width = if (isSelected) 1.4.dp else 0.8.dp,
+                                    color = if (isSelected) accent else MindBorderDark.copy(alpha = 0.5f)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .clickable { capabilityManager.selectActiveLevel(lvl.tier) }
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.padding(vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = "L${lvl.tier}",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                        color = if (isSelected) accent else MindTextSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),

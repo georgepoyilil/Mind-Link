@@ -26,6 +26,7 @@ fun MindLinkOnboardingDialog(
     onDismiss: () -> Unit,
     onLoadSamples: (() -> Unit)? = null,
     onGoogleSignIn: (() -> Unit)? = null,
+    onOpenBlueprint: (() -> Unit)? = null,
     googleUser: com.mindlink.journal.data.sync.GoogleUserProfile? = null
 ) {
     Dialog(
@@ -78,52 +79,87 @@ fun MindLinkOnboardingDialog(
                             color = MindTextPrimary
                         )
                         Text(
-                            text = "Your Associative Second Brain",
+                            text = "Starts Pure at Level 0 · Grows With You",
                             style = MaterialTheme.typography.bodySmall,
                             color = PastelLavender
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Scrollable features list
+                // Progressive Growth Overview Callout
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MindIndigo.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, MindIndigo.copy(alpha = 0.45f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "🌿 Starts Calm · 23 Features Ready Underneath",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = PastelMint
+                        )
+                        Text(
+                            text = "Begin with pure simple text, follow-ups, and the + button. Upgrade feature-by-feature via occasional smart suggestions, or toggle Levels L0–L5 manually anytime in Settings or the Drawer.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MindTextSecondary,
+                            fontSize = 11.5.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Scrollable roadmap of features inside MindLink
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OnboardingFeatureCard(
                         icon = Icons.Default.EditNote,
-                        iconColor = PastelLavender,
-                        title = "1. Mindful Capture",
-                        description = "Markdown notes, live speech dictation, high-fidelity local voice memos, and smart OCR document scanning that cleans and structures text."
-                    )
-                    OnboardingFeatureCard(
-                        icon = Icons.Default.Hub,
-                        iconColor = PastelSky,
-                        title = "2. Synaptic Knowledge Graph",
-                        description = "Interconnect thoughts automatically with #tags and [[Wikilinks]]. Explore relationships in an interactive 2D physics graph."
-                    )
-                    OnboardingFeatureCard(
-                        icon = Icons.Default.Memory,
-                        iconColor = PastelViolet,
-                        title = "3. Second Brain Inquiries",
-                        description = "Ask questions across all past notes. Synthesize insights using on-device SLMs (Qwen 2.5 / SmolLM2) or Cloud Gemini."
-                    )
-                    OnboardingFeatureCard(
-                        icon = Icons.Default.Security,
                         iconColor = PastelMint,
-                        title = "4. 100% Offline & Private",
-                        description = "All thoughts, vector embeddings, and media are stored locally in Room SQLite. Zero trackers, zero cloud dependencies."
+                        title = "Level 0 · Blank Slate (Default Start)",
+                        description = "Just write plain notes with +, append follow-up points, search offline, and switch Dark/Light/Glass themes."
                     )
                     OnboardingFeatureCard(
-                        icon = Icons.Default.CloudSync,
+                        icon = Icons.Default.Checklist,
                         iconColor = PastelSky,
-                        title = "5. Redundant Cloud & Photo Backup",
-                        description = "Optional Google Drive backup keeps 3 rolling historical snapshots with all your notes and attached photos safe."
+                        title = "Level 1–2 · Formatting, Voice & Moments",
+                        description = "Add Rich Text & Word View, Checklists, Topic Tags, Type Studio fonts, Photos, Voice Studio memos, Page Scanner (OCR) & Mood Aura."
                     )
+                    OnboardingFeatureCard(
+                        icon = Icons.Default.Lock,
+                        iconColor = PastelAmber,
+                        title = "Level 3 · History, Privacy & Cloud Vault",
+                        description = "Unlock Time Machine revision diffs, Fingerprint Vault Lock, Mindful Nudges & 3-slot Google Drive backups."
+                    )
+                    OnboardingFeatureCard(
+                        icon = Icons.Default.Psychology,
+                        iconColor = PastelViolet,
+                        title = "Level 4–5 · Memory Oracle & Edge AI",
+                        description = "Ask questions across past thoughts, explore your 2D Thought Constellation, and run offline Qwen 2.5 SLM on your phone GPU."
+                    )
+                }
+
+                if (onOpenBlueprint != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = onOpenBlueprint,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelLavender),
+                        border = BorderStroke(1.dp, PastelLavender.copy(alpha = 0.55f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.TrendingUp, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Choose Level Manually (L0 – L5)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

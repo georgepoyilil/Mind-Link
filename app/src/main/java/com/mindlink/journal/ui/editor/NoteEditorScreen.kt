@@ -118,6 +118,7 @@ fun NoteEditorScreen(
 
     val capabilityManager = remember { com.mindlink.journal.di.ServiceLocator.getInstance(context).capabilityLadderManager }
     val ladderState by capabilityManager.state.collectAsState()
+    val canUseRichText = ladderState.isEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_RICH_TEXT)
     val canUseTypography = ladderState.isEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_TYPOGRAPHY)
     val canUseMedia = ladderState.isEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_MEDIA_CAPTURE)
     val canUseOcr = ladderState.isEnabled(com.mindlink.journal.data.capability.CapabilityLadderManager.FEATURE_OCR)
@@ -483,32 +484,33 @@ fun NoteEditorScreen(
                         }
                     }
 
-                    // Undo Button
-                    IconButton(
-                        onClick = performUndo,
-                        enabled = canUndo,
-                        modifier = Modifier.size(34.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Undo,
-                            contentDescription = "Undo",
-                            tint = if (canUndo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                    // Undo & Redo Buttons (Rich Text Level 1+)
+                    if (canUseRichText) {
+                        IconButton(
+                            onClick = performUndo,
+                            enabled = canUndo,
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Undo,
+                                contentDescription = "Undo",
+                                tint = if (canUndo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
 
-                    // Redo Button
-                    IconButton(
-                        onClick = performRedo,
-                        enabled = canRedo,
-                        modifier = Modifier.size(34.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Redo,
-                            contentDescription = "Redo",
-                            tint = if (canRedo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
-                            modifier = Modifier.size(20.dp)
-                        )
+                        IconButton(
+                            onClick = performRedo,
+                            enabled = canRedo,
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Redo,
+                                contentDescription = "Redo",
+                                tint = if (canRedo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.width(2.dp))
@@ -627,257 +629,268 @@ fun NoteEditorScreen(
                 }
             }
 
-            // Reorganized Professional Editing Toolbar & Inspectors
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MindGlassSurfaceVariant)
-            ) {
-                // 1. Two-Row Categorized Toolbar (Grouped by Tool Type)
+            // Reorganized Professional Editing Toolbar & Inspectors (Hidden completely at Level 0 Pure Text)
+            val hasAnyToolbarControl = canUseRichText || canUseTypography || canUseMedia || canUseVoice || canUseOcr || canUseChecklists || canUseSplitter || canUseJester
+            if (hasAnyToolbarControl) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                        .background(MindGlassSurfaceVariant)
                 ) {
-                    // ROW 1: Structural & Block Tools (Aa Typography, Attach Media, H3, Quote, List, + Task, ⚡ Tasks, 🎭 Wit & Roast)
-                    Row(
+                    // 1. Two-Row Categorized Toolbar (Grouped by Tool Type)
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        // Typography / Font Size Inspector Toggle (Aa)
-                        if (canUseTypography) {
-                            val activeScale = uiState.fontSizeScale
-                            val sizeLabel = when {
-                                activeScale == null -> "Aa"
-                                activeScale < 0.9f -> "Aa · S"
-                                activeScale < 1.1f -> "Aa · M"
-                                activeScale < 1.25f -> "Aa · L"
-                                else -> "Aa · XL"
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (showTypographyPanel) MindIndigo.copy(alpha = 0.35f) else MindGlassButtonContainer,
-                                border = BorderStroke(1.dp, if (showTypographyPanel) PastelLavender else MindGlassButtonBorder),
+                        // ROW 1: Structural & Block Tools (Aa Typography, Media, H3, Quote, List, + Task, ⚡ Tasks, 🎭 Wit)
+                        val hasRow1Items = canUseTypography || canUseMedia || canUseVoice || canUseOcr || canUseRichText || canUseChecklists || canUseSplitter || canUseJester
+                        if (hasRow1Items) {
+                            Row(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        showTypographyPanel = !showTypographyPanel
-                                        if (showTypographyPanel) showMediaPanel = false
-                                    }
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                // Typography / Font Size Inspector Toggle (Aa)
+                                if (canUseTypography) {
+                                    val activeScale = uiState.fontSizeScale
+                                    val sizeLabel = when {
+                                        activeScale == null -> "Aa"
+                                        activeScale < 0.9f -> "Aa · S"
+                                        activeScale < 1.1f -> "Aa · M"
+                                        activeScale < 1.25f -> "Aa · L"
+                                        else -> "Aa · XL"
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (showTypographyPanel) MindIndigo.copy(alpha = 0.35f) else MindGlassButtonContainer,
+                                        border = BorderStroke(1.dp, if (showTypographyPanel) PastelLavender else MindGlassButtonBorder),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                showTypographyPanel = !showTypographyPanel
+                                                if (showTypographyPanel) showMediaPanel = false
+                                            }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.TextFields,
+                                                contentDescription = "Typography",
+                                                tint = if (showTypographyPanel) PastelLavender else MindTextPrimary,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = sizeLabel,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 11.sp,
+                                                color = if (showTypographyPanel) PastelLavender else MindTextPrimary
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Insert Media Tray Toggle (+)
+                                if (canUseMedia || canUseVoice || canUseOcr) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (showMediaPanel) PastelSky.copy(alpha = 0.35f) else MindGlassButtonContainer,
+                                        border = BorderStroke(1.dp, if (showMediaPanel) PastelSky else MindGlassButtonBorder),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                showMediaPanel = !showMediaPanel
+                                                if (showMediaPanel) showTypographyPanel = false
+                                            }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.AddPhotoAlternate,
+                                                contentDescription = "Attach Media",
+                                                tint = if (showMediaPanel) PastelSky else MindTextPrimary,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Media", fontSize = 11.sp, color = if (showMediaPanel) PastelSky else MindTextPrimary, fontWeight = FontWeight.SemiBold)
+                                        }
+                                    }
+                                }
+
+                                if (canUseRichText) {
+                                    if (canUseTypography || canUseMedia || canUseVoice || canUseOcr) {
+                                        Box(
+                                            modifier = Modifier
+                                                .height(16.dp)
+                                                .width(1.dp)
+                                                .background(MindGlassBorderSubtle)
+                                        )
+                                    }
+
+                                    // Heading H3
+                                    IconButton(onClick = { insertLinePrefix("### ") }, modifier = Modifier.size(30.dp)) {
+                                        Text("H3", fontWeight = FontWeight.Bold, color = MindTextPrimary, fontSize = 12.sp)
+                                    }
+
+                                    // Quote
+                                    IconButton(onClick = { insertLinePrefix("> ") }, modifier = Modifier.size(30.dp)) {
+                                        Icon(Icons.Default.FormatQuote, contentDescription = "Quote", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
+                                    }
+
+                                    // Bullet List
+                                    IconButton(onClick = { insertLinePrefix("- ") }, modifier = Modifier.size(30.dp)) {
+                                        Icon(Icons.Default.FormatListBulleted, contentDescription = "Bullet List", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+
+                                // + Task checklist button
+                                if (canUseChecklists) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MindGlassButtonContainer,
+                                        border = BorderStroke(0.8.dp, MindGlassButtonBorder),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { addNewTask() }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.TaskAlt, contentDescription = null, tint = PastelMint, modifier = Modifier.size(13.dp))
+                                            Spacer(modifier = Modifier.width(3.dp))
+                                            Text("+ Task", fontSize = 11.sp, color = PastelMint, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                // ⚡ Dynamic Tasks Quick Splitter
+                                if (canUseSplitter) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = PastelSky.copy(alpha = 0.15f),
+                                        border = BorderStroke(0.8.dp, PastelSky.copy(alpha = 0.4f)),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { showTaskSplitterDialog = true }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Bolt, contentDescription = null, tint = PastelSky, modifier = Modifier.size(13.dp))
+                                            Spacer(modifier = Modifier.width(3.dp))
+                                            Text("⚡ Tasks", fontSize = 11.sp, color = PastelSky, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                // 🎭 Wit & Roast (Perspective Jester)
+                                if (canUseJester) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = PastelRose.copy(alpha = 0.15f),
+                                        border = BorderStroke(0.8.dp, PastelRose.copy(alpha = 0.4f)),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                witText = generateMindLinkWit(uiState.title, contentValue.text, uiState.checklistItems.size, witCategory)
+                                                showWitDialog = true
+                                            }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("🎭 Wit & Roast", fontSize = 11.sp, color = PastelRose, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (canUseRichText) {
+                            // Subtle Row Divider
+                            HorizontalDivider(
+                                thickness = 0.5.dp,
+                                color = MindBorderDark.copy(alpha = 0.35f)
+                            )
+
+                            // ROW 2: Inline Text Styling & Action History (Bold, Italic, Underline, Strikethrough, Select All, Undo, Redo)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                // Bold
+                                IconButton(onClick = { wrapSelection("**") }, modifier = Modifier.size(30.dp)) {
+                                    Icon(Icons.Default.FormatBold, contentDescription = "Bold", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
+                                }
+
+                                // Italic
+                                IconButton(onClick = { wrapSelection("*") }, modifier = Modifier.size(30.dp)) {
+                                    Icon(Icons.Default.FormatItalic, contentDescription = "Italic", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
+                                }
+
+                                // Underline
+                                IconButton(onClick = { wrapSelection("__") }, modifier = Modifier.size(30.dp)) {
+                                    Icon(Icons.Default.FormatUnderlined, contentDescription = "Underline", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
+                                }
+
+                                // Strikethrough
+                                IconButton(onClick = { wrapSelection("~~") }, modifier = Modifier.size(30.dp)) {
+                                    Icon(Icons.Default.FormatStrikethrough, contentDescription = "Strikethrough", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .height(16.dp)
+                                        .width(1.dp)
+                                        .background(MindGlassBorderSubtle)
+                                )
+
+                                // Select All
+                                IconButton(
+                                    onClick = {
+                                        contentValue = contentValue.copy(selection = TextRange(0, contentValue.text.length))
+                                    },
+                                    modifier = Modifier.size(30.dp)
                                 ) {
+                                    Icon(Icons.Default.SelectAll, contentDescription = "Select All", tint = MindTextSecondary, modifier = Modifier.size(16.dp))
+                                }
+
+                                // Undo
+                                IconButton(onClick = performUndo, enabled = canUndo, modifier = Modifier.size(30.dp)) {
                                     Icon(
-                                        imageVector = Icons.Default.TextFields,
-                                        contentDescription = "Typography",
-                                        tint = if (showTypographyPanel) PastelLavender else MindTextPrimary,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = sizeLabel,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp,
-                                        color = if (showTypographyPanel) PastelLavender else MindTextPrimary
+                                        Icons.Default.Undo,
+                                        contentDescription = "Undo",
+                                        tint = if (canUndo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
-                            }
-                        }
 
-                        // Insert Media Tray Toggle (+)
-                        if (canUseMedia || canUseVoice || canUseOcr) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (showMediaPanel) PastelSky.copy(alpha = 0.35f) else MindGlassButtonContainer,
-                                border = BorderStroke(1.dp, if (showMediaPanel) PastelSky else MindGlassButtonBorder),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        showMediaPanel = !showMediaPanel
-                                        if (showMediaPanel) showTypographyPanel = false
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+                                // Redo
+                                IconButton(onClick = performRedo, enabled = canRedo, modifier = Modifier.size(30.dp)) {
                                     Icon(
-                                        imageVector = Icons.Default.AddPhotoAlternate,
-                                        contentDescription = "Attach Media",
-                                        tint = if (showMediaPanel) PastelSky else MindTextPrimary,
-                                        modifier = Modifier.size(15.dp)
+                                        Icons.Default.Redo,
+                                        contentDescription = "Redo",
+                                        tint = if (canRedo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
+                                        modifier = Modifier.size(16.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Media", fontSize = 11.sp, color = if (showMediaPanel) PastelSky else MindTextPrimary, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .height(16.dp)
-                                .width(1.dp)
-                                .background(MindGlassBorderSubtle)
-                        )
-
-                        // Heading H3
-                        IconButton(onClick = { insertLinePrefix("### ") }, modifier = Modifier.size(30.dp)) {
-                            Text("H3", fontWeight = FontWeight.Bold, color = MindTextPrimary, fontSize = 12.sp)
-                        }
-
-                        // Quote
-                        IconButton(onClick = { insertLinePrefix("> ") }, modifier = Modifier.size(30.dp)) {
-                            Icon(Icons.Default.FormatQuote, contentDescription = "Quote", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
-                        }
-
-                        // Bullet List
-                        IconButton(onClick = { insertLinePrefix("- ") }, modifier = Modifier.size(30.dp)) {
-                            Icon(Icons.Default.FormatListBulleted, contentDescription = "Bullet List", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
-                        }
-
-                        // + Task checklist button
-                        if (canUseChecklists) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MindGlassButtonContainer,
-                                border = BorderStroke(0.8.dp, MindGlassButtonBorder),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { addNewTask() }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Default.TaskAlt, contentDescription = null, tint = PastelMint, modifier = Modifier.size(13.dp))
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text("+ Task", fontSize = 11.sp, color = PastelMint, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-
-                        // ⚡ Dynamic Tasks Quick Splitter
-                        if (canUseSplitter) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = PastelSky.copy(alpha = 0.15f),
-                                border = BorderStroke(0.8.dp, PastelSky.copy(alpha = 0.4f)),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { showTaskSplitterDialog = true }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Default.Bolt, contentDescription = null, tint = PastelSky, modifier = Modifier.size(13.dp))
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text("⚡ Tasks", fontSize = 11.sp, color = PastelSky, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-
-                        // 🎭 Wit & Roast (Funny Tool)
-                        if (canUseJester) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = PastelRose.copy(alpha = 0.15f),
-                                border = BorderStroke(0.8.dp, PastelRose.copy(alpha = 0.4f)),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        witText = generateMindLinkWit(uiState.title, contentValue.text, uiState.checklistItems.size, witCategory)
-                                        showWitDialog = true
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("🎭 Wit & Roast", fontSize = 11.sp, color = PastelRose, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
                     }
-
-                    // Subtle Row Divider
-                    HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = MindBorderDark.copy(alpha = 0.35f)
-                    )
-
-                    // ROW 2: Inline Text Styling & Action History (Bold, Italic, Underline, Strikethrough, Select All, Undo, Redo)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        // Bold
-                        IconButton(onClick = { wrapSelection("**") }, modifier = Modifier.size(30.dp)) {
-                            Icon(Icons.Default.FormatBold, contentDescription = "Bold", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
-                        }
-
-                        // Italic
-                        IconButton(onClick = { wrapSelection("*") }, modifier = Modifier.size(30.dp)) {
-                            Icon(Icons.Default.FormatItalic, contentDescription = "Italic", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
-                        }
-
-                        // Underline
-                        IconButton(onClick = { wrapSelection("__") }, modifier = Modifier.size(30.dp)) {
-                            Icon(Icons.Default.FormatUnderlined, contentDescription = "Underline", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
-                        }
-
-                        // Strikethrough
-                        IconButton(onClick = { wrapSelection("~~") }, modifier = Modifier.size(30.dp)) {
-                            Icon(Icons.Default.FormatStrikethrough, contentDescription = "Strikethrough", tint = MindTextPrimary, modifier = Modifier.size(16.dp))
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .height(16.dp)
-                                .width(1.dp)
-                                .background(MindGlassBorderSubtle)
-                        )
-
-                        // Select All
-                        IconButton(
-                            onClick = {
-                                contentValue = contentValue.copy(selection = TextRange(0, contentValue.text.length))
-                            },
-                            modifier = Modifier.size(30.dp)
-                        ) {
-                            Icon(Icons.Default.SelectAll, contentDescription = "Select All", tint = MindTextSecondary, modifier = Modifier.size(16.dp))
-                        }
-
-                        // Undo
-                        IconButton(onClick = performUndo, enabled = canUndo, modifier = Modifier.size(30.dp)) {
-                            Icon(
-                                Icons.Default.Undo,
-                                contentDescription = "Undo",
-                                tint = if (canUndo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-
-                        // Redo
-                        IconButton(onClick = performRedo, enabled = canRedo, modifier = Modifier.size(30.dp)) {
-                            Icon(
-                                Icons.Default.Redo,
-                                contentDescription = "Redo",
-                                tint = if (canRedo) MindTextPrimary else MindTextTertiary.copy(alpha = 0.35f),
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                }
 
                 // 2. Expandable Typography & Text Size Inspector (Proper structured editing tool)
                 AnimatedVisibility(visible = canUseTypography && showTypographyPanel) {
@@ -1167,6 +1180,7 @@ fun NoteEditorScreen(
                         }
                     }
                 }
+            }
             }
 
             // Note Content Editor Area
@@ -1849,54 +1863,58 @@ fun NoteEditorScreen(
                     }
                 }
 
-                HorizontalDivider(color = MindBorderDark.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 2.dp))
+                if (canUseRichText || canUseHashtags || canUseChecklists) {
+                    HorizontalDivider(color = MindBorderDark.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 2.dp))
+                }
 
                 val bodyFontSize = (MaterialTheme.typography.bodyLarge.fontSize.value * editorNoteScale).sp
                 val bodyLineHeight = (bodyFontSize.value * activeLineSpacing).sp
 
-                // View Mode Pill: Live Rich Editor vs MS Word Document View
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (isWordPreviewMode) "MS Word Document View (Formatted)" else "Journal Body (Rich Text)",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MindTextTertiary
-                    )
-
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isWordPreviewMode) PastelLavender.copy(alpha = 0.25f) else MindGlassButtonContainer,
-                        border = BorderStroke(1.dp, if (isWordPreviewMode) PastelLavender else MindGlassButtonBorder),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { isWordPreviewMode = !isWordPreviewMode }
+                // View Mode Pill: Live Rich Editor vs MS Word Document View (Only when Rich Text enabled)
+                if (canUseRichText) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Text(
+                            text = if (isWordPreviewMode) "MS Word Document View (Formatted)" else "Journal Body (Rich Text)",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MindTextTertiary
+                        )
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isWordPreviewMode) PastelLavender.copy(alpha = 0.25f) else MindGlassButtonContainer,
+                            border = BorderStroke(1.dp, if (isWordPreviewMode) PastelLavender else MindGlassButtonBorder),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { isWordPreviewMode = !isWordPreviewMode }
                         ) {
-                            Icon(
-                                imageVector = if (isWordPreviewMode) Icons.Default.Edit else Icons.Default.Visibility,
-                                contentDescription = null,
-                                tint = if (isWordPreviewMode) PastelLavender else MindTextPrimary,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = if (isWordPreviewMode) "Edit Mode" else "Word View",
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isWordPreviewMode) PastelLavender else MindTextPrimary
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (isWordPreviewMode) Icons.Default.Edit else Icons.Default.Visibility,
+                                    contentDescription = null,
+                                    tint = if (isWordPreviewMode) PastelLavender else MindTextPrimary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text(
+                                    text = if (isWordPreviewMode) "Edit Mode" else "Word View",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isWordPreviewMode) PastelLavender else MindTextPrimary
+                                )
+                            }
                         }
                     }
                 }
 
-                if (isWordPreviewMode) {
+                if (canUseRichText && isWordPreviewMode) {
                     // MS Word Document View: zero raw markdown punctuation!
                     Card(
                         modifier = Modifier
@@ -1920,7 +1938,10 @@ fun NoteEditorScreen(
                         }
                     }
                 } else {
-                    // Markdown Body Field (Selection-Aware & Real-time Styled!)
+                    // Journal Body Field (Plain simple text at Level 0; Live Markdown at Level 1+)
+                    val markdownTransform = remember(bodyFontSize) {
+                        MarkdownVisualTransformation(baseFontSizeSp = bodyFontSize.value)
+                    }
                     TextField(
                         value = contentValue,
                         onValueChange = { newValue ->
@@ -1930,8 +1951,10 @@ fun NoteEditorScreen(
                             canUndo = undoRedoManager.canUndo
                             canRedo = undoRedoManager.canRedo
                         },
-                        visualTransformation = remember(bodyFontSize) {
-                            MarkdownVisualTransformation(baseFontSizeSp = bodyFontSize.value)
+                        visualTransformation = if (canUseRichText) {
+                            markdownTransform
+                        } else {
+                            androidx.compose.ui.text.input.VisualTransformation.None
                         },
                         placeholder = {
                             Text(

@@ -85,6 +85,7 @@ fun NoteDetailScreen(
     }
 
     val ladderState = LocalLadderState.current
+    val showRichText = ladderState.isEnabled(CapabilityLadderManager.FEATURE_RICH_TEXT)
     val showVersionHistory = ladderState.isEnabled(CapabilityLadderManager.FEATURE_VERSION_HISTORY)
     val showBiometrics = ladderState.isEnabled(CapabilityLadderManager.FEATURE_BIOMETRIC_LOCK)
     val showTypography = ladderState.isEnabled(CapabilityLadderManager.FEATURE_TYPOGRAPHY)
@@ -705,16 +706,29 @@ fun NoteDetailScreen(
                             val lineSpacing = LocalLineSpacingMultiplier.current
                             val bodyFontSize = (MaterialTheme.typography.bodyLarge.fontSize.value * noteScale).sp
                             val bodyLineHeight = (bodyFontSize.value * lineSpacing).sp
-                            RichTextView(
-                                text = note.content,
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontSize = bodyFontSize,
-                                    lineHeight = bodyLineHeight,
-                                    fontFamily = noteFont
-                                ),
-                                color = MindTextPrimary,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            if (showRichText) {
+                                RichTextView(
+                                    text = note.content,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontSize = bodyFontSize,
+                                        lineHeight = bodyLineHeight,
+                                        fontFamily = noteFont
+                                    ),
+                                    color = MindTextPrimary,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            } else {
+                                Text(
+                                    text = note.content,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontSize = bodyFontSize,
+                                        lineHeight = bodyLineHeight,
+                                        fontFamily = noteFont
+                                    ),
+                                    color = MindTextPrimary,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
 
@@ -1314,8 +1328,8 @@ fun NoteDetailScreen(
         }
     }
 
-    // Version History & Diff Viewer Dialog
-    if (showVersionHistoryDialog && note != null) {
+    // Version History & Diff Viewer Dialog (Time Machine Level 3+)
+    if (showVersionHistory && showVersionHistoryDialog && note != null) {
         NoteVersionHistoryDialog(
             currentTitle = note.title,
             currentContent = note.content,

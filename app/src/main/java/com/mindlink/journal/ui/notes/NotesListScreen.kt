@@ -117,9 +117,20 @@ fun NotesListScreen(
         viewModel.checkForOtaUpdates(context)
     }
 
-    // Evaluate progressive capability unlocks based on thought volume
-    LaunchedEffect(uiState.notes.size) {
-        capabilityManager.evaluateProgress(uiState.notes.size)
+    // Evaluate progressive capability unlocks & intelligent suggestions based on note content
+    LaunchedEffect(uiState.notes) {
+        capabilityManager.evaluateProgress(uiState.notes)
+    }
+
+    val ladderIntroPrefs = remember {
+        context.getSharedPreferences("mindlink_capability_ladder", android.content.Context.MODE_PRIVATE)
+    }
+    var showProgressiveIntroBanner by remember {
+        mutableStateOf(!ladderIntroPrefs.getBoolean("pref_seen_progressive_intro_v1", false))
+    }
+    fun markIntroSeen() {
+        ladderIntroPrefs.edit().putBoolean("pref_seen_progressive_intro_v1", true).apply()
+        showProgressiveIntroBanner = false
     }
 
     // Non-interruptive toast when a new complexity level unlocks
@@ -302,8 +313,16 @@ fun NotesListScreen(
     // First-Time User Onboarding Modal
     if (uiState.showOnboarding) {
         MindLinkOnboardingDialog(
-            onDismiss = { viewModel.dismissOnboarding() },
+            onDismiss = {
+                viewModel.dismissOnboarding()
+                markIntroSeen()
+            },
             onLoadSamples = { viewModel.loadSampleThoughtsAndDismiss() },
+            onOpenBlueprint = {
+                viewModel.dismissOnboarding()
+                markIntroSeen()
+                onComplexityLadderClick()
+            },
             onGoogleSignIn = {
                 val chooser = serviceLocator.googleSyncManager.getAccountChooserIntent()
                 if (chooser != null) {
@@ -655,6 +674,43 @@ fun NotesListScreen(
                         },
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
+
+                    // Quick 1-Tap Selectable Level Strip inside Drawer (L0..L5)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        CapabilityLadderManager.TIERS.forEach { lvl ->
+                            val isSelected = ladderState.currentTier == lvl.tier
+                            val accent = Color(lvl.accentHex)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) accent.copy(alpha = 0.25f) else MindGlassSurfaceVariant,
+                                border = BorderStroke(
+                                    width = if (isSelected) 1.3.dp else 0.7.dp,
+                                    color = if (isSelected) accent else MindGlassBorderSubtle
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { capabilityManager.selectActiveLevel(lvl.tier) }
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.padding(vertical = 5.dp)
+                                ) {
+                                    Text(
+                                        text = "L${lvl.tier}",
+                                        fontSize = 10.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                        color = if (isSelected) accent else MindTextSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     if (ladderState.currentTier >= 2 || ladderState.activeNotesCount >= 5) {
                         NavigationDrawerItem(
@@ -1489,8 +1545,208 @@ fun NotesListScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // 1. Notes Stream with Active ViewMode
-            if (uiState.filteredNotes.isEmpty()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // One-Time Post-Install Blueprint Overview Banner
+                AnimatedVisibility(
+                    visible = showProgressiveIntroBanner && !uiState.showOnboarding && uiState.selectedTab == NotesTab.JOURNAL,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MindIndigo.copy(alpha = 0.14f),
+                        border = BorderStroke(1.dp, PastelLavender.copy(alpha = 0.45f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Text("🌿", fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "MindLink Grows With You (L0 – L5)",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MindTextPrimary
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { markIntroSeen() },
+                                    modifier = Modifier.size(22.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = MindTextTertiary, modifier = Modifier.size(15.dp))
+                                }
+                            }
+
+                            Text(
+                                text = "All 23 features (Checklists, Tags, Photos, Voice, Lock, Cloud Vault, Memory Oracle & Edge AI) are built in. Start calm at Level 0 (just + note & follow-up), progress feature-by-feature via occasional smart suggestions, or toggle any level manually in Settings or the Drawer.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MindTextSecondary,
+                                fontSize = 11.5.sp,
+                                lineHeight = 16.sp
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (ladderState.currentTier > 0) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            capabilityManager.selectActiveLevel(0)
+                                            markIntroSeen()
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = BorderStroke(1.dp, PastelMint.copy(alpha = 0.6f)),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = PastelMint),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text("Switch to L0 Simple", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Button(
+                                    onClick = {
+                                        markIntroSeen()
+                                        onComplexityLadderClick()
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MindIndigo),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text("Open Blueprint", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                                TextButton(
+                                    onClick = { markIntroSeen() },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text("Got it", fontSize = 11.sp, color = MindTextTertiary)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Intelligent Feature-by-Feature Suggestion Banner (Shown once in a while)
+                val activeSuggestion = ladderState.activeSuggestion
+                AnimatedVisibility(
+                    visible = activeSuggestion != null && !showProgressiveIntroBanner && !uiState.showOnboarding && uiState.selectedTab == NotesTab.JOURNAL,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    activeSuggestion?.let { suggestion ->
+                        val sAccent = Color(suggestion.accentHex)
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = sAccent.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, sAccent.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                        Text(suggestion.featureIcon, fontSize = 16.sp)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = sAccent.copy(alpha = 0.22f)
+                                        ) {
+                                            Text(
+                                                text = "Smart Suggestion · Level ${suggestion.targetLevel}",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = sAccent,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    IconButton(
+                                        onClick = { capabilityManager.dismissSuggestion(suggestion) },
+                                        modifier = Modifier.size(22.dp)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = MindTextTertiary, modifier = Modifier.size(15.dp))
+                                    }
+                                }
+
+                                Text(
+                                    text = suggestion.headline,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MindTextPrimary
+                                )
+
+                                Text(
+                                    text = suggestion.reason,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MindTextSecondary,
+                                    fontSize = 11.5.sp,
+                                    lineHeight = 16.sp
+                                )
+
+                                Text(
+                                    text = "Skip if: ${suggestion.drawback}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MindTextTertiary,
+                                    fontSize = 10.5.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(2.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = { capabilityManager.acceptSuggestionFeature(suggestion) },
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = sAccent, contentColor = Color(0xFF0B0F19)),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text("Add ${suggestion.featureTitle}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    if (ladderState.currentTier < suggestion.targetLevel) {
+                                        OutlinedButton(
+                                            onClick = { capabilityManager.acceptSuggestionLevel(suggestion) },
+                                            shape = RoundedCornerShape(10.dp),
+                                            border = BorderStroke(0.8.dp, sAccent.copy(alpha = 0.6f)),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = sAccent),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Text("Unlock L${suggestion.targetLevel}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    TextButton(
+                                        onClick = { capabilityManager.dismissSuggestion(suggestion) },
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text("Not Now", fontSize = 11.sp, color = MindTextTertiary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    // 1. Notes Stream with Active ViewMode
+                    if (uiState.filteredNotes.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1701,6 +1957,8 @@ fun NotesListScreen(
                     }
                 }
             }
+            } // End Box around stream
+            } // End Column (Banners + Stream)
 
             // 2. Ambient Drop Shadow below the All(39) horizontal bar so scrolling looks naturally going under
             Box(
